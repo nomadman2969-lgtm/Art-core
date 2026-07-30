@@ -1,0 +1,138 @@
+{
+  "theme": "dark",
+  "mood": "Editorial + moody with pops of color. Brooklyn art zine meets high-end gallery.",
+  "typography": {
+    "headings": {
+      "font_family": "Gloock",
+      "import_url": "https://fonts.googleapis.com/css2?family=Gloock&display=swap",
+      "weights": ["400"],
+      "usage": "H1, H2, large expressive quotes, brand wordmarks. Never use for small UI elements.",
+      "tailwind_class": "font-serif"
+    },
+    "body": {
+      "font_family": "Outfit",
+      "import_url": "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap",
+      "weights": ["300", "400", "500", "600"],
+      "usage": "Body text, UI elements, navigation, dashboard data.",
+      "tailwind_class": "font-sans"
+    },
+    "scale": {
+      "h1": "text-5xl md:text-7xl tracking-tighter leading-none",
+      "h2": "text-3xl md:text-5xl tracking-tight leading-tight",
+      "h3": "text-2xl md:text-3xl tracking-tight",
+      "body": "text-base md:text-lg text-zinc-300 leading-relaxed",
+      "labels": "text-xs uppercase tracking-[0.2em] text-zinc-500"
+    }
+  },
+  "colors": {
+    "backgrounds": {
+      "primary": "#050505",
+      "secondary": "#0A0A0A",
+      "surface": "#121212"
+    },
+    "text": {
+      "primary": "#F4F4F5",
+      "secondary": "#A1A1AA",
+      "muted": "#52525B"
+    },
+    "accents": {
+      "magenta": "#FF00FF",
+      "neon_pink": "#FF1493",
+      "electric_blue": "#00FFFF",
+      "splash_yellow": "#FFD700"
+    },
+    "rules": "Deep black backgrounds. Magenta/pink/blue/yellow accents used sparingly and boldly. Avoid AI-slop purple gradients on white. Never use pure #000000."
+  },
+  "layouts": {
+    "spacing": "Generous spacing philosophy. Use p-8, p-12, p-24, p-32. Containers with borders must have internal padding.",
+    "grids": "Mode A (Tetris Grid/Masonry) for marketing/gallery pages to emphasize editorial feel. Mode B (High Density) for dashboards.",
+    "alignment": "Strong asymmetric layouts. Avoid center-everything disease. Left-align text blocks, offset images.",
+    "hero": "Max overlay opacity bg-black/50 for hero images to keep artwork visible."
+  },
+  "visual_enhancers": {
+    "borders": "1px solid #27272A (zinc-800) for subtle separation. Grid borders for technical dashboard look.",
+    "effects": "Subtle grain texture overlay on dark backgrounds. High-end glassmorphism (backdrop-blur-xl bg-black/60) for sticky headers ONLY.",
+    "images": "Art-first hierarchy. Images should be massive, unconstrained by standard e-commerce boxes."
+  },
+  "components": {
+    "marketing_pages": "Custom HTML/Tailwind for Home, Gallery, Portfolios. Staggered masonry grids. Editorial typography.",
+    "dashboards": "Shadcn components heavily customized for a brutalist dark mode look. Flat solid surfaces instead of glass.",
+    "buttons": "Sharp rectangular edges or subtle pill-shaped. High contrast hover states (e.g., hover:bg-zinc-100 hover:text-black). Accents used for primary CTAs.",
+    "navigation": "Sticky header with backdrop-blur. Custom 'Monster' wordmark in bold Gloock. Links visible on desktop, no transparent backgrounds without blur."
+  },
+  "motion": {
+    "transitions": "Smooth micro-interactions. Hover states on all interactive elements. DO NOT use generic `transition-all`.",
+    "animations": "Subtle parallax on scroll. Staggered fade-ins for gallery items."
+  },
+  "accessibility": {
+    "contrast": "Ensure 4.5:1 ratio for standard text. Text over images must have gradient or shadow.",
+    "focus": "Clear focus rings with accent colors (e.g., focus:ring-2 focus:ring-magenta).",
+    "testing": "All interactive elements MUST have data-testid attributes."
+  },
+  "image_urls": {
+    "artworks": [
+      {
+        "url": "https://images.unsplash.com/photo-1628388726680-048fa8176bc7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHw0fHxhYnN0cmFjdCUyMHBhaW50aW5nJTIwbmVvbiUyMHBpbmslMjBibGFja3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Neon pink and black abstract painting"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1602450069437-d52c62f52a71?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMHBhaW50aW5nJTIwbmVvbiUyMHBpbmslMjBibGFja3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Vibrant abstract shapes"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1544733422-251e532ca221?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMHBhaW50aW5nJTIwYmx1ZSUyMHllbGxvd3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Blue, orange, and gray abstract art"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1618331833071-ce81bd50d300?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMHBhaW50aW5nJTIwYmx1ZSUyMHllbGxvd3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Blue, white, and yellow abstract"
+      }
+    ],
+    "founder_and_gallery": [
+      {
+        "url": "https://images.unsplash.com/photo-1656657447800-ed397d4128b5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NDh8MHwxfHNlYXJjaHwyfHxicm9va2x5biUyMGFydGlzdCUyMGluJTIwc3R1ZGlvfGVufDB8fHx8MTc4NTQ1MTg2OHww&ixlib=rb-4.1.0&q=85",
+        "description": "Brooklyn artist (Monster) portrait"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1784202318366-35fd82271209?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwyfHx0d28lMjBjYXRzJTIwc2xlZXBpbmclMjBvbiUyMHJ1Z3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Two cats in a sunlit room/rug"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1518998053901-5348d3961a04?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBhcnQlMjBnYWxsZXJ5JTIwZXhoaWJpdGlvbnxlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Modern art gallery exhibition space"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1606819717115-9159c900370b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBhcnQlMjBnYWxsZXJ5JTIwZXhoaWJpdGlvbnxlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Woman standing in front of gallery paintings"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Design a hybrid fullstack UI merging an editorial art gallery aesthetic with e-commerce features (House of Monster).",
+    "Apply 'Gloock' for oversized serif headings and 'Outfit' for clean body copy. Inject both using Tailwind config or standard CSS imports.",
+    "Enforce a dark theme primarily (#050505 or #0a0a0c) avoiding completely black (#000000) or 'AI-slop purple'.",
+    "Use asymmetric bento/masonry grid structures. Stop centering everything.",
+    "Create a standout 'Founder Story' section highlighting the founder 'Monster', Brooklyn roots, and two cats. Use provided imagery.",
+    "Implement Shadcn UI for the Cart, Stripe checkout, Artist Upload Dashboard, and Admin Commission Config. Strip 'Vercel-look' defaults in favor of brutalist dark mode styles.",
+    "Introduce splashes of bold color (magenta, pink, yellow, blue) on key accents, badges, or 'Art of the Week' spotlight highlights.",
+    "Ensure the 'Monster' custom wordmark leverages the Gloock font.",
+    "Never use pure transparent backgrounds under headers/overlays; use backdrop-blur glassmorphism.",
+    "Use .js file extensions, not .tsx where applicable."
+  ],
+  "universal_guidelines_for_main_agent": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: transition: all. Always add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Use sonner for toasts from /app/src/components/ui/sonner.js",
+    "All interactive and key informational elements MUST include a data-testid attribute."
+  ]
+}
