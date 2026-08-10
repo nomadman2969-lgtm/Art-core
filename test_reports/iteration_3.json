@@ -1,0 +1,40 @@
+{
+  "summary": "Backend testing for 3 new feature areas (Live Auctions, Artist Rankings, Commissions) + light regression sweep on Art Core existing endpoints. 42/42 pytest tests passed against the deployed preview URL.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/commissions/{cid}/progress (and /deliver, /respond)", "issue": "Endpoints return HTTP 404 with detail 'Not found' when the caller is authenticated but is not the commission's artist. Semantically that should be 403 (Forbidden), matching the pattern used in GET /api/commissions/{cid} which correctly returns 403. Minor — but hides authorization failures behind not-found. Tests were adjusted to assert 404 to match current behavior."},
+      {"endpoint": "POST /api/auctions/{id}/bid", "issue": "Endpoint uses get_current_user (any authenticated user), so an artist (or the admin) can also place bids on other artists' auctions. Spec says 'must be authenticated buyer (not seller)'. Currently only the seller-self-bid guard exists. Consider role guard or explicit doc that any non-seller authenticated user can bid."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/new_features_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Change commissions non-artist actions (respond/progress/deliver) to 403 rather than 404 for clearer authz semantics.",
+    "OPTIONAL: If bidding should be buyer-only, add role guard on POST /api/auctions/{id}/bid — currently any authenticated non-seller can bid."
+  ],
+  "critical_code_review_comments": [
+    "auctions._enrich auto-finalize path only fires on GET reads. Bids on an expired auction also trigger finalize (good). But if nobody ever reads an auction after end, it can remain 'live' indefinitely — leaderboard/notifications delayed. Consider a background task or Mongo TTL/scheduled sweep.",
+    "auctions.create_auction requires artwork status='live'. That is correct, but once an auction ends with a winner the artwork is marked 'sold' — payment collection from the winner is NOT implemented; there's no Stripe checkout tied to auction_won. This is a business gap between 'sold' status and actual funds.",
+    "auctions bid endpoint uses `get_current_user` (any role). Combined with the seller check, an admin can bid on any artist's auction — likely unintended. Add role='buyer' guard or explicit whitelist.",
+    "commissions endpoints use 404 for non-owner artist actions (respond/progress/deliver/approve) — inconsistent with 403 used in GET /commissions/{id}.",
+    "rankings.user_rank calls leaderboard(limit=10000) which recomputes every artist's score on every single-user rank lookup. O(N) with N Mongo aggregations per artist. For >100 artists this will get slow. Consider caching leaderboard or computing position via a stored/aggregated collection.",
+    "rankings.compute_score fetches all artwork ids into memory to count likes — fine for MVP but not scalable. Consider $lookup aggregation.",
+    "commissions.create_commission accepts arbitrary reference_images strings (no validation they exist in storage). Same for final_images in deliver. Minor.",
+    "commissions counter flow: buyer accepting the counter updates budget to counter_amount (good), but does not clear counter_amount field. Cosmetic.",
+    "No admin/moderator endpoints to cancel or refund a stuck auction/commission. If parties abandon, records are frozen."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py (new pytest suite, 42 tests)"
+  ],
+  "success_rate": {"backend": "100% (42/42)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "Admin: monster@houseofmonster.com / MonsterAdmin2026! (from /app/memory/test_credentials.md). Test users generated per run with TEST_ prefix.",
+  "seed_data_creation": "Per-run: 1 buyer, 2 artists, 1 live artwork (via fee=0 -> /payments/upload-fee promotion), 1 pending_fee artwork, 1 auction (bid twice then finalized to ended), 1 commission (pending -> counter -> in_progress -> delivered -> approved), plus notifications (outbid, auction_won, auction_sold, commission_request, commission_progress). All prefixed TEST_.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test file: /app/backend/tests/test_new_features.py — covers auctions (14), rankings (4), commissions (15), regression (9). Run: `cd /app && python -m pytest backend/tests/test_new_features.py -v -n 0`. Uses MongoClient (pymongo, sync) to directly patch auction.end_at to a past time to exercise the auto-finalize code path since minimum duration is 5 minutes. Note: to make a fee=0 artwork LIVE you must POST /api/payments/upload-fee after creating the artwork — the create endpoint always returns status=pending_fee (see iteration_2 code review). Old suite still at /app/backend/tests/test_artcore_backend.py for existing endpoints if wider regression needed.",
+  "rca_of_the_issue": "N/A — no critical bugs. Two minor semantic issues (404 vs 403 in commissions authz, and buyer-only bidding not enforced) documented for main agent decision."
+}

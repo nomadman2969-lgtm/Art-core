@@ -40,7 +40,6 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 - `/api/artists` + `/api/artists/{id}` — portfolios
 - `/api/payments/checkout` — Stripe buyer checkout
 - `/api/payments/upload-fee` — Stripe artist fee
-- `/api/payments/status/{sid}` + `/api/stripe/webhook`
 - `/api/admin/*` — settings, featured, aotw, orders, mentorship, stats, artists
 - `/api/artist/*` — dashboard, connect/start, connect/complete
 - `/api/users/{id}/follow` + `/social` — social graph
@@ -50,7 +49,28 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 - `/api/search` — artworks + artists
 - `/api/feed` — explore feed with enrichment
 - `/api/newsletter` — public signup
-- Admin auto-seeded on startup: monster@houseofmonster.com
+- `/api/auctions` — create, list, detail, bid, bids, mine, auto-finalize with winner + outbid notifications
+- `/api/rankings` — tiers, leaderboard, per-user score with position
+- `/api/commissions` — create, mine, detail, respond (accept/decline/counter), buyer-action, progress, deliver, approve
+
+### Frontend (React) — Live routes
+- `/`, `/explore`, `/marketplace`, `/artwork/:id`, `/artists`, `/artist/:id`, `/search`
+- `/login`, `/register`, `/cart`, `/payment/success`, `/payment/cancel`
+- `/messages`, `/messages/:userId`, `/dashboard` (buyer)
+- `/studio`, `/studio/upload` (artist)
+- `/admin` (admin, 7 tabs)
+- `/auctions`, `/auctions/new`, `/auctions/:id` — bidding room with countdown + polling
+- `/rankings` — full leaderboard with tier legend + rank badges
+- `/commissions`, `/commissions/new/:artistId`, `/commissions/:id` — full workflow
+
+### Coming Soon (stubs)
+- `/events` (geolocation, RSVP)
+- `/notifications` (unified notification feed)
+- `/studio-custom` (profile themes)
+
+### Testing
+- Iteration 2: 54/54 (Core Art Core rebrand)
+- Iteration 3: 42/42 (Auctions + Rankings + Commissions)
 
 ### Frontend (React)
 - Layout with glassy nav, search, cart badge, unread messages badge

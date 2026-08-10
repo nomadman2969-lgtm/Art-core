@@ -26,7 +26,8 @@ export default function Layout({ children }) {
     { to: "/explore", label: "Explore", testid: "nav-explore" },
     { to: "/marketplace", label: "Marketplace", testid: "nav-marketplace" },
     { to: "/artists", label: "Artists", testid: "nav-artists" },
-    { to: "/auctions", label: "Auctions", testid: "nav-auctions", badge: "Soon" },
+    { to: "/auctions", label: "Auctions", testid: "nav-auctions" },
+    { to: "/rankings", label: "Rankings", testid: "nav-rankings" },
     { to: "/events", label: "Events", testid: "nav-events", badge: "Soon" },
   ];
 
@@ -87,6 +88,7 @@ export default function Layout({ children }) {
                 {user.role === "admin" && <Link to="/admin" data-testid="nav-admin" className="label-caps hover:text-[#CCFF00]">Admin</Link>}
                 {(user.role === "artist" || user.role === "admin") && <Link to="/studio" data-testid="nav-studio" className="label-caps hover:text-[#CCFF00]">Studio</Link>}
                 {user.role === "buyer" && <Link to="/dashboard" data-testid="nav-dashboard" className="label-caps hover:text-[#CCFF00]">Dashboard</Link>}
+                <Link to="/commissions" data-testid="nav-commissions" className="label-caps hover:text-[#CCFF00]">Commissions</Link>
                 <button data-testid="logout-btn" onClick={() => { logout(); nav("/"); }} className="label-caps hover:text-[#FF4D4D]">Logout</button>
               </div>
             ) : (

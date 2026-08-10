@@ -19,6 +19,9 @@ import BuyerDashboard from "@/pages/BuyerDashboard";
 import { MessagesInbox, MessageThread } from "@/pages/Messages";
 import Search from "@/pages/Search";
 import ComingSoon from "@/pages/ComingSoon";
+import { AuctionsList, AuctionDetail, CreateAuction } from "@/pages/Auctions";
+import Rankings from "@/pages/Rankings";
+import { CommissionsInbox, CommissionCreate, CommissionDetail } from "@/pages/Commissions";
 
 function RequireRole({ roles, children }) {
   const { user, loading } = useAuth();
@@ -64,22 +67,17 @@ function App() {
                 <Route path="/admin" element={<RequireRole roles={["admin"]}><AdminDashboard /></RequireRole>} />
 
                 {/* Coming soon stubs */}
-                <Route path="/auctions" element={<ComingSoon title="Live Auctions" accent="#7C3AED"
-                  tagline="Real-time bidding. Live countdowns. Watch pieces you love — win the ones you can't live without."
-                  description="Auctions will feature real-time countdowns, live bid updates, auction chat, and winning notifications. Sellers set reserve prices; buyers watch, bid, and win from anywhere."
-                  icon={<Gavel size={20} className="text-[#7C3AED]" />} />} />
-                <Route path="/commissions" element={<ComingSoon title="Commissions" accent="#CCFF00"
-                  tagline="Custom work, made to order. Chat with artists as they build it."
-                  description="Request custom artwork with reference images, budget, deadline, size, and style. Artists accept, counter-offer, or negotiate. Track progress with photos until final delivery."
-                  icon={<Palette size={20} className="text-[#CCFF00]" />} />} />
+                <Route path="/auctions" element={<AuctionsList />} />
+                <Route path="/auctions/new" element={<RequireRole roles={["artist", "admin"]}><CreateAuction /></RequireRole>} />
+                <Route path="/auctions/:id" element={<AuctionDetail />} />
+                <Route path="/rankings" element={<Rankings />} />
+                <Route path="/commissions" element={<RequireAuth><CommissionsInbox /></RequireAuth>} />
+                <Route path="/commissions/new/:artistId" element={<RequireAuth><CommissionCreate /></RequireAuth>} />
+                <Route path="/commissions/:id" element={<RequireAuth><CommissionDetail /></RequireAuth>} />
                 <Route path="/events" element={<ComingSoon title="Events" accent="#FF4D4D"
                   tagline="Openings, festivals, pop-ups — near you."
                   description="Discover gallery openings, art festivals, street fairs, pop-up markets, live painting events, and meetups near you. RSVP, buy tickets, save events."
                   icon={<MapPin size={20} className="text-[#FF4D4D]" />} />} />
-                <Route path="/rankings" element={<ComingSoon title="Rankings" accent="#CCFF00"
-                  tagline="Bronze to legendary. Earn your rank."
-                  description="Artists rise through Bronze, Silver, Gold, Platinum, Diamond, and Legendary tiers based on sales, followers, community engagement, and consistency. Global and local leaderboards."
-                  icon={<Trophy size={20} className="text-[#CCFF00]" />} />} />
                 <Route path="/notifications" element={<ComingSoon title="Notifications" accent="#7C3AED"
                   tagline="Every like, comment, sale — in one place."
                   description="Get notified on likes, comments, sales, messages, commission requests, auction updates, new followers, event reminders, and order updates."

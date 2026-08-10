@@ -131,14 +131,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* LIVE AUCTIONS PROMO (Coming soon) */}
+      {/* LIVE FEATURES PROMO */}
       <section className="max-w-[1600px] mx-auto px-6 md:px-12 py-24">
         <div className="grid md:grid-cols-2 gap-8">
           <PromoBlock
             testid="promo-auctions"
-            kicker="Coming Soon"
+            kicker="Live Now"
             title="Live Auctions"
-            desc="Real-time bidding. Live countdowns. Auction chat. Watch pieces you love — win the ones you can't live without."
+            desc="Real-time bidding. Live countdowns. Watch pieces you love — win the ones you can't live without."
             to="/auctions"
             icon={<Gavel />}
             accent="#7C3AED"
@@ -146,7 +146,7 @@ export default function Home() {
           />
           <PromoBlock
             testid="promo-commissions"
-            kicker="Coming Soon"
+            kicker="Live Now"
             title="Commissions"
             desc="Request custom work. Set a budget, a deadline, a vibe. Chat with artists as they build it."
             to="/commissions"

@@ -4,7 +4,8 @@ import { api, fileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { ArtCard } from "../components/ArtCard";
 import { toast } from "sonner";
-import { UserPlus, UserCheck, MessageCircle, MapPin } from "lucide-react";
+import { UserPlus, UserCheck, MessageCircle, MapPin, Palette } from "lucide-react";
+import { RankBadge } from "./Rankings";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -50,9 +51,11 @@ export function ArtistPortfolio() {
   const { user } = useAuth();
   const [artist, setArtist] = useState(null);
   const [social, setSocial] = useState(null);
+  const [rank, setRank] = useState(null);
   const loadAll = () => {
     api.get(`/artists/${id}`).then((r) => setArtist(r.data));
     api.get(`/users/${id}/social`).then((r) => setSocial(r.data));
+    api.get(`/rankings/${id}`).then((r) => setRank(r.data)).catch(() => {});
   };
   useEffect(loadAll, [id]);
 
@@ -90,7 +93,15 @@ export function ArtistPortfolio() {
           <div className="flex items-center gap-2 mt-2 label-caps">
             <MapPin size={12} /> Brooklyn, NY
           </div>
-          <div className="flex gap-3 mt-6">
+          {rank && (
+            <div className="mt-4 flex items-center gap-3">
+              <RankBadge tier={rank.tier} color={rank.tier_color} />
+              <div className="label-caps">
+                <span className="text-[#CCFF00]">{rank.score}</span> pts · #{rank.position} of {rank.total_artists}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-3 mt-6">
             {user?.id !== artist.id && (
               <button data-testid="follow-btn" onClick={toggleFollow}
                 className={social?.is_following ? "btn-ghost" : "btn-lime"}>
@@ -100,6 +111,11 @@ export function ArtistPortfolio() {
             {user && user.id !== artist.id && (
               <button data-testid="message-btn" onClick={() => nav(`/messages/${artist.id}`)} className="btn-ghost">
                 <MessageCircle size={14} className="mr-2" /> Message
+              </button>
+            )}
+            {user && user.id !== artist.id && (
+              <button data-testid="commission-btn" onClick={() => nav(`/commissions/new/${artist.id}`)} className="btn-violet">
+                <Palette size={14} className="mr-2" /> Request Commission
               </button>
             )}
           </div>

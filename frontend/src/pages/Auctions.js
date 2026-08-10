@@ -1,0 +1,284 @@
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { api, fileUrl } from "../api";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
+import { Gavel, Clock, TrendingUp, Trophy } from "lucide-react";
+
+const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+
+function useCountdown(endIso) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, new Date(endIso) - new Date()));
+  useEffect(() => {
+    const t = setInterval(() => setRemaining(Math.max(0, new Date(endIso) - new Date())), 1000);
+    return () => clearInterval(t);
+  }, [endIso]);
+  const sec = Math.floor(remaining / 1000);
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return { d, h, m, s, done: remaining === 0 };
+}
+
+function CountdownBadge({ endIso, small }) {
+  const { d, h, m, s, done } = useCountdown(endIso);
+  if (done) return <div className={`badge-coral ${small ? "" : "!text-sm !px-3 !py-1.5"}`}>Ended</div>;
+  const cls = small ? "font-anton text-lg" : "font-anton text-3xl md:text-5xl";
+  return (
+    <div className="flex items-baseline gap-2" data-testid="countdown">
+      {d > 0 && <><span className={cls}>{d}</span><span className="label-caps">d</span></>}
+      <span className={cls}>{String(h).padStart(2, "0")}</span><span className="label-caps">h</span>
+      <span className={cls}>{String(m).padStart(2, "0")}</span><span className="label-caps">m</span>
+      <span className={cls}>{String(s).padStart(2, "0")}</span><span className="label-caps">s</span>
+    </div>
+  );
+}
+
+export function AuctionsList() {
+  const [live, setLive] = useState([]);
+  const [ended, setEnded] = useState([]);
+  const [tab, setTab] = useState("live");
+  useEffect(() => {
+    api.get("/auctions?status=live").then((r) => setLive(r.data));
+    api.get("/auctions?status=ended").then((r) => setEnded(r.data));
+    const t = setInterval(() => {
+      api.get("/auctions?status=live").then((r) => setLive(r.data));
+    }, 5000);
+    return () => clearInterval(t);
+  }, []);
+  const list = tab === "live" ? live : ended;
+  return (
+    <div data-testid="auctions-page" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-16 pb-32">
+      <div className="mb-8">
+        <div className="label-caps text-[#7C3AED]"><Gavel size={12} className="inline mr-2" /> Bidding Room</div>
+        <h1 className="font-anton text-6xl md:text-9xl uppercase mt-4 leading-[0.85]">Auctions</h1>
+        <p className="text-zinc-400 mt-4 max-w-xl">Real-time bidding. When the clock runs out, the highest bid wins.</p>
+      </div>
+      <div className="flex gap-1 border-b border-white/8 mb-10">
+        {[["live", `Live (${live.length})`], ["ended", `Ended (${ended.length})`]].map(([k, l]) => (
+          <button key={k} data-testid={`auction-tab-${k}`} onClick={() => setTab(k)}
+            className={`label-caps px-4 py-3 border-b-2 ${tab === k ? "border-[#CCFF00] text-white" : "border-transparent text-zinc-500"}`}>{l}</button>
+        ))}
+      </div>
+      {list.length === 0 ? (
+        <div className="border border-dashed border-white/10 py-24 text-center label-caps text-zinc-500 rounded-sm">
+          {tab === "live" ? "No live auctions right now." : "No completed auctions yet."}
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {list.map((a) => <AuctionCard key={a.id} a={a} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AuctionCard({ a }) {
+  const { done } = useCountdown(a.end_at);
+  return (
+    <Link to={`/auctions/${a.id}`} data-testid={`auction-card-${a.id}`}
+      className="block border border-white/8 hover-lift-card group bg-[#121214] rounded-sm">
+      <div className="aspect-[4/3] overflow-hidden bg-black relative">
+        <img src={resolveImg(a.artwork?.images?.[0])} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
+        <div className="absolute top-3 left-3 badge-violet">Live · {a.bid_count} bids</div>
+        {done && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><div className="badge-coral !text-sm !px-4 !py-2">Ending...</div></div>}
+      </div>
+      <div className="p-5">
+        <div className="font-unbounded font-semibold text-lg">{a.artwork?.title}</div>
+        <div className="text-xs text-zinc-500 mt-1">by {a.seller?.name}</div>
+        <div className="flex items-baseline justify-between mt-4">
+          <div>
+            <div className="label-caps">Current bid</div>
+            <div className="font-anton text-3xl text-[#CCFF00] mt-1">${Number(a.current_bid || a.start_price).toLocaleString()}</div>
+          </div>
+          <div className="text-right">
+            <div className="label-caps">Ends in</div>
+            <div className="mt-1"><CountdownBadge endIso={a.end_at} small /></div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export function AuctionDetail() {
+  const { id } = useParams();
+  const nav = useNavigate();
+  const { user } = useAuth();
+  const [a, setA] = useState(null);
+  const [bids, setBids] = useState([]);
+  const [amount, setAmount] = useState("");
+  const [placing, setPlacing] = useState(false);
+
+  const load = () => {
+    api.get(`/auctions/${id}`).then((r) => { setA(r.data); }).catch(() => nav("/auctions"));
+    api.get(`/auctions/${id}/bids`).then((r) => setBids(r.data));
+  };
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [id]);
+
+  const placeBid = async (e) => {
+    e.preventDefault();
+    if (!user) { toast("Sign in to bid"); return; }
+    setPlacing(true);
+    try {
+      await api.post(`/auctions/${id}/bid`, { amount: Number(amount) });
+      toast.success("Bid placed");
+      setAmount("");
+      load();
+    } catch (er) { toast.error(er?.response?.data?.detail || "Bid failed"); }
+    setPlacing(false);
+  };
+
+  if (!a) return <div className="py-32 text-center label-caps text-zinc-500">Loading...</div>;
+  const isSeller = user?.id === a.seller_id;
+  const minNext = Math.max(a.start_price, (a.current_bid || 0) + 1);
+  const isWinning = user?.id === a.current_bidder_id;
+  const iWon = a.status === "ended" && a.winner_id === user?.id;
+
+  return (
+    <div data-testid="auction-detail" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-12 pb-32">
+      <div className="grid md:grid-cols-12 gap-10">
+        <div className="md:col-span-7">
+          <div className="aspect-[4/3] bg-black overflow-hidden border border-white/8 rounded-sm">
+            <img src={resolveImg(a.artwork?.images?.[0])} alt="" className="w-full h-full object-cover" />
+          </div>
+          <div className="mt-4">
+            <div className="label-caps text-[#7C3AED]">Auctioning</div>
+            <div className="font-anton text-4xl mt-2">{a.artwork?.title}</div>
+            <div className="text-sm text-zinc-500 mt-1">by <Link to={`/artist/${a.seller?.id}`} className="text-[#CCFF00]">{a.seller?.name}</Link></div>
+          </div>
+        </div>
+
+        <div className="md:col-span-5">
+          <div className="glass-card p-6 rounded-sm">
+            {a.status === "live" ? (
+              <>
+                <div className="label-caps text-[#7C3AED]">Ends in</div>
+                <div className="mt-2"><CountdownBadge endIso={a.end_at} /></div>
+              </>
+            ) : (
+              <div className="badge-coral">Auction Ended</div>
+            )}
+            <div className="mt-8 border-t border-white/8 pt-6">
+              <div className="label-caps">Current bid</div>
+              <div className="font-anton text-6xl text-[#CCFF00] mt-2">${Number(a.current_bid || a.start_price).toLocaleString()}</div>
+              <div className="text-xs text-zinc-500 mt-2">
+                {a.bid_count} bid{a.bid_count === 1 ? "" : "s"} · Start ${Number(a.start_price).toLocaleString()}
+                {a.reserve_price > 0 && ` · Reserve $${Number(a.reserve_price).toLocaleString()}`}
+              </div>
+              {a.current_bidder_name && (
+                <div className="mt-3 label-caps">
+                  Leading: <span className={isWinning ? "text-[#CCFF00]" : "text-white"}>{a.current_bidder_name}</span>
+                  {isWinning && <span className="ml-2 text-[#CCFF00]">← you</span>}
+                </div>
+              )}
+            </div>
+
+            {a.status === "live" && !isSeller && (
+              <form onSubmit={placeBid} className="mt-6">
+                <div className="label-caps mb-2">Your bid (min ${minNext.toLocaleString()})</div>
+                <div className="flex gap-2">
+                  <input data-testid="bid-input" type="number" min={minNext} step="1" required
+                    value={amount} onChange={(e) => setAmount(e.target.value)}
+                    className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none focus:border-[#CCFF00] font-unbounded" />
+                  <button data-testid="bid-submit" disabled={placing} className="btn-lime">
+                    {placing ? "..." : "Bid"}
+                  </button>
+                </div>
+              </form>
+            )}
+            {isSeller && a.status === "live" && <div className="mt-6 label-caps text-zinc-500">You're the seller.</div>}
+            {iWon && (
+              <div className="mt-6 p-4 border border-[#CCFF00] rounded-sm bg-[#CCFF00]/5" data-testid="winner-banner">
+                <div className="badge-lime"><Trophy size={12} className="inline mr-1" /> You won</div>
+                <div className="text-sm mt-3">Congrats. Art Core will coordinate delivery.</div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 glass-card p-6 rounded-sm">
+            <div className="label-caps mb-4 flex items-center gap-2"><TrendingUp size={12} /> Bid History</div>
+            {bids.length === 0 ? <div className="text-zinc-500 text-sm">No bids yet.</div> : (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {bids.map((b) => (
+                  <div key={b.id} data-testid={`bid-${b.id}`} className="flex justify-between text-sm py-2 border-b border-white/5">
+                    <div>{b.user_name}</div>
+                    <div className="font-anton text-[#CCFF00]">${Number(b.amount).toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function CreateAuction() {
+  const nav = useNavigate();
+  const { user } = useAuth();
+  const [artworks, setArtworks] = useState([]);
+  const [form, setForm] = useState({ artwork_id: "", start_price: 100, reserve_price: 0, duration_minutes: 60 });
+  useEffect(() => {
+    api.get("/artworks/mine").then((r) => setArtworks(r.data.filter((a) => a.status === "live")));
+  }, []);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.artwork_id) { toast.error("Pick an artwork"); return; }
+    try {
+      const r = await api.post("/auctions", {
+        ...form,
+        start_price: Number(form.start_price),
+        reserve_price: Number(form.reserve_price),
+        duration_minutes: Number(form.duration_minutes),
+      });
+      toast.success("Auction live");
+      nav(`/auctions/${r.data.id}`);
+    } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
+  };
+  return (
+    <div data-testid="create-auction" className="max-w-2xl mx-auto px-6 pt-16 pb-32">
+      <div className="label-caps text-[#7C3AED]"><Gavel size={12} className="inline mr-2" /> New Auction</div>
+      <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-10">Launch Auction</h1>
+      <form onSubmit={submit} className="space-y-5">
+        <label className="block">
+          <div className="label-caps mb-2">Artwork (live only)</div>
+          <select data-testid="auction-artwork" value={form.artwork_id} onChange={(e) => setForm({ ...form, artwork_id: e.target.value })} required
+            className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none">
+            <option value="">— Select —</option>
+            {artworks.map((a) => <option key={a.id} value={a.id}>{a.title} (${a.price})</option>)}
+          </select>
+          {artworks.length === 0 && <div className="text-xs text-zinc-500 mt-2">You need at least one live artwork. <Link to="/studio/upload" className="text-[#CCFF00]">Upload one</Link></div>}
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Start price (USD)</div>
+          <input data-testid="auction-start-price" type="number" min="1" required value={form.start_price} onChange={(e) => setForm({ ...form, start_price: e.target.value })}
+            className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none" />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Reserve price (0 = none)</div>
+          <input data-testid="auction-reserve-price" type="number" min="0" value={form.reserve_price} onChange={(e) => setForm({ ...form, reserve_price: e.target.value })}
+            className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none" />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Duration</div>
+          <select data-testid="auction-duration" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
+            className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none">
+            <option value={15}>15 minutes</option>
+            <option value={60}>1 hour</option>
+            <option value={60 * 24}>24 hours</option>
+            <option value={60 * 24 * 3}>3 days</option>
+            <option value={60 * 24 * 7}>7 days</option>
+          </select>
+        </label>
+        <button data-testid="auction-submit" className="btn-lime mt-6">Launch Live Auction</button>
+      </form>
+    </div>
+  );
+}

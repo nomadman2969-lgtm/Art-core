@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Gavel } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -53,8 +53,9 @@ export function ArtistDashboard() {
           <div className="label-caps text-[#CCFF00]">Studio</div>
           <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4">Hey, {user?.name}.</h1>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button data-testid="edit-profile" onClick={() => setProfileOpen(!profileOpen)} className="btn-ghost">Edit Profile</button>
+          <Link data-testid="new-auction-btn" to="/auctions/new" className="btn-violet"><Gavel size={14} className="mr-2" /> Launch Auction</Link>
           <Link data-testid="new-artwork-btn" to="/studio/upload" className="btn-lime"><Plus size={14} className="mr-2" /> New Artwork</Link>
         </div>
       </div>
