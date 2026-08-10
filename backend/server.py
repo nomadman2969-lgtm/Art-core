@@ -22,6 +22,7 @@ from search import router as search_router
 from auctions import router as auctions_router
 from rankings import router as rankings_router
 from commissions import router as commissions_router
+from studio import router as studio_router, posts_router
 from storage import init_storage
 
 app = FastAPI(title="Art Core")
@@ -38,6 +39,8 @@ app.include_router(search_router)
 app.include_router(auctions_router)
 app.include_router(rankings_router)
 app.include_router(commissions_router)
+app.include_router(studio_router)
+app.include_router(posts_router)
 
 
 @app.get("/api/")

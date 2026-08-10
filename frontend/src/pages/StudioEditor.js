@@ -1,0 +1,526 @@
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { api, fileUrl, ORIGIN } from "../api";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
+import { Plus, Gavel, Sparkles, Eye, Palette as PaletteIcon, GripVertical, Trash2, ExternalLink } from "lucide-react";
+
+const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+
+export function StudioEditor() {
+  const { user, refresh } = useAuth();
+  const nav = useNavigate();
+  const [tab, setTab] = useState("overview");
+  const [dashboard, setDashboard] = useState(null);
+  const [artworks, setArtworks] = useState([]);
+  const [config, setConfig] = useState(null);
+  const [themes, setThemes] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  const loadAll = async () => {
+    api.get("/artist/dashboard").then((r) => setDashboard(r.data));
+    api.get("/artworks/mine").then((r) => setArtworks(r.data));
+    api.get(`/studio/${user.id}`).then((r) => setConfig(r.data.config));
+    api.get("/studio/themes").then((r) => setThemes(r.data));
+    api.get("/studio/analytics/me").then((r) => setAnalytics(r.data));
+  };
+  useEffect(() => { if (user) loadAll(); }, [user]);
+
+  const saveConfig = async (patch) => {
+    const next = { ...config, ...patch };
+    setConfig(next);
+    setDirty(true);
+    try {
+      await api.patch("/studio", patch);
+      setDirty(false);
+    } catch { toast.error("Save failed"); }
+  };
+
+  const runAI = async () => {
+    if (!aiPrompt.trim()) return;
+    setAiBusy(true);
+    try {
+      const r = await api.post("/studio/ai-design", { prompt: aiPrompt });
+      const c = r.data.config;
+      const nextSections = (config.sections || []).map((s) => ({
+        ...s, title: c.section_titles?.[s.kind] || s.title,
+      }));
+      await saveConfig({
+        theme: c.theme, accent_color: c.accent_color, lighting: c.lighting,
+        typography: c.typography, sections: nextSections,
+      });
+      toast.success("Studio redesigned");
+    } catch (er) { toast.error(er?.response?.data?.detail || "AI failed"); }
+    setAiBusy(false);
+  };
+
+  const payFee = async (id) => {
+    try {
+      const r = await api.post("/payments/upload-fee", { artwork_id: id, origin_url: ORIGIN });
+      if (r.data.free) { toast.success("Live!"); loadAll(); return; }
+      window.location.href = r.data.checkout_url;
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  const submitAotw = async (id) => {
+    try { await api.post(`/artworks/${id}/submit-aotw`); toast.success("Submitted"); loadAll(); }
+    catch { toast.error("Only live artworks can be submitted"); }
+  };
+
+  if (!user || !config || !dashboard) return <div className="py-32 text-center label-caps text-zinc-500">Loading Studio...</div>;
+
+  const tabs = [
+    ["overview", "Overview"],
+    ["theme", "Theme & Look"],
+    ["sections", "Sections"],
+    ["story", "My Story"],
+    ["posts", "Posts"],
+    ["artworks", "Artworks"],
+    ["analytics", "Analytics"],
+    ["payouts", "Payouts"],
+  ];
+
+  return (
+    <div data-testid="studio-editor" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-14 pb-32">
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+        <div>
+          <div className="label-caps text-[#CCFF00]"><PaletteIcon size={12} className="inline mr-2" /> Studio Editor</div>
+          <h1 className="font-anton text-5xl md:text-7xl uppercase mt-3">Hey, {user.name}.</h1>
+          <div className="text-zinc-500 text-sm mt-2">Customize your studio · Visitors see the live version. {dirty && <span className="text-[#F5A623] ml-2">saving...</span>}</div>
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <Link to={`/artist/${user.id}`} data-testid="view-studio" className="btn-ghost"><Eye size={14} className="mr-2" /> View Public Studio</Link>
+          <Link to="/auctions/new" className="btn-violet"><Gavel size={14} className="mr-2" /> Launch Auction</Link>
+          <Link to="/studio/upload" data-testid="new-artwork-btn" className="btn-lime"><Plus size={14} className="mr-2" /> New Artwork</Link>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1 mb-10 border-b border-white/8 overflow-x-auto">
+        {tabs.map(([k, l]) => (
+          <button key={k} data-testid={`tab-${k}`} onClick={() => setTab(k)}
+            className={`label-caps text-xs px-4 py-3 border-b-2 whitespace-nowrap ${tab === k ? "border-[#CCFF00] text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}>{l}</button>
+        ))}
+      </div>
+
+      {/* OVERVIEW */}
+      {tab === "overview" && (
+        <div className="grid md:grid-cols-4 gap-4 mb-12">
+          <Stat label="Live listings" value={dashboard.listings.live} accent="#FFFFFF" />
+          <Stat label="Sold" value={dashboard.listings.sold} accent="#CCFF00" />
+          <Stat label="Pending fee" value={dashboard.listings.pending_fee} accent="#FF4D4D" />
+          <Stat label="Net earnings" value={`$${dashboard.total_net.toLocaleString()}`} accent="#7C3AED" />
+        </div>
+      )}
+      {tab === "overview" && (
+        <>
+          <SectionH title="Studio Design AI">
+            <div className="glass-card p-6 rounded-sm">
+              <div className="label-caps mb-3 text-[#CCFF00]"><Sparkles size={12} className="inline mr-2" /> Describe your studio</div>
+              <div className="flex gap-2">
+                <input data-testid="ai-prompt" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="e.g. Dark underground graffiti gallery with neon lime"
+                  className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none focus:border-[#CCFF00]" />
+                <button data-testid="ai-run" disabled={aiBusy || !aiPrompt.trim()} onClick={runAI} className="btn-lime">
+                  {aiBusy ? "Designing..." : "Redesign"}
+                </button>
+              </div>
+              <div className="text-xs text-zinc-500 mt-3">Powered by Claude · Instantly restyles your theme, accent, lighting, and section titles.</div>
+            </div>
+          </SectionH>
+          <div className="mt-10 grid md:grid-cols-2 gap-4">
+            <Link to={`/artist/${user.id}`} className="glass-card p-8 rounded-sm hover-lift-card block">
+              <div className="label-caps text-[#CCFF00]">Preview</div>
+              <div className="font-anton text-3xl mt-2">See your live studio →</div>
+            </Link>
+            <button onClick={() => setTab("theme")} className="glass-card p-8 rounded-sm hover-lift-card text-left">
+              <div className="label-caps text-[#7C3AED]">Design</div>
+              <div className="font-anton text-3xl mt-2">Change theme →</div>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* THEME */}
+      {tab === "theme" && (
+        <div className="space-y-10">
+          <SectionH title="Theme">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {themes.map((t) => (
+                <button key={t.id} data-testid={`theme-${t.id}`} onClick={() => saveConfig({ theme: t.id })}
+                  className={`relative aspect-[4/3] overflow-hidden border rounded-sm text-left ${config.theme === t.id ? "border-[#CCFF00]" : "border-white/10"} hover:border-[#CCFF00] transition-colors`}>
+                  {t.bg_url ? <img src={t.bg_url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" /> : <div className="absolute inset-0 bg-gradient-to-br from-[#0A0A0C] to-[#1A1A1E]" />}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
+                  <div className="relative h-full flex flex-col justify-end p-4">
+                    <div className="font-anton text-xl uppercase">{t.name}</div>
+                    <div className="w-6 h-1 mt-1" style={{ background: t.accent }} />
+                    {config.theme === t.id && <div className="badge-lime absolute top-2 right-2">Active</div>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </SectionH>
+
+          <SectionH title="Accent Color">
+            <div className="flex flex-wrap gap-3 items-center">
+              {["#CCFF00", "#7C3AED", "#FF4D4D", "#00E5FF", "#F5A623", "#FF6EC7", "#D4AF37", "#FFFFFF"].map((c) => (
+                <button key={c} data-testid={`accent-${c}`} onClick={() => saveConfig({ accent_color: c })}
+                  className={`w-10 h-10 rounded-sm border-2 ${config.accent_color === c ? "border-white" : "border-white/20"}`}
+                  style={{ background: c }} />
+              ))}
+              <input type="color" data-testid="accent-picker" value={config.accent_color || "#CCFF00"}
+                onChange={(e) => saveConfig({ accent_color: e.target.value })}
+                className="w-10 h-10 rounded-sm bg-transparent border border-white/20 cursor-pointer" />
+            </div>
+          </SectionH>
+
+          <SectionH title="Lighting">
+            <div className="grid md:grid-cols-3 gap-3">
+              {["gallery", "spotlight", "neon", "warm", "cool", "ambient"].map((p) => (
+                <button key={p} data-testid={`lighting-${p}`}
+                  onClick={() => saveConfig({ lighting: { ...config.lighting, preset: p } })}
+                  className={`p-4 border rounded-sm text-left ${config.lighting?.preset === p ? "border-[#CCFF00]" : "border-white/10 hover:border-white/30"}`}>
+                  <div className="font-unbounded uppercase text-sm">{p}</div>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4">
+              <div className="label-caps mb-2">Intensity ({config.lighting?.intensity ?? 70}%)</div>
+              <input data-testid="lighting-intensity" type="range" min="20" max="100" value={config.lighting?.intensity ?? 70}
+                onChange={(e) => saveConfig({ lighting: { ...config.lighting, intensity: Number(e.target.value) } })}
+                className="w-full accent-[#CCFF00]" />
+            </div>
+          </SectionH>
+
+          <SectionH title="AI Designer">
+            <div className="glass-card p-6 rounded-sm">
+              <div className="label-caps mb-3 text-[#CCFF00]"><Sparkles size={12} className="inline mr-2" /> Describe the vibe</div>
+              <div className="flex gap-2">
+                <input data-testid="ai-prompt-theme" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="Cyberpunk digital gallery with cyan neon and glitchy titles..."
+                  className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none focus:border-[#CCFF00]" />
+                <button disabled={aiBusy || !aiPrompt.trim()} onClick={runAI} className="btn-lime">
+                  {aiBusy ? "Designing..." : "Redesign"}
+                </button>
+              </div>
+            </div>
+          </SectionH>
+        </div>
+      )}
+
+      {/* SECTIONS */}
+      {tab === "sections" && (
+        <SectionsEditor config={config} save={saveConfig} />
+      )}
+
+      {/* STORY */}
+      {tab === "story" && (
+        <StoryEditor config={config} save={saveConfig} user={user} refresh={refresh} />
+      )}
+
+      {/* POSTS */}
+      {tab === "posts" && (
+        <PostsEditor userId={user.id} />
+      )}
+
+      {/* ARTWORKS */}
+      {tab === "artworks" && (
+        <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
+          {artworks.length === 0 ? (
+            <div className="text-zinc-500 py-16 label-caps text-center">No artworks yet. <Link to="/studio/upload" className="text-[#CCFF00] ml-2">Upload →</Link></div>
+          ) : artworks.map((a) => (
+            <div key={a.id} data-testid={`my-art-${a.id}`} className="p-4 flex flex-wrap items-center gap-4">
+              <img src={resolveImg(a.images?.[0])} className="w-16 h-16 object-cover rounded-sm" alt="" />
+              <div className="flex-1 min-w-[200px]">
+                <div className="font-unbounded text-lg font-semibold">{a.title}</div>
+                <div className="label-caps mt-1">${Number(a.price).toLocaleString()} · <span className={
+                  a.status === "live" ? "text-[#CCFF00]" : a.status === "sold" ? "text-[#7C3AED]" : "text-[#FF4D4D]"
+                }>{a.status}</span></div>
+              </div>
+              {a.status === "pending_fee" && <button data-testid={`pay-fee-${a.id}`} onClick={() => payFee(a.id)} className="btn-lime">Pay Fee to List</button>}
+              {a.status === "live" && !a.aotw_submitted && <button onClick={() => submitAotw(a.id)} className="btn-ghost">Submit Feature</button>}
+              {a.aotw && <div className="badge-lime">Featured ★</div>}
+              <Link to={`/artwork/${a.id}`} className="label-caps hover:text-[#CCFF00]"><ExternalLink size={12} className="inline" /></Link>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ANALYTICS */}
+      {tab === "analytics" && analytics && (
+        <div className="space-y-8">
+          <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <Stat label="Studio visits" value={analytics.visits} accent="#CCFF00" />
+            <Stat label="Followers" value={analytics.followers} accent="#7C3AED" />
+            <Stat label="Total likes" value={analytics.total_likes} accent="#FF4D4D" />
+            <Stat label="Sales" value={analytics.sales} accent="#00E5FF" />
+            <Stat label="Revenue" value={`$${analytics.revenue.toLocaleString()}`} accent="#F5A623" />
+            <Stat label="Artworks" value={analytics.artworks_count} accent="#FFFFFF" />
+          </div>
+          <SectionH title="Top artworks by likes">
+            {analytics.top_artworks.length === 0 ? (
+              <div className="text-zinc-500 label-caps py-8 text-center">No liked artworks yet.</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {analytics.top_artworks.map((a) => (
+                  <Link key={a.id} to={`/artwork/${a.id}`} className="border border-white/8 rounded-sm hover-lift-card block">
+                    <img src={resolveImg(a.images?.[0])} className="w-full aspect-square object-cover" alt="" />
+                    <div className="p-3">
+                      <div className="font-unbounded text-sm truncate">{a.title}</div>
+                      <div className="label-caps mt-1 text-[#FF4D4D]">♥ {a.likes}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </SectionH>
+        </div>
+      )}
+
+      {/* PAYOUTS */}
+      {tab === "payouts" && (
+        <PayoutsPanel dashboard={dashboard} refresh={loadAll} refreshUser={refresh} />
+      )}
+    </div>
+  );
+}
+
+function SectionH({ title, children }) {
+  return (
+    <div>
+      <div className="label-caps mb-4">{title}</div>
+      {children}
+    </div>
+  );
+}
+function Stat({ label, value, accent }) {
+  return (
+    <div className="glass-card p-5 rounded-sm">
+      <div className="label-caps">{label}</div>
+      <div className="font-anton text-4xl mt-3" style={{ color: accent }}>{value}</div>
+    </div>
+  );
+}
+
+// ---------- Sections editor ----------
+const SECTION_KINDS = [
+  { kind: "featured_works", label: "Featured Works" },
+  { kind: "available_now", label: "Available Now" },
+  { kind: "sold_works", label: "Sold Works" },
+  { kind: "upcoming_auctions", label: "Live Auctions" },
+  { kind: "feed", label: "Studio Feed" },
+  { kind: "story", label: "My Story" },
+  { kind: "commission", label: "Commission Me" },
+  { kind: "custom", label: "Custom Section" },
+];
+
+function SectionsEditor({ config, save }) {
+  const sections = config.sections || [];
+  const move = (i, dir) => {
+    const arr = [...sections];
+    const j = i + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    arr.forEach((s, idx) => (s.order = idx));
+    save({ sections: arr });
+  };
+  const update = (id, patch) => {
+    const arr = sections.map((s) => (s.id === id ? { ...s, ...patch } : s));
+    save({ sections: arr });
+  };
+  const remove = (id) => save({ sections: sections.filter((s) => s.id !== id) });
+  const add = (kind) => {
+    const label = SECTION_KINDS.find((k) => k.kind === kind)?.label || "New Section";
+    const s = { id: `s-${Date.now()}`, kind, title: label, order: sections.length, visible: true };
+    save({ sections: [...sections, s] });
+  };
+  return (
+    <div>
+      <div className="border border-white/8 rounded-sm divide-y divide-white/8 mb-8">
+        {sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s, i) => (
+          <div key={s.id} data-testid={`section-row-${s.id}`} className="p-4 flex flex-wrap items-center gap-3">
+            <GripVertical size={14} className="text-zinc-500" />
+            <div className="label-caps text-zinc-500 w-32 flex-shrink-0">{s.kind}</div>
+            <input value={s.title} onChange={(e) => update(s.id, { title: e.target.value })}
+              className="flex-1 min-w-[180px] bg-transparent border-b border-white/10 focus:border-[#CCFF00] px-2 py-1 outline-none" />
+            <label className="label-caps flex items-center gap-2">
+              <input type="checkbox" checked={s.visible !== false} onChange={(e) => update(s.id, { visible: e.target.checked })} /> Visible
+            </label>
+            <button onClick={() => move(i, -1)} className="label-caps hover:text-[#CCFF00]">↑</button>
+            <button onClick={() => move(i, 1)} className="label-caps hover:text-[#CCFF00]">↓</button>
+            <button onClick={() => remove(s.id)} className="text-zinc-500 hover:text-[#FF4D4D]"><Trash2 size={14} /></button>
+          </div>
+        ))}
+      </div>
+      <div className="label-caps mb-3">Add a section</div>
+      <div className="flex flex-wrap gap-2">
+        {SECTION_KINDS.map((k) => (
+          <button key={k.kind} data-testid={`add-section-${k.kind}`} onClick={() => add(k.kind)} className="btn-ghost !py-2 !text-xs">+ {k.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Story editor ----------
+function StoryEditor({ config, save, user, refresh }) {
+  const [story, setStory] = useState(config.artist_story || {});
+  const [bio, setBio] = useState(user.bio || "");
+  const patch = (k, v) => setStory({ ...story, [k]: v });
+  const saveAll = async () => {
+    await save({ artist_story: story });
+    await api.patch("/auth/me", { bio });
+    await refresh();
+    toast.success("Story saved");
+  };
+  const F = ({ label, field, ...rest }) => (
+    <label className="block">
+      <div className="label-caps mb-2">{label}</div>
+      <input value={story[field] || ""} onChange={(e) => patch(field, e.target.value)}
+        className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2.5 outline-none focus:border-[#CCFF00]" {...rest} />
+    </label>
+  );
+  return (
+    <div className="space-y-5 max-w-3xl">
+      <label className="block">
+        <div className="label-caps mb-2">Bio (shown at top of your Studio)</div>
+        <textarea data-testid="bio-input" value={bio} onChange={(e) => setBio(e.target.value)} rows={4}
+          className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
+      </label>
+      <div className="grid md:grid-cols-2 gap-4">
+        <F label="Location" field="location" />
+        <F label="Style" field="style" placeholder="Abstract, street, mixed media..." />
+        <F label="Active since (year)" field="years_active" />
+        <F label="Education" field="education" />
+        <F label="Exhibitions" field="exhibitions" />
+        <F label="Awards" field="awards" />
+      </div>
+      <label className="block">
+        <div className="label-caps mb-2">Influences / Inspiration</div>
+        <textarea value={story.influences || ""} onChange={(e) => patch("influences", e.target.value)} rows={3}
+          className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
+      </label>
+      <div className="grid md:grid-cols-3 gap-4">
+        <F label="Website" field="website" placeholder="https://" />
+        <F label="Instagram" field="instagram" placeholder="@handle" />
+        <F label="Twitter / X" field="twitter" placeholder="@handle" />
+      </div>
+      <button data-testid="save-story" onClick={saveAll} className="btn-lime mt-4">Save Story</button>
+    </div>
+  );
+}
+
+// ---------- Posts editor ----------
+function PostsEditor({ userId }) {
+  const [text, setText] = useState("");
+  const [kind, setKind] = useState("update");
+  const [image, setImage] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [posts, setPosts] = useState([]);
+  const load = () => api.get(`/posts?artist_id=${userId}`).then((r) => setPosts(r.data));
+  useEffect(load, []);
+
+  const uploadImage = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setUploading(true);
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setImage(r.data.path);
+    } catch { toast.error("Upload failed"); }
+    setUploading(false);
+  };
+  const post = async () => {
+    if (!text.trim()) return;
+    try {
+      await api.post("/posts", { text, kind, image });
+      setText(""); setImage(null); toast.success("Posted"); load();
+    } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
+  };
+  const del = async (id) => {
+    if (!confirm("Delete?")) return;
+    await api.delete(`/posts/${id}`); load();
+  };
+  const pin = async (p) => { await api.patch(`/posts/${p.id}/pin`, { pinned: !p.pinned }); load(); };
+  return (
+    <div className="max-w-3xl space-y-8">
+      <div className="glass-card p-6 rounded-sm">
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <select data-testid="post-kind" value={kind} onChange={(e) => setKind(e.target.value)} className="bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2">
+            <option value="update">Update</option>
+            <option value="wip">Work in progress</option>
+            <option value="studio_photo">Studio photo</option>
+            <option value="announcement">Announcement</option>
+            <option value="auction">Auction</option>
+            <option value="sold">Sold</option>
+          </select>
+          <div><input type="file" accept="image/*" onChange={uploadImage} className="text-xs" /></div>
+        </div>
+        <textarea data-testid="post-text" value={text} onChange={(e) => setText(e.target.value)} rows={4}
+          placeholder="What's happening in the studio?" className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
+        {image && <img src={fileUrl(image)} className="mt-3 w-40 rounded-sm" alt="" />}
+        {uploading && <div className="text-xs text-[#CCFF00] mt-2">Uploading...</div>}
+        <button data-testid="post-create" onClick={post} className="btn-lime mt-4">Publish</button>
+      </div>
+      <div className="space-y-3">
+        {posts.map((p) => (
+          <div key={p.id} className="border border-white/8 rounded-sm p-4">
+            <div className="flex justify-between items-center mb-2">
+              <div className="label-caps">{p.pinned && "📌 "}{p.kind} · {new Date(p.created_at).toLocaleDateString()}</div>
+              <div className="flex gap-2">
+                <button onClick={() => pin(p)} className="label-caps hover:text-[#CCFF00]">{p.pinned ? "Unpin" : "Pin"}</button>
+                <button onClick={() => del(p.id)} className="label-caps hover:text-[#FF4D4D]">Delete</button>
+              </div>
+            </div>
+            <div className="text-zinc-200 whitespace-pre-wrap">{p.text}</div>
+            {p.image && <img src={resolveImg(p.image)} className="mt-3 w-64 rounded-sm" alt="" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Payouts panel ----------
+function PayoutsPanel({ dashboard, refresh, refreshUser }) {
+  const startConnect = async () => {
+    const r = await api.post("/artist/connect/start");
+    window.open(r.data.onboarding_url, "_blank");
+  };
+  const completeConnect = async () => {
+    await api.post("/artist/connect/complete"); await refreshUser(); refresh();
+    toast.success("Stripe Connect linked");
+  };
+  return (
+    <div className="space-y-8 max-w-3xl">
+      <div className="glass-card p-8 rounded-sm">
+        <div className="label-caps">Stripe Connect Status</div>
+        <div className="mt-2 text-sm text-zinc-300">Current: <span className="text-[#CCFF00]" data-testid="connect-status">{dashboard.stripe_connect_status}</span></div>
+        <div className="flex flex-wrap gap-3 mt-6">
+          {dashboard.stripe_connect_status !== "connected" ? (
+            <>
+              <button data-testid="connect-start" onClick={startConnect} className="btn-lime">Start Onboarding</button>
+              <button data-testid="connect-complete" onClick={completeConnect} className="btn-ghost">I've completed it</button>
+            </>
+          ) : <div className="text-[#CCFF00] font-unbounded">Ready for payouts.</div>}
+        </div>
+      </div>
+      <div>
+        <div className="label-caps mb-3">Recent Payouts</div>
+        {dashboard.payouts.length === 0 ? <div className="text-zinc-500 label-caps">No payouts yet.</div> : (
+          <div className="border border-white/8 divide-y divide-white/8 text-sm rounded-sm">
+            {dashboard.payouts.slice(0, 10).map((p, i) => (
+              <div key={i} className="p-4 flex justify-between items-center">
+                <div className="text-zinc-400">{new Date(p.created_at).toLocaleDateString()}</div>
+                <div className="font-anton text-xl">${p.net.toFixed(2)} <span className="text-zinc-500 text-xs font-manrope">of ${p.gross.toFixed(2)}</span></div>
+                <div className="label-caps text-[#CCFF00]">{p.status}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

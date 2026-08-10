@@ -10,10 +10,12 @@ import Home from "@/pages/Home";
 import Explore from "@/pages/Explore";
 import Marketplace from "@/pages/Gallery";
 import ArtworkDetail from "@/pages/ArtworkDetail";
-import { ArtistsList, ArtistPortfolio } from "@/pages/Artists";
+import { ArtistsList } from "@/pages/Artists";
+import { ArtistStudioPage } from "@/pages/ArtistStudio";
+import { StudioEditor } from "@/pages/StudioEditor";
 import { Login, Register } from "@/pages/Auth";
 import { Cart, PaymentSuccess, PaymentCancel } from "@/pages/Cart";
-import { ArtistDashboard, UploadArtwork } from "@/pages/Artist";
+import { UploadArtwork } from "@/pages/Artist";
 import AdminDashboard from "@/pages/Admin";
 import BuyerDashboard from "@/pages/BuyerDashboard";
 import { MessagesInbox, MessageThread } from "@/pages/Messages";
@@ -52,7 +54,7 @@ function App() {
                 <Route path="/marketplace" element={<Marketplace />} />
                 <Route path="/artwork/:id" element={<ArtworkDetail />} />
                 <Route path="/artists" element={<ArtistsList />} />
-                <Route path="/artist/:id" element={<ArtistPortfolio />} />
+                <Route path="/artist/:id" element={<ArtistStudioPage />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
@@ -62,7 +64,7 @@ function App() {
                 <Route path="/messages" element={<RequireAuth><MessagesInbox /></RequireAuth>} />
                 <Route path="/messages/:userId" element={<RequireAuth><MessageThread /></RequireAuth>} />
                 <Route path="/dashboard" element={<RequireAuth><BuyerDashboard /></RequireAuth>} />
-                <Route path="/studio" element={<RequireRole roles={["artist", "admin"]}><ArtistDashboard /></RequireRole>} />
+                <Route path="/studio" element={<RequireRole roles={["artist", "admin"]}><StudioEditor /></RequireRole>} />
                 <Route path="/studio/upload" element={<RequireRole roles={["artist", "admin"]}><UploadArtwork /></RequireRole>} />
                 <Route path="/admin" element={<RequireRole roles={["admin"]}><AdminDashboard /></RequireRole>} />
 

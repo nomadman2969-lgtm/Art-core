@@ -34,43 +34,28 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 ## Implemented (Feb 10, 2026)
 
 ### Backend (FastAPI + MongoDB)
-- `/api/auth/*` — register, login, me, patch me
-- `/api/upload/image` + `/api/files/{path}` — Emergent object storage
-- `/api/artworks` — CRUD + filters, aotw endpoints
-- `/api/artists` + `/api/artists/{id}` — portfolios
-- `/api/payments/checkout` — Stripe buyer checkout
-- `/api/payments/upload-fee` — Stripe artist fee
-- `/api/admin/*` — settings, featured, aotw, orders, mentorship, stats, artists
-- `/api/artist/*` — dashboard, connect/start, connect/complete
-- `/api/users/{id}/follow` + `/social` — social graph
-- `/api/artworks/{id}/like` + `/likes` — likes
-- `/api/artworks/{id}/comments` + delete — comments
-- `/api/messages/*` — DMs (threads, thread/{id}, send, unread-count)
-- `/api/search` — artworks + artists
-- `/api/feed` — explore feed with enrichment
-- `/api/newsletter` — public signup
-- `/api/auctions` — create, list, detail, bid, bids, mine, auto-finalize with winner + outbid notifications
-- `/api/rankings` — tiers, leaderboard, per-user score with position
-- `/api/commissions` — create, mine, detail, respond (accept/decline/counter), buyer-action, progress, deliver, approve
+- Auth, artworks, payments, admin, artist dashboard (v1)
+- Social layer: follows, likes, comments, feed
+- Messages, search
+- Auctions, rankings, commissions
+- **Studio system (NEW)**: `/api/studio/themes`, `/api/studio/{artist_id}`, PATCH `/api/studio`, `/api/studio/analytics/me`, `POST /api/studio/ai-design` (Claude Sonnet 4.6)
+- **Studio Posts (NEW)**: `/api/posts` CRUD + pin + like
 
 ### Frontend (React) — Live routes
-- `/`, `/explore`, `/marketplace`, `/artwork/:id`, `/artists`, `/artist/:id`, `/search`
-- `/login`, `/register`, `/cart`, `/payment/success`, `/payment/cancel`
-- `/messages`, `/messages/:userId`, `/dashboard` (buyer)
-- `/studio`, `/studio/upload` (artist)
-- `/admin` (admin, 7 tabs)
-- `/auctions`, `/auctions/new`, `/auctions/:id` — bidding room with countdown + polling
-- `/rankings` — full leaderboard with tier legend + rank badges
-- `/commissions`, `/commissions/new/:artistId`, `/commissions/:id` — full workflow
-
-### Coming Soon (stubs)
-- `/events` (geolocation, RSVP)
-- `/notifications` (unified notification feed)
-- `/studio-custom` (profile themes)
+- Home, Explore, Marketplace, Artwork detail, Artists list, Search
+- Auth, Cart, Payment success/cancel
+- Messages inbox + thread, Buyer dashboard
+- Auctions list + detail + create
+- Rankings leaderboard
+- Commissions inbox + create + detail
+- **Artist Studio** (`/artist/:id`): immersive themed page with header, follow/message/commission CTAs, live auction rails, artwork walls, social feed, story block, commission CTA
+- **Studio Editor** (`/studio`): tabs for Overview, Theme & Look (7 themes, accent picker, lighting presets, AI designer), Sections (reorder/rename/toggle), My Story (bio, location, style, education, awards, socials), Posts (Facebook-style timeline), Artworks, Analytics (visits, likes, top artworks, revenue), Payouts
+- Coming Soon: /events, /notifications, /studio-custom
 
 ### Testing
-- Iteration 2: 54/54 (Core Art Core rebrand)
-- Iteration 3: 42/42 (Auctions + Rankings + Commissions)
+- Iteration 2: 54/54 (Core Art Core)
+- Iteration 3: 42/42 (Auctions, Rankings, Commissions)
+- Iteration 4: 35/35 (Studio + Posts + AI Designer)
 
 ### Frontend (React)
 - Layout with glassy nav, search, cart badge, unread messages badge
