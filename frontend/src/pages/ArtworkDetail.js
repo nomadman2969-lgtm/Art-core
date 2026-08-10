@@ -1,0 +1,144 @@
+import React, { useEffect, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { api, fileUrl } from "../api";
+import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
+import { Share2, Heart, MessageCircle, Send } from "lucide-react";
+
+const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+
+export default function ArtworkDetail() {
+  const { id } = useParams();
+  const [art, setArt] = useState(null);
+  const [idx, setIdx] = useState(0);
+  const [likes, setLikes] = useState({ count: 0, liked: false });
+  const [comments, setComments] = useState([]);
+  const [comment, setComment] = useState("");
+  const { add, items } = useCart();
+  const { user } = useAuth();
+  const nav = useNavigate();
+
+  const loadAll = () => {
+    api.get(`/artworks/${id}`).then((r) => setArt(r.data)).catch(() => nav("/marketplace"));
+    api.get(`/artworks/${id}/likes`).then((r) => setLikes(r.data));
+    api.get(`/artworks/${id}/comments`).then((r) => setComments(r.data));
+  };
+  useEffect(loadAll, [id]);
+
+  if (!art) return <div className="py-32 text-center label-caps text-zinc-500">Loading...</div>;
+  const inCart = items.some((i) => i.id === art.id);
+  const isSold = art.status === "sold";
+
+  const share = () => {
+    const url = window.location.href;
+    if (navigator.share) navigator.share({ title: art.title, url }).catch(() => {});
+    else { navigator.clipboard.writeText(url); toast.success("Link copied"); }
+  };
+  const toggleLike = async () => {
+    if (!user) { toast("Sign in to like"); return; }
+    try {
+      if (likes.liked) { await api.delete(`/artworks/${id}/like`); setLikes({ liked: false, count: likes.count - 1 }); }
+      else { await api.post(`/artworks/${id}/like`); setLikes({ liked: true, count: likes.count + 1 }); }
+    } catch { toast.error("Try again"); }
+  };
+  const postComment = async (e) => {
+    e.preventDefault();
+    if (!user) { toast("Sign in to comment"); return; }
+    if (!comment.trim()) return;
+    try {
+      await api.post(`/artworks/${id}/comments`, { text: comment });
+      setComment("");
+      const r = await api.get(`/artworks/${id}/comments`);
+      setComments(r.data);
+    } catch { toast.error("Failed"); }
+  };
+  const submitAotw = async () => {
+    try { await api.post(`/artworks/${id}/submit-aotw`); toast.success("Submitted for Feature"); }
+    catch { toast.error("Couldn't submit"); }
+  };
+
+  return (
+    <div data-testid="artwork-detail" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-12 pb-32">
+      <div className="grid md:grid-cols-12 gap-10">
+        <div className="md:col-span-7">
+          <div className="aspect-[4/5] bg-black overflow-hidden border border-white/8 rounded-sm">
+            <img src={resolveImg(art.images[idx])} alt={art.title} className="w-full h-full object-contain" />
+          </div>
+          {art.images.length > 1 && (
+            <div className="grid grid-cols-6 gap-2 mt-3">
+              {art.images.map((im, i) => (
+                <button key={i} data-testid={`thumb-${i}`} onClick={() => setIdx(i)}
+                  className={`aspect-square overflow-hidden border rounded-sm ${i === idx ? "border-[#CCFF00]" : "border-white/10"}`}>
+                  <img src={resolveImg(im)} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="md:col-span-5 md:sticky md:top-24 self-start">
+          <div className="label-caps">{art.medium}{art.style ? ` · ${art.style}` : ""}</div>
+          <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3 leading-[0.95]">{art.title}</h1>
+          <div className="mt-4 flex items-center gap-3">
+            <Link to={`/artist/${art.artist?.id}`} data-testid="link-artist" className="font-unbounded text-sm text-[#CCFF00] hover:underline">by {art.artist?.name}</Link>
+          </div>
+          <div className="mt-8 font-anton text-4xl text-[#CCFF00]">${Number(art.price).toLocaleString()}</div>
+          <div className="mt-2 text-sm text-zinc-500">{art.width_in} × {art.height_in} in · {art.medium}</div>
+
+          <div className="flex flex-wrap gap-3 mt-8">
+            {isSold ? (
+              <div data-testid="sold-badge" className="badge-coral !px-4 !py-2">Sold</div>
+            ) : inCart ? (
+              <button data-testid="in-cart" onClick={() => nav("/cart")} className="btn-lime">In Cart → Checkout</button>
+            ) : (
+              <button data-testid="add-to-cart" onClick={() => { add(art); toast.success("Added to cart"); }} className="btn-lime">Add to Cart</button>
+            )}
+            <button data-testid="like-btn" onClick={toggleLike} className="btn-ghost">
+              <Heart size={14} className="mr-2" fill={likes.liked ? "#FF4D4D" : "none"} color={likes.liked ? "#FF4D4D" : undefined} />
+              <span>{likes.count}</span>
+            </button>
+            <button data-testid="share-btn" onClick={share} className="btn-ghost"><Share2 size={14} className="mr-2" /> Share</button>
+            {user && art.artist?.id && user.id !== art.artist.id && (
+              <Link to={`/messages/${art.artist.id}`} data-testid="msg-artist" className="btn-ghost"><MessageCircle size={14} className="mr-2" /> Message</Link>
+            )}
+            {user && (user.id === art.artist_id || user.role === "admin") && art.status === "live" && !art.aotw_submitted && (
+              <button data-testid="submit-aotw" onClick={submitAotw} className="btn-violet">Submit AOTW</button>
+            )}
+          </div>
+
+          <div className="mt-10 pt-8 border-t border-white/8">
+            <div className="label-caps mb-4">About the piece</div>
+            <p className="text-zinc-300 leading-relaxed whitespace-pre-wrap">{art.description}</p>
+          </div>
+
+          <div className="mt-10 pt-8 border-t border-white/8">
+            <div className="label-caps mb-4">Comments ({comments.length})</div>
+            <form onSubmit={postComment} className="flex gap-2 mb-6">
+              <input data-testid="comment-input" value={comment} onChange={(e) => setComment(e.target.value)}
+                placeholder={user ? "Add a comment..." : "Sign in to comment"} disabled={!user}
+                className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm" />
+              <button data-testid="comment-submit" disabled={!user || !comment.trim()} className="btn-lime !py-2"><Send size={14} /></button>
+            </form>
+            <div className="space-y-4 max-h-80 overflow-y-auto">
+              {comments.map((c) => (
+                <div key={c.id} data-testid={`comment-${c.id}`} className="border-b border-white/5 pb-3">
+                  <div className="flex items-baseline justify-between">
+                    <div className="font-unbounded text-sm font-semibold">{c.user_name}</div>
+                    <div className="text-xs text-zinc-500">{new Date(c.created_at).toLocaleDateString()}</div>
+                  </div>
+                  <div className="text-sm text-zinc-300 mt-1">{c.text}</div>
+                </div>
+              ))}
+              {comments.length === 0 && <div className="text-zinc-500 text-sm">No comments yet.</div>}
+            </div>
+          </div>
+
+          <div className="mt-8 pt-8 border-t border-white/8 text-xs text-zinc-500">
+            Shipping coordinated by Art Core after purchase. Physical delivery for originals.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

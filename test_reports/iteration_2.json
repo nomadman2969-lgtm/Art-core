@@ -1,0 +1,37 @@
+{
+  "summary": "Comprehensive backend regression + new social/messaging/search/feed test suite for Art Core. 54/54 pytest tests passed after fixing two MongoDB ObjectId serialization bugs and adjusting test expectations for the create-artwork->pending_fee->upload-fee flow.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/mentorship", "issue": "Returned 500 (ObjectId not JSON serializable) because insert_one mutates the dict adding _id and the endpoint returned it directly. Fixed by wrapping return in strip_mongo()."},
+      {"endpoint": "POST /api/artworks/{id}/comments", "issue": "Same ObjectId leak — insert_one mutated dict returned raw. Fixed by strip_mongo()."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_artcore_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Both minor Mongo _id serialization leaks were fixed by the testing agent — no main-agent action required, but consider auditing other endpoints (server.py/*.py) that return insert_one-mutated dicts to prevent regressions."
+  ],
+  "critical_code_review_comments": [
+    "Multiple endpoints previously followed the anti-pattern of `await db.X.insert_one(entry); return entry` — Motor injects '_id' (ObjectId) into the dict. Two occurrences fixed (admin.mentorship, social.comments). Recommend a helper or lint rule.",
+    "artworks.create_artwork hardcodes status='pending_fee' regardless of admin upload_fee value. The 'free' path only activates when the artist subsequently calls /payments/upload-fee. If desired UX is auto-live when fee=0, create_artwork should read settings and set status=live directly. Currently working as spec-documented but requires 2 calls.",
+    "messages.get_thread returns other=None if user was deleted — could 404 instead for clarity.",
+    "search.py imports `public_user` (unused: `from auth import public_user` is used, ok). `strip_mongo` on user dicts before public_user is safe.",
+    "public /api/feed does not paginate cleanly (offset missing) — only `limit`. Fine for MVP."
+  ],
+  "updated_files": [
+    "/app/backend/admin.py (strip_mongo on mentorship insert return)",
+    "/app/backend/social.py (strip_mongo on comment insert return)",
+    "/app/backend/tests/test_artcore_backend.py (new pytest suite)"
+  ],
+  "success_rate": {"backend": "100% (54/54)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "Admin: monster@houseofmonster.com / MonsterAdmin2026! (from /app/memory/test_credentials.md, verified working). Test users created per-run with unique TS+uuid emails prefixed 'TEST_'.",
+  "seed_data_creation": "Per-run creates: 1 buyer, 2 artists, 2 artworks (one live via fee=0, one pending_fee for Stripe test), 1 mentorship flag, 1 comment (then deleted), 2 messages between artists, 1 newsletter signup. All prefixed TEST_ for identification.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test file at /app/backend/tests/test_artcore_backend.py runs 54 tests covering: root, public settings, auth (register/login/me/patch), role guards, image upload+fetch, artwork create (pending_fee), upload-fee free path (fee=0 => live), upload-fee Stripe checkout (fee>0 => checkout_url), buyer Stripe checkout, fake session 404, AOTW submit+curate flow, admin featured toggle, admin stats/orders/artists, mentorship (artist_id+note schema, PATCH .../resolve), newsletter public, artist dashboard + Stripe Connect start/complete, NEW social follows (POST/DELETE/GET social with is_following), NEW likes (POST/DELETE/GET count+liked), NEW comments (POST/GET/DELETE with owner+admin guard), NEW messaging (send both directions, threads list, unread count, thread mark-read, self+404 errors), NEW search (artworks+artists), NEW feed (enriched with artist, like_count, comment_count, liked). Run: `cd /app && python -m pytest backend/tests/test_artcore_backend.py -v -n 0`. Note pytest.ini forces xdist -n 2; use `-n 0` to override for this shared-state suite.",
+  "rca_of_the_issue": "Two ObjectId serialization bugs traced via backend.err.log — POST /api/admin/mentorship + POST /api/artworks/{id}/comments returned the dict passed to insert_one which Motor mutates in-place by adding _id (bson.ObjectId). FastAPI's jsonable_encoder tries dict(obj)/vars(obj) on the ObjectId and raises TypeError -> 500. Mitigation: always wrap insert return in strip_mongo() (already used elsewhere in codebase like messages.send_message)."
+}

@@ -1,138 +1,174 @@
 {
-  "theme": "dark",
-  "mood": "Editorial + moody with pops of color. Brooklyn art zine meets high-end gallery.",
+  "project_name": "Art Core",
+  "theme": "dark_mode_by_default",
   "typography": {
-    "headings": {
-      "font_family": "Gloock",
-      "import_url": "https://fonts.googleapis.com/css2?family=Gloock&display=swap",
-      "weights": ["400"],
-      "usage": "H1, H2, large expressive quotes, brand wordmarks. Never use for small UI elements.",
-      "tailwind_class": "font-serif"
-    },
-    "body": {
-      "font_family": "Outfit",
-      "import_url": "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap",
-      "weights": ["300", "400", "500", "600"],
-      "usage": "Body text, UI elements, navigation, dashboard data.",
-      "tailwind_class": "font-sans"
-    },
-    "scale": {
-      "h1": "text-5xl md:text-7xl tracking-tighter leading-none",
-      "h2": "text-3xl md:text-5xl tracking-tight leading-tight",
-      "h3": "text-2xl md:text-3xl tracking-tight",
-      "body": "text-base md:text-lg text-zinc-300 leading-relaxed",
-      "labels": "text-xs uppercase tracking-[0.2em] text-zinc-500"
-    }
+    "primary_display_font": "Anton",
+    "secondary_heading_font": "Unbounded",
+    "body_font": "Manrope",
+    "guidelines": "Use 'Anton' for massive, brutalist, condensed hero headings and numbers (like rankings). Use 'Unbounded' for secondary headings and badges to give a wide, tech-meets-street feel. Use 'Manrope' for highly readable body text, inputs, and UI elements. Avoid Gloock and Outfit entirely."
   },
   "colors": {
-    "backgrounds": {
-      "primary": "#050505",
-      "secondary": "#0A0A0A",
-      "surface": "#121212"
+    "background": {
+      "main": "#0A0A0C",
+      "surface": "#121214",
+      "surface_elevated": "#1A1A1E"
+    },
+    "primary": {
+      "neon_lime": "#CCFF00",
+      "acid_green": "#A3E635"
+    },
+    "accent": {
+      "electric_violet": "#7C3AED",
+      "hot_coral": "#FF4D4D"
     },
     "text": {
-      "primary": "#F4F4F5",
+      "primary": "#FFFFFF",
       "secondary": "#A1A1AA",
       "muted": "#52525B"
     },
-    "accents": {
-      "magenta": "#FF00FF",
-      "neon_pink": "#FF1493",
-      "electric_blue": "#00FFFF",
-      "splash_yellow": "#FFD700"
+    "borders": {
+      "default": "rgba(255, 255, 255, 0.08)",
+      "highlight": "rgba(204, 255, 0, 0.3)"
     },
-    "rules": "Deep black backgrounds. Magenta/pink/blue/yellow accents used sparingly and boldly. Avoid AI-slop purple gradients on white. Never use pure #000000."
-  },
-  "layouts": {
-    "spacing": "Generous spacing philosophy. Use p-8, p-12, p-24, p-32. Containers with borders must have internal padding.",
-    "grids": "Mode A (Tetris Grid/Masonry) for marketing/gallery pages to emphasize editorial feel. Mode B (High Density) for dashboards.",
-    "alignment": "Strong asymmetric layouts. Avoid center-everything disease. Left-align text blocks, offset images.",
-    "hero": "Max overlay opacity bg-black/50 for hero images to keep artwork visible."
+    "guidelines": "Dark asphalt base (#0A0A0C) with high-contrast electric lime and violet accents. Never use pure black or gray; always tint towards a cool, deep asphalt. Accent colors should be used for interactions, badges, and to emulate neon glows."
   },
   "visual_enhancers": {
-    "borders": "1px solid #27272A (zinc-800) for subtle separation. Grid borders for technical dashboard look.",
-    "effects": "Subtle grain texture overlay on dark backgrounds. High-end glassmorphism (backdrop-blur-xl bg-black/60) for sticky headers ONLY.",
-    "images": "Art-first hierarchy. Images should be massive, unconstrained by standard e-commerce boxes."
+    "glassmorphism": "Use backdrop-blur-xl with a very subtle white border (1px solid rgba(255,255,255,0.1)) and semi-transparent background (rgba(18,18,20,0.6)) for sticky navs and floating elements. Do not use fully transparent backgrounds.",
+    "glows": "Apply soft box-shadows matching the accent colors (e.g., lime or violet) for active states and critical CTAs to mimic neon signs.",
+    "textures": "Incorporate subtle noise/grain overlays on hero sections to emulate asphalt or concrete. Use subtle spray-paint/drip decorative elements sparingly (perhaps as a background mask on the hero).",
+    "corners": "Mix sharp corners (0px radius) for main layout containers to reflect brutalist/gallery styles, and slightly rounded corners (8px) for interactive elements like buttons and badges."
   },
   "components": {
-    "marketing_pages": "Custom HTML/Tailwind for Home, Gallery, Portfolios. Staggered masonry grids. Editorial typography.",
-    "dashboards": "Shadcn components heavily customized for a brutalist dark mode look. Flat solid surfaces instead of glass.",
-    "buttons": "Sharp rectangular edges or subtle pill-shaped. High contrast hover states (e.g., hover:bg-zinc-100 hover:text-black). Accents used for primary CTAs.",
-    "navigation": "Sticky header with backdrop-blur. Custom 'Monster' wordmark in bold Gloock. Links visible on desktop, no transparent backgrounds without blur."
+    "nav_bar": "Sticky, glassy header (backdrop-blur-xl) with solid text contrast. Must include the 'Art Core' wordmark (styled in Anton, brutalist condensed).",
+    "buttons": "Sharp corners or slight radius (4px). Primary buttons use Neon Lime background with Dark Asphalt text. Hover state: slight scale up and glow.",
+    "cards": "For the marketplace and portfolio, use flat surfaces with 1px subtle borders (rgba(255,255,255,0.1)). On hover, lift the card and increase border opacity or tint to an accent color.",
+    "coming_soon_stubs": "For Auctions, Commissions, Events, Gamification: Treat with premium intentionality. Use a dark, blurry overlay with a neon 'Coming Soon' badge or a metallic lock icon.",
+    "feed": "Instagram-style stories rail at the top (circular artist avatars with neon gradients). Explore feed uses a Behance-style masonry or Bento grid."
+  },
+  "grids_and_layouts": {
+    "explore_feed": "Bento grid or masonry layout to accommodate different artwork aspect ratios. Use gap-4 or gap-6.",
+    "hero_section": "Generous spacing (py-24 or py-32). Massive 'Anton' heading, with a subtle parallax artwork background.",
+    "spacing": "Use Tailwind spacing scale generously. Sections should have pt-20 pb-20 minimum to feel like a high-end gallery."
   },
   "motion": {
-    "transitions": "Smooth micro-interactions. Hover states on all interactive elements. DO NOT use generic `transition-all`.",
-    "animations": "Subtle parallax on scroll. Staggered fade-ins for gallery items."
+    "guidelines": "Framer Motion feel. Springy hover states for buttons (scale 1.02). Staggered fade-ins (opacity 0 to 1, translateY 10px to 0) for the explore feed grid. Parallax scroll on the hero background.",
+    "stats": "Animated number counters for likes, followers, and bids."
   },
   "accessibility": {
-    "contrast": "Ensure 4.5:1 ratio for standard text. Text over images must have gradient or shadow.",
-    "focus": "Clear focus rings with accent colors (e.g., focus:ring-2 focus:ring-magenta).",
-    "testing": "All interactive elements MUST have data-testid attributes."
+    "contrast": "Ensure all text on dark backgrounds meets at least 4.5:1 ratio. Hover states must increase visibility. Focus rings should use the Neon Lime accent.",
+    "testing": "All interactive elements must have `data-testid` attributes (e.g., `data-testid='explore-artwork-card'`)."
   },
-  "image_urls": {
-    "artworks": [
+  "media": {
+    "image_urls": [
       {
-        "url": "https://images.unsplash.com/photo-1628388726680-048fa8176bc7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHw0fHxhYnN0cmFjdCUyMHBhaW50aW5nJTIwbmVvbiUyMHBpbmslMjBibGFja3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Neon pink and black abstract painting"
+        "category": "urban_street_art_graffiti",
+        "url": "https://images.unsplash.com/photo-1611063158871-7dd3ed4a2ac8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwzfHxncmFmZml0aSUyMHN0cmVldCUyMGFydHxlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Textured graffiti wall, good for background overlays or hero"
       },
       {
-        "url": "https://images.unsplash.com/photo-1602450069437-d52c62f52a71?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMHBhaW50aW5nJTIwbmVvbiUyMHBpbmslMjBibGFja3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Vibrant abstract shapes"
+        "category": "urban_street_art_graffiti",
+        "url": "https://images.unsplash.com/photo-1487452066049-a710f7296400?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwxfHxncmFmZml0aSUyMHN0cmVldCUyMGFydHxlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Empty tunnel with graffiti walls"
       },
       {
-        "url": "https://images.unsplash.com/photo-1544733422-251e532ca221?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMHBhaW50aW5nJTIwYmx1ZSUyMHllbGxvd3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Blue, orange, and gray abstract art"
+        "category": "urban_street_art_graffiti",
+        "url": "https://images.unsplash.com/photo-1604716053460-3f66248bf8de?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHw0fHxncmFmZml0aSUyMHN0cmVldCUyMGFydHxlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract colorful painting, great for artwork mockups"
       },
       {
-        "url": "https://images.unsplash.com/photo-1618331833071-ce81bd50d300?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMHBhaW50aW5nJTIwYmx1ZSUyMHllbGxvd3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Blue, white, and yellow abstract"
-      }
-    ],
-    "founder_and_gallery": [
-      {
-        "url": "https://images.unsplash.com/photo-1656657447800-ed397d4128b5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NDh8MHwxfHNlYXJjaHwyfHxicm9va2x5biUyMGFydGlzdCUyMGluJTIwc3R1ZGlvfGVufDB8fHx8MTc4NTQ1MTg2OHww&ixlib=rb-4.1.0&q=85",
-        "description": "Brooklyn artist (Monster) portrait"
+        "category": "urban_street_art_graffiti",
+        "url": "https://images.unsplash.com/photo-1581850518616-bcb8077a2336?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwyfHxncmFmZml0aSUyMHN0cmVldCUyMGFydHxlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Green and yellow abstract painting"
       },
       {
-        "url": "https://images.unsplash.com/photo-1784202318366-35fd82271209?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwyfHx0d28lMjBjYXRzJTIwc2xlZXBpbmclMjBvbiUyMHJ1Z3xlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Two cats in a sunlit room/rug"
+        "category": "artist_studio_painting",
+        "url": "https://images.unsplash.com/photo-1501084817091-a4f3d1d19e07?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwzfHxhcnRpc3QlMjBwYWludGluZyUyMHN0dWRpb3xlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Artist studio with paints"
       },
       {
-        "url": "https://images.unsplash.com/photo-1518998053901-5348d3961a04?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBhcnQlMjBnYWxsZXJ5JTIwZXhoaWJpdGlvbnxlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Modern art gallery exhibition space"
+        "category": "artist_studio_painting",
+        "url": "https://images.unsplash.com/photo-1584661156681-540e80a161d3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHw0fHxhcnRpc3QlMjBwYWludGluZyUyMHN0dWRpb3xlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Artist working on a large canvas"
       },
       {
-        "url": "https://images.unsplash.com/photo-1606819717115-9159c900370b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBhcnQlMjBnYWxsZXJ5JTIwZXhoaWJpdGlvbnxlbnwwfHx8fDE3ODU0NTE4Njh8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Woman standing in front of gallery paintings"
+        "category": "artist_studio_painting",
+        "url": "https://images.unsplash.com/photo-1593382067395-ace3045a1547?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwyfHxhcnRpc3QlMjBwYWludGluZyUyMHN0dWRpb3xlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Close up of an artist palette"
+      },
+      {
+        "category": "artist_studio_painting",
+        "url": "https://images.unsplash.com/photo-1541753866388-0b3c701627d3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxhcnRpc3QlMjBwYWludGluZyUyMHN0dWRpb3xlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Artist painting landscape"
+      },
+      {
+        "category": "modern_art_gallery",
+        "url": "https://images.unsplash.com/photo-1617386069438-6b3a5f76f0bc?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBhcnQlMjBnYWxsZXJ5fGVufDB8fHx8MTc4NjM5MDAzOXww&ixlib=rb-4.1.0&q=85",
+        "description": "Woman in gallery looking at modern art"
+      },
+      {
+        "category": "modern_art_gallery",
+        "url": "https://images.unsplash.com/photo-1553644446-9f8f2762ea42?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBhcnQlMjBnYWxsZXJ5fGVufDB8fHx8MTc4NjM5MDAzOXww&ixlib=rb-4.1.0&q=85",
+        "description": "Minimalist gallery space"
+      },
+      {
+        "category": "modern_art_gallery",
+        "url": "https://images.unsplash.com/photo-1743335962347-266cee6f1b22?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBhcnQlMjBnYWxsZXJ5fGVufDB8fHx8MTc4NjM5MDAzOXww&ixlib=rb-4.1.0&q=85",
+        "description": "People observing paintings"
+      },
+      {
+        "category": "modern_art_gallery",
+        "url": "https://images.unsplash.com/photo-1565799515768-2dcfd834625c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBhcnQlMjBnYWxsZXJ5fGVufDB8fHx8MTc4NjM5MDAzOXww&ixlib=rb-4.1.0&q=85",
+        "description": "Salon style modern gallery wall"
+      },
+      {
+        "category": "user_avatars",
+        "url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzNjE3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&q=85",
+        "description": "Artist avatar profile picture"
+      },
+      {
+        "category": "user_avatars",
+        "url": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzNjE3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&q=85",
+        "description": "Artist avatar profile picture 2"
+      },
+      {
+        "category": "user_avatars",
+        "url": "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzNjE3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&q=85",
+        "description": "Artist avatar profile picture 3"
       }
     ]
   },
   "instructions_to_main_agent": [
-    "Design a hybrid fullstack UI merging an editorial art gallery aesthetic with e-commerce features (House of Monster).",
-    "Apply 'Gloock' for oversized serif headings and 'Outfit' for clean body copy. Inject both using Tailwind config or standard CSS imports.",
-    "Enforce a dark theme primarily (#050505 or #0a0a0c) avoiding completely black (#000000) or 'AI-slop purple'.",
-    "Use asymmetric bento/masonry grid structures. Stop centering everything.",
-    "Create a standout 'Founder Story' section highlighting the founder 'Monster', Brooklyn roots, and two cats. Use provided imagery.",
-    "Implement Shadcn UI for the Cart, Stripe checkout, Artist Upload Dashboard, and Admin Commission Config. Strip 'Vercel-look' defaults in favor of brutalist dark mode styles.",
-    "Introduce splashes of bold color (magenta, pink, yellow, blue) on key accents, badges, or 'Art of the Week' spotlight highlights.",
-    "Ensure the 'Monster' custom wordmark leverages the Gloock font.",
-    "Never use pure transparent backgrounds under headers/overlays; use backdrop-blur glassmorphism.",
-    "Use .js file extensions, not .tsx where applicable."
+    "Rebrand context: 'House of Monster' is now 'Art Core'. Remove all traces of Gloock/Outfit fonts and magenta/yellow/pink/blue themes.",
+    "Use a dark, moody 'asphalt' background (#0A0A0C) with high energy neon lime and violet elements to mimic the 'graffiti on asphalt' vibe.",
+    "The wordmark 'Art Core' should be massive and brutalist (use Anton font).",
+    "Integrate Framer Motion for premium feel: parallax hero scrolling, springy hovers, and staggered grid reveals.",
+    "Implement the 'coming soon' stubs (Auctions, Commissions, Events, Gamification) thoughtfully, using a glassy overlay and a premium 'Coming Soon' neon badge.",
+    "Follow the 'Bento' grid structure for the explore page, avoiding simple equal squares.",
+    "Ensure the design feels like a billion-dollar luxury platform that embraces street culture.",
+    "Ensure all interactable elements have `data-testid`."
   ],
-  "universal_guidelines_for_main_agent": [
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
     "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
     "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
     "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
     "Create depth through layered design elements with z-index hierarchy.",
     "Use glass-morphism effects with backdrop filters (12-24px blur).",
-    "You MUST NOT apply universal transition. Eg: transition: all. Always add transitions for specific interactive elements.",
-    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file.",
+    "You MUST NOT apply universal transition. Eg: `transition: all`. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add `.App { text-align: center; }` in the css file. This disrupts the human natural reading flow of text.",
     "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
     "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
-    "Every interaction needs micro-animations - hover states, transitions, parallax effects.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
     "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN. Use the provided Unsplash URLs.",
     "Prioritize using pre-existing components from src/components/ui when applicable.",
-    "Use sonner for toasts from /app/src/components/ui/sonner.js",
-    "All interactive and key informational elements MUST include a data-testid attribute."
-  ]
+    "Create new components that match the style and conventions of existing components when needed.",
+    "Examine existing components to understand the project's component patterns before creating new ones.",
+    "Use `sonner` for toasts. Sonner component are located in `/app/src/components/ui/sonner.tsx`."
+  ],
+  "libraries": {
+    "icons": "lucide-react",
+    "motion": "framer-motion",
+    "toast": "sonner"
+  }
 }
