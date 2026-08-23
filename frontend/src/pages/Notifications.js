@@ -1,0 +1,92 @@
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { api, fileUrl } from "../api";
+import { Bell, Gavel, Trophy, Palette, UserPlus, Check, Trash2 } from "lucide-react";
+
+const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+
+const KIND_META = {
+  outbid: { label: "You were outbid", icon: <Gavel size={14} />, color: "#FF4D4D" },
+  auction_won: { label: "You won an auction", icon: <Trophy size={14} />, color: "#CCFF00" },
+  auction_sold: { label: "Your artwork sold", icon: <Trophy size={14} />, color: "#CCFF00" },
+  commission_request: { label: "New commission request", icon: <Palette size={14} />, color: "#7C3AED" },
+  commission_accept: { label: "Commission accepted", icon: <Check size={14} />, color: "#CCFF00" },
+  commission_decline: { label: "Commission declined", icon: <Palette size={14} />, color: "#FF4D4D" },
+  commission_counter: { label: "Counter offer sent", icon: <Palette size={14} />, color: "#F5A623" },
+  commission_progress: { label: "Commission progress update", icon: <Palette size={14} />, color: "#00E5FF" },
+  commission_delivered: { label: "Commission delivered", icon: <Palette size={14} />, color: "#CCFF00" },
+  commission_approved: { label: "Commission approved", icon: <Check size={14} />, color: "#CCFF00" },
+  new_follower: { label: "New follower", icon: <UserPlus size={14} />, color: "#7C3AED" },
+};
+
+export default function Notifications() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => api.get("/notifications?limit=100").then((r) => setItems(r.data)).finally(() => setLoading(false));
+  useEffect(() => { load(); }, []);
+
+  const markAll = async () => {
+    await api.post("/notifications/read", {});
+    load();
+  };
+  const del = async (id) => {
+    await api.delete(`/notifications/${id}`);
+    load();
+  };
+
+  const unread = items.filter((n) => !n.read).length;
+
+  return (
+    <div data-testid="notifications-page" className="max-w-3xl mx-auto px-6 md:px-12 pt-16 pb-32">
+      <div className="flex items-end justify-between flex-wrap gap-4 mb-10">
+        <div>
+          <div className="label-caps text-[#CCFF00]"><Bell size={12} className="inline mr-2" /> Inbox</div>
+          <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4">Notifications</h1>
+          <div className="label-caps text-zinc-500 mt-2">{unread} unread</div>
+        </div>
+        {unread > 0 && (
+          <button data-testid="mark-all-read" onClick={markAll} className="btn-ghost !py-2 !text-xs">Mark all read</button>
+        )}
+      </div>
+
+      {loading ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
+        items.length === 0 ? (
+          <div className="border border-dashed border-white/10 py-20 text-center rounded-sm">
+            <div className="label-caps text-zinc-500">Nothing here yet.</div>
+            <div className="text-sm text-zinc-400 mt-4">Bid on an auction, follow an artist, or request a commission — updates will land here.</div>
+          </div>
+        ) : (
+          <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
+            {items.map((n) => {
+              const meta = KIND_META[n.kind] || { label: n.kind, icon: <Bell size={14} />, color: "#A1A1AA" };
+              const to = n.commission?.id ? `/commissions/${n.commission.id}` :
+                         n.auction?.id ? `/auctions/${n.auction.id}` :
+                         n.other?.id ? `/artist/${n.other.id}` : null;
+              const inner = (
+                <div className={`p-4 flex items-start gap-4 hover:bg-white/[0.03] transition-colors ${!n.read ? "border-l-2 border-[#CCFF00]" : ""}`}>
+                  <div className="p-2 rounded-sm mt-0.5" style={{ background: `${meta.color}20`, color: meta.color }}>{meta.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="font-unbounded font-semibold text-sm">{meta.label}</div>
+                      <div className="text-xs text-zinc-500 flex-shrink-0">{new Date(n.created_at).toLocaleString()}</div>
+                    </div>
+                    <div className="text-sm text-zinc-300 mt-1 truncate">
+                      {n.commission?.subject}
+                      {n.artwork?.title}
+                      {n.other?.name}
+                      {n.amount != null && <span className="ml-2 text-[#CCFF00] font-anton">${Number(n.amount).toLocaleString()}</span>}
+                    </div>
+                  </div>
+                  <button onClick={(e) => { e.preventDefault(); del(n.id); }} className="text-zinc-500 hover:text-[#FF4D4D] p-1">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              );
+              return to ? <Link key={n.id} to={to} data-testid={`notif-${n.id}`}>{inner}</Link> : <div key={n.id} data-testid={`notif-${n.id}`}>{inner}</div>;
+            })}
+          </div>
+        )}
+    </div>
+  );
+}

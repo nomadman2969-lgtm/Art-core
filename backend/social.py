@@ -22,6 +22,10 @@ async def follow_user(user_id: str, me: dict = Depends(get_current_user)):
     await db.follows.insert_one({
         "id": new_id(), "follower_id": me["id"], "followed_id": user_id, "created_at": now_iso(),
     })
+    await db.notifications.insert_one({
+        "id": new_id(), "user_id": user_id, "kind": "new_follower",
+        "follower_id": me["id"], "read": False, "created_at": now_iso(),
+    })
     return {"ok": True}
 
 
@@ -110,6 +114,7 @@ async def delete_comment(comment_id: str, me: dict = Depends(get_current_user)):
 @router.get("/feed")
 async def explore_feed(limit: int = 60, me: Optional[dict] = Depends(get_optional_user)):
     """Explore feed — mix of recent + featured artworks, enriched with artist + like counts."""
+    limit = max(1, min(limit, 200))
     cursor = db.artworks.find({"status": {"$in": ["live", "sold"]}}).sort("created_at", -1).limit(limit)
     out = []
     for a in await cursor.to_list(limit):

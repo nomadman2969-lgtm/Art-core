@@ -12,11 +12,15 @@ export default function Layout({ children }) {
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [unreadNotif, setUnreadNotif] = useState(0);
   const [q, setQ] = useState("");
 
   useEffect(() => {
     if (!user) return;
-    const load = () => api.get("/messages/unread-count").then((r) => setUnread(r.data.count)).catch(() => {});
+    const load = () => {
+      api.get("/messages/unread-count").then((r) => setUnread(r.data.count)).catch(() => {});
+      api.get("/notifications/unread-count").then((r) => setUnreadNotif(r.data.count)).catch(() => {});
+    };
     load();
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
@@ -79,8 +83,9 @@ export default function Layout({ children }) {
               </Link>
             )}
             {user && (
-              <Link to="/notifications" data-testid="nav-notifications" className="p-2 hover:text-[#CCFF00] transition-colors hidden md:block">
+              <Link to="/notifications" data-testid="nav-notifications" className="relative p-2 hover:text-[#CCFF00] transition-colors hidden md:block">
                 <Bell size={18} />
+                {unreadNotif > 0 && <span className="absolute -top-1 -right-1 bg-[#CCFF00] text-black text-[10px] px-1 min-w-[16px] text-center font-bold rounded-sm">{unreadNotif}</span>}
               </Link>
             )}
             {user ? (

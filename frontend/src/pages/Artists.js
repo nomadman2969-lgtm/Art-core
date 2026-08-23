@@ -113,11 +113,6 @@ export function ArtistPortfolio() {
                 <MessageCircle size={14} className="mr-2" /> Message
               </button>
             )}
-            {user && user.id !== artist.id && (
-              <button data-testid="commission-btn" onClick={() => nav(`/commissions/new/${artist.id}`)} className="btn-violet">
-                <Palette size={14} className="mr-2" /> Request Commission
-              </button>
-            )}
           </div>
           <div className="grid grid-cols-3 gap-3 mt-8">
             <StatMini label="Works" value={artist.artworks.length} />

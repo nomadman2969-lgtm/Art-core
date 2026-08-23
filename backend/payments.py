@@ -189,6 +189,24 @@ async def _apply_paid(session_id: str):
         # Mark artworks sold
         for it in tx["items"]:
             await db.artworks.update_one({"id": it["artwork_id"]}, {"$set": {"status": "sold"}})
+        # Notifications
+        if tx.get("user_id"):
+            await db.notifications.insert_one({
+                "id": new_id(), "user_id": tx["user_id"], "kind": "order_confirmed",
+                "order_id": order["id"], "amount": tx["amount"],
+                "read": False, "created_at": now_iso(),
+            })
+        seen_artists = set()
+        for it in tx["items"]:
+            if it["artist_id"] in seen_artists:
+                continue
+            seen_artists.add(it["artist_id"])
+            await db.notifications.insert_one({
+                "id": new_id(), "user_id": it["artist_id"], "kind": "artwork_sold",
+                "order_id": order["id"], "artwork_id": it["artwork_id"],
+                "amount": it["price"] * it["quantity"],
+                "read": False, "created_at": now_iso(),
+            })
     elif tx["kind"] == "upload_fee":
         await db.artworks.update_one({"id": tx["artwork_id"]}, {"$set": {"status": "live"}})
     await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"_paid_applied": True}})

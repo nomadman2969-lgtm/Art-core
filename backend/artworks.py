@@ -61,6 +61,14 @@ class ArtworkCreate(BaseModel):
     height_in: float
     price: float = Field(gt=0)
     images: List[str] = Field(min_length=1)  # storage paths
+    # Extended marketplace fields
+    year: Optional[int] = None
+    category: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    quantity: int = Field(default=1, ge=1)
+    kind: str = "original"  # original | print | digital
+    shipping_info: Optional[str] = None
+    coa: Optional[str] = None  # Certificate of authenticity notes
 
 
 class ArtworkUpdate(BaseModel):
@@ -73,6 +81,13 @@ class ArtworkUpdate(BaseModel):
     height_in: Optional[float] = None
     price: Optional[float] = None
     images: Optional[List[str]] = None
+    year: Optional[int] = None
+    category: Optional[str] = None
+    tags: Optional[List[str]] = None
+    quantity: Optional[int] = None
+    kind: Optional[str] = None
+    shipping_info: Optional[str] = None
+    coa: Optional[str] = None
 
 
 async def _enrich(art: dict) -> dict:
@@ -119,6 +134,30 @@ async def update_artwork(artwork_id: str, req: ArtworkUpdate, user: dict = Depen
     if updates:
         await db.artworks.update_one({"id": artwork_id}, {"$set": updates})
     return await _enrich(await db.artworks.find_one({"id": artwork_id}))
+
+
+@router.delete("/artworks/{artwork_id}")
+async def delete_artwork(artwork_id: str, user: dict = Depends(get_current_user)):
+    art = await db.artworks.find_one({"id": artwork_id})
+    if not art:
+        raise HTTPException(404, "Not found")
+    if user["role"] != "admin" and art["artist_id"] != user["id"]:
+        raise HTTPException(403, "Not yours")
+    if art.get("status") == "sold":
+        raise HTTPException(400, "Cannot delete sold artwork")
+    await db.artworks.delete_one({"id": artwork_id})
+    return {"deleted": 1}
+
+
+@router.post("/artworks/{artwork_id}/mark-sold")
+async def mark_sold(artwork_id: str, user: dict = Depends(get_current_user)):
+    art = await db.artworks.find_one({"id": artwork_id})
+    if not art:
+        raise HTTPException(404, "Not found")
+    if user["role"] != "admin" and art["artist_id"] != user["id"]:
+        raise HTTPException(403, "Not yours")
+    await db.artworks.update_one({"id": artwork_id}, {"$set": {"status": "sold", "sold_offline": True}})
+    return {"ok": True}
 
 
 @router.post("/artworks/{artwork_id}/submit-aotw")

@@ -140,7 +140,12 @@ function Stat({ label, value, accent }) {
 }
 
 export function UploadArtwork() {
-  const [form, setForm] = useState({ title: "", description: "", medium: "Oil", style: "", color: "", width_in: 12, height_in: 12, price: 100 });
+  const [form, setForm] = useState({
+    title: "", description: "", medium: "Oil", style: "", color: "",
+    width_in: 12, height_in: 12, price: 100,
+    year: new Date().getFullYear(), category: "", tags: "",
+    quantity: 1, kind: "original", shipping_info: "", coa: "",
+  });
   const [images, setImages] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [settings, setSettings] = useState(null);
@@ -159,13 +164,22 @@ export function UploadArtwork() {
     } catch { toast.error("Upload failed"); }
     setUploading(false);
   };
+  const removeImg = (p) => setImages((prev) => prev.filter((x) => x !== p));
 
   const submit = async (e) => {
     e.preventDefault();
     if (images.length === 0) { toast.error("Add at least one image"); return; }
     try {
-      const r = await api.post("/artworks", { ...form, images, price: Number(form.price), width_in: Number(form.width_in), height_in: Number(form.height_in) });
-      toast.success("Artwork saved as draft");
+      const payload = {
+        ...form, images,
+        price: Number(form.price),
+        width_in: Number(form.width_in), height_in: Number(form.height_in),
+        year: form.year ? Number(form.year) : null,
+        quantity: Number(form.quantity) || 1,
+        tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+      };
+      const r = await api.post("/artworks", payload);
+      toast.success("Artwork saved");
       const fee = settings?.upload_fee ?? 0;
       if (fee > 0) {
         const p = await api.post("/payments/upload-fee", { artwork_id: r.data.id, origin_url: ORIGIN });
@@ -180,28 +194,50 @@ export function UploadArtwork() {
     <div data-testid="upload-artwork" className="max-w-3xl mx-auto px-6 pt-16 pb-32">
       <div className="label-caps text-[#CCFF00]">Upload</div>
       <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-4">New Artwork</h1>
-      <p className="text-zinc-400 mb-12">Listing fee: <span className="text-[#CCFF00] font-unbounded">${settings?.upload_fee ?? "..."}</span> — paid after saving.</p>
+      <p className="text-zinc-400 mb-12">Listing fee: <span className="text-[#CCFF00] font-unbounded">${settings?.upload_fee ?? "..."}</span></p>
       <form onSubmit={submit} className="space-y-6">
         <Field label="Title"><input data-testid="art-title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none focus:border-[#CCFF00]" /></Field>
         <Field label="Description"><textarea data-testid="art-description" required rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 focus:border-[#CCFF00] outline-none" /></Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Medium">
             <select data-testid="art-medium" value={form.medium} onChange={(e) => setForm({ ...form, medium: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm py-3 px-3">
-              {["Oil", "Acrylic", "Watercolor", "Mixed Media", "Digital", "Photography"].map((m) => <option key={m} value={m}>{m}</option>)}
+              {["Oil", "Acrylic", "Watercolor", "Mixed Media", "Digital", "Photography", "Sculpture", "Print"].map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </Field>
-          <Field label="Style (optional)"><input data-testid="art-style" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none focus:border-[#CCFF00]" /></Field>
+          <Field label="Type">
+            <select data-testid="art-kind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm py-3 px-3">
+              <option value="original">Original</option>
+              <option value="print">Print</option>
+              <option value="digital">Digital</option>
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Style (optional)"><input data-testid="art-style" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
+          <Field label="Category (optional)"><input data-testid="art-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Portrait, Landscape..." className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
         </div>
         <div className="grid grid-cols-3 gap-4">
           <Field label="Width (in)"><input data-testid="art-width" type="number" step="0.1" required value={form.width_in} onChange={(e) => setForm({ ...form, width_in: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
           <Field label="Height (in)"><input data-testid="art-height" type="number" step="0.1" required value={form.height_in} onChange={(e) => setForm({ ...form, height_in: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
-          <Field label="Price (USD)"><input data-testid="art-price" type="number" min="1" required value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
+          <Field label="Year"><input data-testid="art-year" type="number" min="1900" max={new Date().getFullYear()} value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
         </div>
-        <Field label="Images">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Price (USD)"><input data-testid="art-price" type="number" min="1" required value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
+          <Field label="Quantity"><input data-testid="art-quantity" type="number" min="1" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
+        </div>
+        <Field label="Tags (comma separated)"><input data-testid="art-tags" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="neon, urban, portrait" className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
+        <Field label="Shipping info (optional)"><textarea data-testid="art-shipping" rows={2} value={form.shipping_info} onChange={(e) => setForm({ ...form, shipping_info: e.target.value })} placeholder="Ships worldwide within 5 business days..." className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" /></Field>
+        <Field label="Certificate of Authenticity (optional)"><textarea data-testid="art-coa" rows={2} value={form.coa} onChange={(e) => setForm({ ...form, coa: e.target.value })} placeholder="Signed COA included with delivery..." className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" /></Field>
+        <Field label="Images (drag to reorder later)">
           <input data-testid="art-images" type="file" accept="image/*" multiple onChange={upload} className="text-sm" />
           {uploading && <div className="text-xs text-[#CCFF00] mt-2">Uploading...</div>}
           <div className="flex flex-wrap gap-3 mt-4">
-            {images.map((p) => <img key={p} src={fileUrl(p)} className="w-24 h-24 object-cover rounded-sm border border-white/8" alt="" />)}
+            {images.map((p) => (
+              <div key={p} className="relative group">
+                <img src={fileUrl(p)} className="w-24 h-24 object-cover rounded-sm border border-white/8" alt="" />
+                <button type="button" onClick={() => removeImg(p)} className="absolute -top-2 -right-2 bg-[#FF4D4D] text-white w-5 h-5 rounded-full text-xs opacity-0 group-hover:opacity-100">×</button>
+              </div>
+            ))}
           </div>
         </Field>
         <button data-testid="submit-artwork" className="btn-lime mt-6">Save & Continue</button>

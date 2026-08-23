@@ -115,6 +115,7 @@ async def create_auction(req: AuctionCreate, user: dict = Depends(require_role("
 
 @router.get("")
 async def list_auctions(status: Optional[str] = "live", limit: int = 60):
+    limit = max(1, min(limit, 200))
     q: dict = {}
     if status and status != "all":
         q["status"] = status

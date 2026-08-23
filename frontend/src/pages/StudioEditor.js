@@ -4,7 +4,6 @@ import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Plus, Gavel, Sparkles, Eye, Palette as PaletteIcon, GripVertical, Trash2, ExternalLink } from "lucide-react";
-
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
 export function StudioEditor() {
@@ -78,6 +77,7 @@ export function StudioEditor() {
     ["story", "My Story"],
     ["posts", "Posts"],
     ["artworks", "Artworks"],
+    ["requests", "Requests"],
     ["analytics", "Analytics"],
     ["payouts", "Payouts"],
   ];
@@ -162,6 +162,10 @@ export function StudioEditor() {
             </div>
           </SectionH>
 
+          <SectionH title="Background">
+            <BackgroundEditor config={config} save={saveConfig} />
+          </SectionH>
+
           <SectionH title="Accent Color">
             <div className="flex flex-wrap gap-3 items-center">
               {["#CCFF00", "#7C3AED", "#FF4D4D", "#00E5FF", "#F5A623", "#FF6EC7", "#D4AF37", "#FFFFFF"].map((c) => (
@@ -230,19 +234,7 @@ export function StudioEditor() {
           {artworks.length === 0 ? (
             <div className="text-zinc-500 py-16 label-caps text-center">No artworks yet. <Link to="/studio/upload" className="text-[#CCFF00] ml-2">Upload →</Link></div>
           ) : artworks.map((a) => (
-            <div key={a.id} data-testid={`my-art-${a.id}`} className="p-4 flex flex-wrap items-center gap-4">
-              <img src={resolveImg(a.images?.[0])} className="w-16 h-16 object-cover rounded-sm" alt="" />
-              <div className="flex-1 min-w-[200px]">
-                <div className="font-unbounded text-lg font-semibold">{a.title}</div>
-                <div className="label-caps mt-1">${Number(a.price).toLocaleString()} · <span className={
-                  a.status === "live" ? "text-[#CCFF00]" : a.status === "sold" ? "text-[#7C3AED]" : "text-[#FF4D4D]"
-                }>{a.status}</span></div>
-              </div>
-              {a.status === "pending_fee" && <button data-testid={`pay-fee-${a.id}`} onClick={() => payFee(a.id)} className="btn-lime">Pay Fee to List</button>}
-              {a.status === "live" && !a.aotw_submitted && <button onClick={() => submitAotw(a.id)} className="btn-ghost">Submit Feature</button>}
-              {a.aotw && <div className="badge-lime">Featured ★</div>}
-              <Link to={`/artwork/${a.id}`} className="label-caps hover:text-[#CCFF00]"><ExternalLink size={12} className="inline" /></Link>
-            </div>
+            <ArtworkRow key={a.id} a={a} onReload={loadAll} onPayFee={payFee} onSubmitAotw={submitAotw} />
           ))}
         </div>
       )}
@@ -282,6 +274,10 @@ export function StudioEditor() {
       {tab === "payouts" && (
         <PayoutsPanel dashboard={dashboard} refresh={loadAll} refreshUser={refresh} />
       )}
+
+      {tab === "requests" && (
+        <CommissionRequestsPanel />
+      )}
     </div>
   );
 }
@@ -291,6 +287,43 @@ function SectionH({ title, children }) {
     <div>
       <div className="label-caps mb-4">{title}</div>
       {children}
+    </div>
+  );
+}
+
+function BackgroundEditor({ config, save }) {
+  const [uploading, setUploading] = useState(false);
+  const bg = config.background || { type: "theme" };
+  const upload = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setUploading(true);
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const url = `${api.defaults.baseURL}/files/${r.data.path}`;
+      save({ background: { type: "image", value: url } });
+      toast.success("Background updated");
+    } catch { toast.error("Upload failed"); }
+    setUploading(false);
+  };
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3">
+        <button data-testid="bg-theme" onClick={() => save({ background: { type: "theme" } })}
+          className={`px-4 py-3 border rounded-sm label-caps text-xs ${bg.type === "theme" ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400 hover:border-white/30"}`}>Use Theme Default</button>
+        <label className={`px-4 py-3 border rounded-sm label-caps text-xs cursor-pointer ${bg.type === "image" ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400 hover:border-white/30"}`}>
+          {uploading ? "Uploading..." : "Upload Custom"}
+          <input data-testid="bg-upload" type="file" accept="image/*" onChange={upload} className="hidden" />
+        </label>
+      </div>
+      {bg.type === "image" && bg.value && (
+        <div>
+          <div className="label-caps mb-2">Current background</div>
+          <img src={bg.value} alt="" className="w-full max-w-lg aspect-[16/6] object-cover border border-white/10 rounded-sm" />
+          <button onClick={() => save({ background: { type: "theme" } })} className="label-caps text-[#FF4D4D] hover:underline mt-2">Remove and use theme default</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -521,6 +554,117 @@ function PayoutsPanel({ dashboard, refresh, refreshUser }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ArtworkRow({ a, onReload, onPayFee, onSubmitAotw }) {
+  const del = async () => {
+    if (!confirm(`Delete "${a.title}"?`)) return;
+    try { await api.delete(`/artworks/${a.id}`); toast.success("Deleted"); onReload(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  const markSold = async () => {
+    if (!confirm(`Mark "${a.title}" as sold?`)) return;
+    try { await api.post(`/artworks/${a.id}/mark-sold`); toast.success("Marked sold"); onReload(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  return (
+    <div data-testid={`my-art-${a.id}`} className="p-4 flex flex-wrap items-center gap-4">
+      <img src={resolveImg(a.images?.[0])} className="w-16 h-16 object-cover rounded-sm" alt="" />
+      <div className="flex-1 min-w-[200px]">
+        <div className="font-unbounded text-lg font-semibold">{a.title}</div>
+        <div className="label-caps mt-1">${Number(a.price).toLocaleString()} · <span className={
+          a.status === "live" ? "text-[#CCFF00]" : a.status === "sold" ? "text-[#7C3AED]" : "text-[#FF4D4D]"
+        }>{a.status}</span>{a.kind && a.kind !== "original" ? ` · ${a.kind}` : ""}</div>
+      </div>
+      {a.status === "pending_fee" && <button data-testid={`pay-fee-${a.id}`} onClick={() => onPayFee(a.id)} className="btn-lime !py-2 !text-xs">Pay Fee</button>}
+      {a.status === "live" && !a.aotw_submitted && <button onClick={() => onSubmitAotw(a.id)} className="btn-ghost !py-2 !text-xs">Feature</button>}
+      {a.status === "live" && <button data-testid={`mark-sold-${a.id}`} onClick={markSold} className="btn-ghost !py-2 !text-xs">Mark Sold</button>}
+      {a.aotw && <div className="badge-lime">Featured</div>}
+      <Link to={`/artwork/${a.id}`} className="label-caps hover:text-[#CCFF00]"><ExternalLink size={12} className="inline" /></Link>
+      {a.status !== "sold" && <button data-testid={`delete-${a.id}`} onClick={del} className="text-zinc-500 hover:text-[#FF4D4D]"><Trash2 size={14} /></button>}
+    </div>
+  );
+}
+
+// ---------- Commission Requests Panel (artist inbox in Studio) ----------
+function CommissionRequestsPanel() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openId, setOpenId] = useState(null);
+  const [counterAmt, setCounterAmt] = useState("");
+  const [counterMsg, setCounterMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = () => api.get("/commissions/mine?as_role=artist").then((r) => setItems(r.data)).finally(() => setLoading(false));
+  useEffect(() => { load(); }, []);
+
+  const respond = async (id, action, extra = {}) => {
+    setBusy(true);
+    try {
+      await api.post(`/commissions/${id}/respond`, { action, ...extra });
+      toast.success(action === "accept" ? "Accepted" : action === "decline" ? "Declined" : "Counter sent");
+      setOpenId(null); setCounterAmt(""); setCounterMsg("");
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+    setBusy(false);
+  };
+
+  const statusColor = { pending: "#F5A623", counter: "#F5A623", in_progress: "#7C3AED", accepted: "#CCFF00", declined: "#FF4D4D", delivered: "#00E5FF", approved: "#CCFF00", cancelled: "#52525B" };
+
+  if (loading) return <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div>;
+  if (items.length === 0) return (
+    <div className="border border-dashed border-white/10 py-20 text-center rounded-sm">
+      <div className="label-caps text-zinc-500">No commission requests yet.</div>
+      <div className="text-sm text-zinc-400 mt-3">Collectors can request custom work from your Studio page.</div>
+    </div>
+  );
+  return (
+    <div data-testid="requests-panel" className="space-y-3">
+      {items.map((c) => {
+        const isOpen = openId === c.id;
+        const canAct = c.status === "pending";
+        return (
+          <div key={c.id} data-testid={`request-${c.id}`} className="border border-white/8 rounded-sm">
+            <div className="p-4 flex flex-wrap items-center gap-4">
+              <div className="flex-1 min-w-[220px]">
+                <div className="font-unbounded font-semibold text-lg">{c.subject}</div>
+                <div className="text-sm text-zinc-400 mt-1 line-clamp-1">{c.instructions}</div>
+                <div className="label-caps mt-2">From <span className="text-white">{c.buyer?.name}</span> · {new Date(c.created_at).toLocaleDateString()}</div>
+              </div>
+              <div className="text-right">
+                <div className="font-anton text-2xl text-[#CCFF00]">${Number(c.counter_amount || c.budget).toLocaleString()}</div>
+                <div className="label-caps mt-1" style={{ color: statusColor[c.status] || "#A1A1AA" }}>{c.status.replace(/_/g, " ")}</div>
+              </div>
+              <Link to={`/commissions/${c.id}`} className="label-caps hover:text-[#CCFF00]">Open →</Link>
+              {canAct && (
+                <button data-testid={`req-toggle-${c.id}`} onClick={() => setOpenId(isOpen ? null : c.id)} className="btn-ghost !py-2 !text-xs">
+                  {isOpen ? "Close" : "Respond"}
+                </button>
+              )}
+            </div>
+            {isOpen && canAct && (
+              <div className="p-4 border-t border-white/8 bg-white/[0.02] space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <button data-testid={`req-accept-${c.id}`} disabled={busy} onClick={() => respond(c.id, "accept")} className="btn-lime !py-2 !text-xs">Accept ${Number(c.budget).toLocaleString()}</button>
+                  <button data-testid={`req-decline-${c.id}`} disabled={busy} onClick={() => respond(c.id, "decline")} className="btn-ghost !py-2 !text-xs">Decline</button>
+                </div>
+                <div className="border-t border-white/8 pt-3">
+                  <div className="label-caps mb-2">Counter offer</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input data-testid={`req-counter-amt-${c.id}`} type="number" min="1" placeholder="Amount" value={counterAmt} onChange={(e) => setCounterAmt(e.target.value)}
+                      className="bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none" />
+                    <input data-testid={`req-counter-msg-${c.id}`} placeholder="Message (optional)" value={counterMsg} onChange={(e) => setCounterMsg(e.target.value)}
+                      className="bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none" />
+                  </div>
+                  <button data-testid={`req-counter-${c.id}`} disabled={busy || !counterAmt} onClick={() => respond(c.id, "counter", { counter_amount: Number(counterAmt), message: counterMsg })} className="btn-violet !py-2 !text-xs mt-2">Send Counter</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

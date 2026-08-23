@@ -9,6 +9,7 @@ import {
   UserPlus, UserCheck, MessageCircle, Palette, Share2, Eye,
   Gavel, Clock, Heart, MessageSquare, Pin, MapPin, Instagram, Twitter, Globe,
 } from "lucide-react";
+import CommissionRequestModal from "../components/CommissionRequestModal";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -20,13 +21,21 @@ export function ArtistStudioPage() {
   const [studio, setStudio] = useState(null);
   const [rank, setRank] = useState(null);
   const [social, setSocial] = useState(null);
+  const [commissionOpen, setCommissionOpen] = useState(false);
 
   const load = () => {
     api.get(`/studio/${id}`).then((r) => setStudio(r.data)).catch(() => nav("/artists"));
     api.get(`/rankings/${id}`).then((r) => setRank(r.data)).catch(() => {});
     api.get(`/users/${id}/social`).then((r) => setSocial(r.data)).catch(() => {});
   };
-  useEffect(load, [id]);
+  useEffect(() => {
+    load();
+    // real-time refresh for live auctions & posts every 8s
+    const t = setInterval(() => {
+      api.get(`/studio/${id}`).then((r) => setStudio((old) => old ? { ...old, auctions: r.data.auctions, posts: r.data.posts } : r.data)).catch(() => {});
+    }, 8000);
+    return () => clearInterval(t);
+  }, [id]);
 
   if (!studio) return <div className="py-32 text-center label-caps text-zinc-500">Entering studio...</div>;
   const { artist, config, artworks, auctions, posts } = studio;
@@ -86,7 +95,10 @@ export function ArtistStudioPage() {
                 </button>
               )}
               {!isOwner && (
-                <button data-testid="studio-commission" onClick={() => user ? nav(`/commissions/new/${artist.id}`) : nav("/login")} className="btn-violet">
+                <button data-testid="studio-commission" onClick={() => {
+                  if (!user) { nav("/login"); return; }
+                  setCommissionOpen(true);
+                }} className="btn-violet">
                   <Palette size={14} className="mr-2" /> Commission
                 </button>
               )}
@@ -111,6 +123,14 @@ export function ArtistStudioPage() {
             <StudioSection key={section.id} section={section} studio={studio} isOwner={isOwner} onRefresh={load} />
           ))}
       </div>
+
+      {commissionOpen && (
+        <CommissionRequestModal
+          artist={artist}
+          onClose={() => setCommissionOpen(false)}
+          onSubmitted={() => setCommissionOpen(false)}
+        />
+      )}
     </StudioThemeShell>
   );
 }
@@ -146,7 +166,7 @@ function StudioSection({ section, studio, isOwner, onRefresh }) {
     return <div data-testid={`sec-${section.id}`}>{title}<StoryBlock story={config.artist_story} artist={artist} /></div>;
   }
   if (kind === "commission") {
-    return <div data-testid={`sec-${section.id}`}>{title}<CommissionBlock artistId={artist.id} isOwner={isOwner} /></div>;
+    return <div data-testid={`sec-${section.id}`}>{title}<CommissionBlock artistId={artist.id} artist={artist} isOwner={isOwner} /></div>;
   }
   if (kind === "custom") {
     return <div data-testid={`sec-${section.id}`}>{title}<div className="text-zinc-300 leading-relaxed max-w-3xl">{section.body || "Custom section."}</div></div>;
@@ -340,16 +360,14 @@ function StoryLine({ label, value }) {
 }
 
 // ---------- Commission ----------
-function CommissionBlock({ artistId, isOwner }) {
-  const nav = useNavigate();
+function CommissionBlock({ artistId, artist, isOwner }) {
   return (
     <div className="glass-card p-10 rounded-sm relative overflow-hidden">
       <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl opacity-30" style={{ background: "var(--accent)" }} />
       <div className="relative">
         <div className="label-caps mb-3" style={{ color: "var(--accent)" }}><Palette size={12} className="inline mr-2" /> Available for commissions</div>
         <h3 className="font-anton text-3xl md:text-5xl uppercase leading-tight">Want something custom?</h3>
-        <p className="text-zinc-300 mt-4 max-w-xl">Send a brief with your budget, deadline, and any references. I'll respond within a few days.</p>
-        {!isOwner && <button onClick={() => nav(`/commissions/new/${artistId}`)} data-testid="cta-commission" className="btn-lime mt-6">Request a Commission</button>}
+        <p className="text-zinc-300 mt-4 max-w-xl">Send a brief with your budget, deadline, and any references. {artist?.name || "The artist"} will respond within a few days. Use the <span className="text-[color:var(--accent)]">Commission</span> button in the header to send a request.</p>
       </div>
     </div>
   );

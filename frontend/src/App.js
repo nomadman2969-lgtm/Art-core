@@ -24,6 +24,9 @@ import ComingSoon from "@/pages/ComingSoon";
 import { AuctionsList, AuctionDetail, CreateAuction } from "@/pages/Auctions";
 import Rankings from "@/pages/Rankings";
 import { CommissionsInbox, CommissionCreate, CommissionDetail } from "@/pages/Commissions";
+import Notifications from "@/pages/Notifications";
+import NotFound from "@/pages/NotFound";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function RequireRole({ roles, children }) {
   const { user, loading } = useAuth();
@@ -42,12 +45,13 @@ function RequireAuth({ children }) {
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <AuthProvider>
-          <CartProvider>
-            <Toaster theme="dark" position="top-center"
-              toastOptions={{ style: { background: "#121214", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Manrope" } }} />
-            <Layout>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <AuthProvider>
+            <CartProvider>
+              <Toaster theme="dark" position="top-center"
+                toastOptions={{ style: { background: "#121214", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Manrope" } }} />
+              <Layout>
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/explore" element={<Explore />} />
@@ -80,19 +84,18 @@ function App() {
                   tagline="Openings, festivals, pop-ups — near you."
                   description="Discover gallery openings, art festivals, street fairs, pop-up markets, live painting events, and meetups near you. RSVP, buy tickets, save events."
                   icon={<MapPin size={20} className="text-[#FF4D4D]" />} />} />
-                <Route path="/notifications" element={<ComingSoon title="Notifications" accent="#7C3AED"
-                  tagline="Every like, comment, sale — in one place."
-                  description="Get notified on likes, comments, sales, messages, commission requests, auction updates, new followers, event reminders, and order updates."
-                  icon={<Bell size={20} className="text-[#7C3AED]" />} />} />
+                <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
                 <Route path="/studio-custom" element={<ComingSoon title="Studio Themes" accent="#CCFF00"
                   tagline="Make your profile yours."
                   description="Custom themes, backgrounds, gallery layouts, fonts, animated banners, widgets, pinned artwork, and profile music. Build your creative identity."
                   icon={<Sparkles size={20} className="text-[#CCFF00]" />} />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Layout>
           </CartProvider>
         </AuthProvider>
       </BrowserRouter>
+      </ErrorBoundary>
     </div>
   );
 }
