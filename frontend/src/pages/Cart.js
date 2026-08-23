@@ -92,14 +92,28 @@ export function PaymentSuccess() {
       </>}
       {status === "paid" && <>
         <div className="label-caps text-[#CCFF00]">Confirmed</div>
-        <h1 className="font-anton text-6xl md:text-8xl uppercase mt-4">{kind === "upload_fee" ? "Live now" : "Thank you."}</h1>
+        <h1 className="font-anton text-6xl md:text-8xl uppercase mt-4">
+          {kind === "upload_fee" ? "Live now" :
+           kind === "auction_win" ? "Piece is yours" :
+           kind === "commission_payment" ? "Payment sent" :
+           "Thank you."}
+        </h1>
         <p className="text-zinc-400 mt-8">
-          {kind === "upload_fee"
-            ? "Your artwork is live in the marketplace."
-            : "A confirmation email is on its way. Art Core will coordinate shipping."}
+          {kind === "upload_fee" ? "Your artwork is live in the marketplace." :
+           kind === "auction_win" ? "Your auction win is settled. Art Core will coordinate delivery with the seller." :
+           kind === "commission_payment" ? "Funds released to the artist. Enjoy your custom piece." :
+           "A confirmation email is on its way. Art Core will coordinate shipping."}
         </p>
-        <Link to={kind === "upload_fee" ? "/studio" : "/explore"} className="btn-lime mt-10 inline-flex">
-          {kind === "upload_fee" ? "Back to Studio" : "Keep Browsing"}
+        <Link to={
+          kind === "upload_fee" ? "/studio" :
+          kind === "auction_win" ? "/orders" :
+          kind === "commission_payment" ? "/commissions" :
+          "/orders"
+        } className="btn-lime mt-10 inline-flex">
+          {kind === "upload_fee" ? "Back to Studio" :
+           kind === "auction_win" ? "View Order" :
+           kind === "commission_payment" ? "Back to Commissions" :
+           "View Orders"}
         </Link>
       </>}
       {status === "timeout" && <>

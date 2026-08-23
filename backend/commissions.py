@@ -77,6 +77,30 @@ async def get_commission(cid: str, me: dict = Depends(get_current_user)):
     return await _enrich(c)
 
 
+# Public: completed commissions for an artist (proof of work rail)
+public_router = APIRouter(prefix="/api", tags=["commissions-public"])
+
+
+@public_router.get("/artists/{artist_id}/completed-commissions")
+async def artist_completed(artist_id: str, limit: int = 12):
+    from db import strip_mongo as _sm
+    cursor = db.commissions.find({
+        "artist_id": artist_id,
+        "status": {"$in": ["approved", "paid"]},
+        "final_images": {"$exists": True, "$ne": []},
+    }).sort("updated_at", -1).limit(limit)
+    out = []
+    for c in await cursor.to_list(limit):
+        c = _sm(c)
+        out.append({
+            "id": c["id"], "subject": c["subject"],
+            "final_images": c.get("final_images", []),
+            "budget": c.get("counter_amount") or c.get("budget"),
+            "completed_at": c.get("updated_at"),
+        })
+    return out
+
+
 class RespondReq(BaseModel):
     action: str  # accept | decline | counter
     counter_amount: Optional[float] = None

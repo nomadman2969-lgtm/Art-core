@@ -166,7 +166,7 @@ function StudioSection({ section, studio, isOwner, onRefresh }) {
     return <div data-testid={`sec-${section.id}`}>{title}<StoryBlock story={config.artist_story} artist={artist} /></div>;
   }
   if (kind === "commission") {
-    return <div data-testid={`sec-${section.id}`}>{title}<CommissionBlock artistId={artist.id} artist={artist} isOwner={isOwner} /></div>;
+    return <div data-testid={`sec-${section.id}`}>{title}<CommissionBlock artistId={artist.id} artist={artist} isOwner={isOwner} /><CompletedCommissionsRail artistId={artist.id} /></div>;
   }
   if (kind === "custom") {
     return <div data-testid={`sec-${section.id}`}>{title}<div className="text-zinc-300 leading-relaxed max-w-3xl">{section.body || "Custom section."}</div></div>;
@@ -357,6 +357,33 @@ function StoryBlock({ story, artist }) {
 }
 function StoryLine({ label, value }) {
   return <div><div className="label-caps">{label}</div><div className="font-unbounded text-base mt-1">{value}</div></div>;
+}
+
+// ---------- Completed Commissions Rail (proof of work) ----------
+function CompletedCommissionsRail({ artistId }) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    api.get(`/artists/${artistId}/completed-commissions?limit=8`).then((r) => setItems(r.data)).catch(() => {});
+  }, [artistId]);
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-8" data-testid="completed-commissions-rail">
+      <div className="label-caps mb-4" style={{ color: "var(--accent)" }}>Past commissions · {items.length}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {items.map((c) => (
+          <div key={c.id} data-testid={`completed-${c.id}`} className="border border-white/8 rounded-sm bg-[#121214] overflow-hidden hover-lift-card">
+            <div className="aspect-square overflow-hidden bg-black">
+              <img src={resolveImg(c.final_images?.[0])} className="w-full h-full object-cover" alt="" />
+            </div>
+            <div className="p-3">
+              <div className="font-unbounded text-sm truncate">{c.subject}</div>
+              <div className="label-caps mt-1" style={{ color: "var(--accent)" }}>Delivered</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ---------- Commission ----------

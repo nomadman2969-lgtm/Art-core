@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, fileUrl } from "../api";
+import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Palette, Check, X, RefreshCw, Upload, Package } from "lucide-react";
+import { Palette, Check, X, RefreshCw, Upload, Package, CreditCard } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -14,7 +14,8 @@ const STATUS_STYLES = {
   counter: { color: "#F5A623", label: "Counter Offer" },
   declined: { color: "#FF4D4D", label: "Declined" },
   delivered: { color: "#00E5FF", label: "Delivered" },
-  approved: { color: "#CCFF00", label: "Approved" },
+  approved: { color: "#CCFF00", label: "Approved · Payment Due" },
+  paid: { color: "#CCFF00", label: "Paid" },
   cancelled: { color: "#52525B", label: "Cancelled" },
 };
 
@@ -319,6 +320,22 @@ export function CommissionDetail() {
         </div>
       )}
 
+      {isBuyer && c.status === "approved" && !c.paid && (
+        <div className="mt-8 glass-card p-6 rounded-sm" data-testid="buyer-pay-panel">
+          <div className="label-caps text-[#CCFF00]">Payment due</div>
+          <div className="font-anton text-4xl text-[#CCFF00] mt-2">${Number(c.counter_amount || c.budget).toLocaleString()}</div>
+          <div className="text-sm text-zinc-400 mt-3">You've approved the delivery. Complete payment to release funds to {c.artist?.name}.</div>
+          <PayCommissionButton commissionId={c.id} amount={c.counter_amount || c.budget} />
+        </div>
+      )}
+
+      {(c.status === "paid" || c.paid) && (
+        <div className="mt-8 glass-card p-6 rounded-sm" data-testid="commission-paid-panel">
+          <div className="badge-lime">Paid</div>
+          <div className="text-sm mt-3 text-zinc-200">Payment settled. Funds released to {c.artist?.name}.</div>
+        </div>
+      )}
+
       {/* Progress log */}
       <div className="mt-10">
         <div className="label-caps mb-6">Activity</div>
@@ -341,4 +358,21 @@ export function CommissionDetail() {
 
 function Meta({ label, value }) {
   return <div className="glass-card p-4 rounded-sm"><div className="label-caps">{label}</div><div className="font-unbounded text-sm mt-2">{value}</div></div>;
+}
+
+function PayCommissionButton({ commissionId, amount }) {
+  const [busy, setBusy] = React.useState(false);
+  const pay = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post(`/payments/commissions/${commissionId}/pay`, { origin_url: ORIGIN });
+      window.location.href = r.data.checkout_url;
+    } catch (e) { toast.error(e?.response?.data?.detail || "Payment failed"); setBusy(false); }
+  };
+  return (
+    <button data-testid="pay-commission-btn" onClick={pay} disabled={busy} className="btn-lime mt-4">
+      <CreditCard size={14} className="mr-2" />
+      {busy ? "Redirecting..." : `Pay $${Number(amount).toLocaleString()}`}
+    </button>
+  );
 }

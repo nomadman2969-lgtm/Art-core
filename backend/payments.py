@@ -153,6 +153,100 @@ async def upload_fee_checkout(req: UploadFeeReq, user: dict = Depends(require_ro
     return {"checkout_url": session.url, "session_id": session.id}
 
 
+# ---------- Auction winner payment ----------
+class AuctionPayReq(BaseModel):
+    origin_url: str
+
+
+@router.post("/payments/auctions/{auction_id}/pay")
+async def pay_auction(auction_id: str, req: AuctionPayReq, user: dict = Depends(get_current_user)):
+    au = await db.auctions.find_one({"id": auction_id})
+    if not au:
+        raise HTTPException(404, "Auction not found")
+    if au["status"] != "ended":
+        raise HTTPException(400, "Auction not ended")
+    if au.get("winner_id") != user["id"]:
+        raise HTTPException(403, "Not the winner")
+    if au.get("paid"):
+        raise HTTPException(400, "Already paid")
+    amount = float(au.get("final_price") or au.get("current_bid") or 0)
+    if amount <= 0:
+        raise HTTPException(400, "Invalid amount")
+    art = await db.artworks.find_one({"id": au["artwork_id"]})
+    settings = await get_settings()
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": settings["currency"],
+                "product_data": {"name": f"Auction win: {art['title'] if art else 'Artwork'}"},
+                "unit_amount": int(round(amount * 100)),
+            },
+            "quantity": 1,
+        }],
+        success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{req.origin_url}/payment/cancel",
+        shipping_address_collection={"allowed_countries": ["US", "CA", "GB", "AU", "DE", "FR", "IT", "ES", "NL", "IE", "SE", "NO", "DK", "FI", "JP", "MX", "BR"]},
+        customer_email=user["email"],
+        metadata={"kind": "auction_win", "auction_id": auction_id, "user_id": user["id"]},
+    )
+    await db.payment_transactions.insert_one({
+        "id": new_id(), "session_id": session.id,
+        "kind": "auction_win", "user_id": user["id"],
+        "auction_id": auction_id, "artwork_id": au["artwork_id"],
+        "seller_id": au["seller_id"],
+        "amount": amount, "currency": settings["currency"],
+        "status": "initiated", "payment_status": "pending",
+        "created_at": now_iso(), "updated_at": now_iso(),
+    })
+    return {"checkout_url": session.url, "session_id": session.id}
+
+
+# ---------- Commission payment ----------
+class CommissionPayReq(BaseModel):
+    origin_url: str
+
+
+@router.post("/payments/commissions/{commission_id}/pay")
+async def pay_commission(commission_id: str, req: CommissionPayReq, user: dict = Depends(get_current_user)):
+    c = await db.commissions.find_one({"id": commission_id})
+    if not c:
+        raise HTTPException(404, "Commission not found")
+    if c["buyer_id"] != user["id"]:
+        raise HTTPException(403, "Not your commission")
+    if c["status"] != "approved":
+        raise HTTPException(400, "Commission not approved yet")
+    if c.get("paid"):
+        raise HTTPException(400, "Already paid")
+    amount = float(c.get("counter_amount") or c["budget"])
+    settings = await get_settings()
+    artist = await db.users.find_one({"id": c["artist_id"]})
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": settings["currency"],
+                "product_data": {"name": f"Commission: {c['subject']}"},
+                "unit_amount": int(round(amount * 100)),
+            },
+            "quantity": 1,
+        }],
+        success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{req.origin_url}/payment/cancel",
+        customer_email=user["email"],
+        metadata={"kind": "commission_payment", "commission_id": commission_id, "user_id": user["id"]},
+    )
+    await db.payment_transactions.insert_one({
+        "id": new_id(), "session_id": session.id,
+        "kind": "commission_payment", "user_id": user["id"],
+        "commission_id": commission_id, "artist_id": c["artist_id"],
+        "amount": amount, "currency": settings["currency"],
+        "status": "initiated", "payment_status": "pending",
+        "created_at": now_iso(), "updated_at": now_iso(),
+    })
+    return {"checkout_url": session.url, "session_id": session.id}
+
+
 # ---------- Status ----------
 async def _apply_paid(session_id: str):
     """Idempotent post-payment side effects."""
@@ -209,6 +303,54 @@ async def _apply_paid(session_id: str):
             })
     elif tx["kind"] == "upload_fee":
         await db.artworks.update_one({"id": tx["artwork_id"]}, {"$set": {"status": "live"}})
+    elif tx["kind"] == "auction_win":
+        settings = await get_settings()
+        commission = float(settings["commission_percent"]) / 100.0
+        gross = float(tx["amount"])
+        order = {
+            "id": new_id(),
+            "session_id": session_id,
+            "buyer_id": tx["user_id"],
+            "items": [{"artwork_id": tx["artwork_id"], "artist_id": tx["seller_id"], "price": gross, "quantity": 1}],
+            "total": gross,
+            "currency": tx["currency"],
+            "commission_percent": settings["commission_percent"],
+            "platform_take": round(gross * commission, 2),
+            "artist_payouts": [{
+                "artist_id": tx["seller_id"], "artwork_id": tx["artwork_id"],
+                "gross": gross, "net": round(gross * (1 - commission), 2), "status": "pending",
+            }],
+            "source": "auction",
+            "auction_id": tx["auction_id"],
+            "created_at": now_iso(),
+        }
+        await db.orders.insert_one(order)
+        await db.auctions.update_one({"id": tx["auction_id"]}, {"$set": {"paid": True, "order_id": order["id"], "paid_at": now_iso()}})
+        # notify seller of settled payment
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": tx["seller_id"], "kind": "auction_paid",
+            "auction_id": tx["auction_id"], "order_id": order["id"],
+            "amount": gross, "read": False, "created_at": now_iso(),
+        })
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": tx["user_id"], "kind": "order_confirmed",
+            "order_id": order["id"], "amount": gross,
+            "read": False, "created_at": now_iso(),
+        })
+    elif tx["kind"] == "commission_payment":
+        settings = await get_settings()
+        commission = float(settings["commission_percent"]) / 100.0
+        gross = float(tx["amount"])
+        await db.commissions.update_one({"id": tx["commission_id"]}, {"$set": {
+            "paid": True, "paid_at": now_iso(), "status": "paid",
+            "platform_take": round(gross * commission, 2),
+            "net_to_artist": round(gross * (1 - commission), 2),
+        }})
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": tx["artist_id"], "kind": "commission_paid",
+            "commission_id": tx["commission_id"], "amount": gross,
+            "read": False, "created_at": now_iso(),
+        })
     await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"_paid_applied": True}})
 
 

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, fileUrl } from "../api";
+import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Gavel, Clock, TrendingUp, Trophy } from "lucide-react";
+import { Gavel, Clock, TrendingUp, Trophy, CreditCard } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -193,10 +193,17 @@ export function AuctionDetail() {
               </form>
             )}
             {isSeller && a.status === "live" && <div className="mt-6 label-caps text-zinc-500">You're the seller.</div>}
-            {iWon && (
+            {iWon && !a.paid && (
               <div className="mt-6 p-4 border border-[#CCFF00] rounded-sm bg-[#CCFF00]/5" data-testid="winner-banner">
                 <div className="badge-lime"><Trophy size={12} className="inline mr-1" /> You won</div>
-                <div className="text-sm mt-3">Congrats. Art Core will coordinate delivery.</div>
+                <div className="text-sm mt-3 text-zinc-200">Complete payment to release the piece to Art Core for shipping.</div>
+                <PayAuctionButton auctionId={a.id} amount={a.final_price || a.current_bid} />
+              </div>
+            )}
+            {iWon && a.paid && (
+              <div className="mt-6 p-4 border border-white/10 rounded-sm" data-testid="winner-paid">
+                <div className="badge-lime">Paid</div>
+                <div className="text-sm mt-3 text-zinc-200">Your win is settled. Art Core is coordinating delivery.</div>
               </div>
             )}
           </div>
@@ -280,5 +287,22 @@ export function CreateAuction() {
         <button data-testid="auction-submit" className="btn-lime mt-6">Launch Live Auction</button>
       </form>
     </div>
+  );
+}
+
+function PayAuctionButton({ auctionId, amount }) {
+  const [busy, setBusy] = useState(false);
+  const pay = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post(`/payments/auctions/${auctionId}/pay`, { origin_url: ORIGIN });
+      window.location.href = r.data.checkout_url;
+    } catch (e) { toast.error(e?.response?.data?.detail || "Payment failed"); setBusy(false); }
+  };
+  return (
+    <button data-testid="pay-auction-btn" onClick={pay} disabled={busy} className="btn-lime mt-4">
+      <CreditCard size={14} className="mr-2" />
+      {busy ? "Redirecting..." : `Pay $${Number(amount).toLocaleString()} Now`}
+    </button>
   );
 }

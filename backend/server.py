@@ -21,7 +21,7 @@ from messages import router as messages_router
 from search import router as search_router
 from auctions import router as auctions_router
 from rankings import router as rankings_router
-from commissions import router as commissions_router
+from commissions import router as commissions_router, public_router as commissions_public_router
 from studio import router as studio_router, posts_router
 from notifications import router as notifications_router
 from orders import router as orders_router
@@ -41,6 +41,7 @@ app.include_router(search_router)
 app.include_router(auctions_router)
 app.include_router(rankings_router)
 app.include_router(commissions_router)
+app.include_router(commissions_public_router)
 app.include_router(studio_router)
 app.include_router(posts_router)
 app.include_router(notifications_router)
