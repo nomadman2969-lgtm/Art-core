@@ -24,6 +24,8 @@ import ComingSoon from "@/pages/ComingSoon";
 import { AuctionsList, AuctionDetail, CreateAuction } from "@/pages/Auctions";
 import Rankings from "@/pages/Rankings";
 import { CommissionsInbox, CommissionCreate, CommissionDetail } from "@/pages/Commissions";
+import OffersInbox from "@/pages/Offers";
+import { Orders, OrderDetail, SellingOrders } from "@/pages/Orders";
 import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -80,6 +82,10 @@ function App() {
                 <Route path="/commissions" element={<RequireAuth><CommissionsInbox /></RequireAuth>} />
                 <Route path="/commissions/new/:artistId" element={<RequireAuth><CommissionCreate /></RequireAuth>} />
                 <Route path="/commissions/:id" element={<RequireAuth><CommissionDetail /></RequireAuth>} />
+                <Route path="/offers" element={<RequireAuth><OffersInbox /></RequireAuth>} />
+                <Route path="/orders" element={<RequireAuth><Orders /></RequireAuth>} />
+                <Route path="/orders/:id" element={<RequireAuth><OrderDetail /></RequireAuth>} />
+                <Route path="/selling" element={<RequireRole roles={["artist", "admin"]}><SellingOrders /></RequireRole>} />
                 <Route path="/events" element={<ComingSoon title="Events" accent="#FF4D4D"
                   tagline="Openings, festivals, pop-ups — near you."
                   description="Discover gallery openings, art festivals, street fairs, pop-up markets, live painting events, and meetups near you. RSVP, buy tickets, save events."

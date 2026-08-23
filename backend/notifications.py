@@ -13,7 +13,7 @@ async def _enrich(n: dict) -> dict:
     if not n:
         return n
     kind = n.get("kind")
-    if kind in ("outbid", "auction_won", "auction_sold") and n.get("auction_id"):
+    if kind in ("outbid", "auction_won", "auction_sold", "auction_forfeited", "auction_cancelled", "auction_deadline_soon", "watched_auction_leader", "auction_paid") and n.get("auction_id"):
         au = await db.auctions.find_one({"id": n["auction_id"]})
         if au and au.get("artwork_id"):
             art = await db.artworks.find_one({"id": au["artwork_id"]})
@@ -28,6 +28,22 @@ async def _enrich(n: dict) -> dict:
             other = await db.users.find_one({"id": other_id})
             if other:
                 n["other"] = {"id": other["id"], "name": other["name"]}
+    if kind and kind.startswith("offer_") and n.get("offer_id"):
+        offer = await db.offers.find_one({"id": n["offer_id"]})
+        if offer:
+            n["offer"] = {"id": offer["id"], "status": offer["status"], "amount": offer.get("amount"), "counter_amount": offer.get("counter_amount")}
+        if n.get("artwork_id"):
+            art = await db.artworks.find_one({"id": n["artwork_id"]})
+            if art:
+                n["artwork"] = {"id": art["id"], "title": art["title"], "images": art.get("images", [])[:1]}
+    if kind == "order_shipped" and n.get("order_id"):
+        n["order"] = {"id": n["order_id"]}
+    if kind == "payout_released" and n.get("order_id"):
+        n["order"] = {"id": n["order_id"]}
+        if n.get("artwork_id"):
+            art = await db.artworks.find_one({"id": n["artwork_id"]})
+            if art:
+                n["artwork"] = {"id": art["id"], "title": art["title"], "images": art.get("images", [])[:1]}
     if kind in ("order_confirmed", "artwork_sold", "new_review") and n.get("order_id"):
         n["order"] = {"id": n["order_id"]}
     if kind == "new_review" and n.get("artwork_id"):

@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, fileUrl } from "../api";
+import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Package, Star, Download } from "lucide-react";
+import { Package, Star, Download, Truck, CheckCircle2 } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+
+const FULFILLMENT_META = {
+  pending: { label: "Awaiting Shipment", color: "#F5A623" },
+  shipped: { label: "Shipped", color: "#7C3AED" },
+  delivered: { label: "Delivered", color: "#CCFF00" },
+};
 
 export function Orders() {
   const [orders, setOrders] = useState([]);
@@ -24,21 +31,63 @@ export function Orders() {
           </div>
         ) : (
           <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
-            {orders.map((o) => (
-              <Link key={o.id} to={`/orders/${o.id}`} data-testid={`order-${o.id}`}
-                className="p-4 flex flex-wrap items-center gap-4 hover:bg-white/[0.03] transition-colors">
-                <div className="flex -space-x-3">
-                  {o.items.slice(0, 3).map((it, i) => (
-                    <img key={i} src={resolveImg(it.artwork?.images?.[0])} className="w-14 h-14 object-cover border-2 border-[#0A0A0C] rounded-sm" alt="" />
-                  ))}
-                </div>
-                <div className="flex-1 min-w-[180px]">
-                  <div className="font-unbounded font-semibold">Order #{o.id.slice(0, 8)}</div>
-                  <div className="label-caps mt-1">{new Date(o.created_at).toLocaleDateString()} · {o.items.length} piece(s)</div>
-                </div>
-                <div className="font-anton text-2xl text-[#CCFF00]">${Number(o.total).toLocaleString()}</div>
-              </Link>
-            ))}
+            {orders.map((o) => {
+              const fm = FULFILLMENT_META[(o.fulfillment || {}).status || "pending"] || FULFILLMENT_META.pending;
+              return (
+                <Link key={o.id} to={`/orders/${o.id}`} data-testid={`order-${o.id}`}
+                  className="p-4 flex flex-wrap items-center gap-4 hover:bg-white/[0.03] transition-colors">
+                  <div className="flex -space-x-3">
+                    {o.items.slice(0, 3).map((it, i) => (
+                      <img key={i} src={resolveImg(it.artwork?.images?.[0])} className="w-14 h-14 object-cover border-2 border-[#0A0A0C] rounded-sm" alt="" />
+                    ))}
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <div className="font-unbounded font-semibold">Order #{o.id.slice(0, 8)}</div>
+                    <div className="label-caps mt-1">{new Date(o.created_at).toLocaleDateString()} · {o.items.length} piece(s)</div>
+                    <div className="label-caps mt-1 inline-block px-2 py-0.5 rounded-sm" style={{ background: `${fm.color}20`, color: fm.color }}>{fm.label}</div>
+                  </div>
+                  <div className="font-anton text-2xl text-[#CCFF00]">${Number(o.total).toLocaleString()}</div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+    </div>
+  );
+}
+
+export function SellingOrders() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api.get("/orders/selling").then((r) => setOrders(r.data)).finally(() => setLoading(false));
+  }, []);
+  return (
+    <div data-testid="selling-orders-page" className="max-w-3xl mx-auto px-6 md:px-12 pt-16 pb-32">
+      <div className="label-caps text-[#7C3AED]"><Package size={12} className="inline mr-2" /> Fulfillment</div>
+      <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-10">Sales to Ship</h1>
+      {loading ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
+        orders.length === 0 ? (
+          <div className="border border-dashed border-white/10 py-20 text-center rounded-sm">
+            <div className="label-caps text-zinc-500">No sales yet.</div>
+          </div>
+        ) : (
+          <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
+            {orders.map((o) => {
+              const fm = FULFILLMENT_META[(o.fulfillment || {}).status || "pending"] || FULFILLMENT_META.pending;
+              return (
+                <Link key={o.id} to={`/orders/${o.id}`} data-testid={`selling-${o.id}`}
+                  className="p-4 flex flex-wrap items-center gap-4 hover:bg-white/[0.03] transition-colors">
+                  <img src={resolveImg(o.items[0]?.artwork?.images?.[0])} className="w-14 h-14 object-cover rounded-sm" alt="" />
+                  <div className="flex-1 min-w-[180px]">
+                    <div className="font-unbounded font-semibold">Order #{o.id.slice(0, 8)}</div>
+                    <div className="label-caps mt-1">{new Date(o.created_at).toLocaleDateString()}</div>
+                    <div className="label-caps mt-1 inline-block px-2 py-0.5 rounded-sm" style={{ background: `${fm.color}20`, color: fm.color }}>{fm.label}</div>
+                  </div>
+                  <div className="font-anton text-2xl text-[#CCFF00]">${Number(o.total).toLocaleString()}</div>
+                </Link>
+              );
+            })}
           </div>
         )}
     </div>
@@ -47,12 +96,15 @@ export function Orders() {
 
 export function OrderDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [o, setO] = useState(null);
   const [reviewFor, setReviewFor] = useState(null);
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [reviewed, setReviewed] = useState({}); // artwork_id -> true
+  const [shipForm, setShipForm] = useState({ carrier: "USPS", tracking: "", note: "" });
+  const [shipBusy, setShipBusy] = useState(false);
 
   const load = async () => {
     try {
@@ -83,15 +135,89 @@ export function OrderDetail() {
     setPosting(false);
   };
 
+  const submitShip = async (e) => {
+    e.preventDefault();
+    setShipBusy(true);
+    try {
+      await api.post(`/orders/${id}/ship`, shipForm);
+      toast.success("Marked shipped");
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+    setShipBusy(false);
+  };
+
+  const markDelivered = async () => {
+    setShipBusy(true);
+    try {
+      await api.post(`/orders/${id}/mark-delivered`);
+      toast.success("Delivery confirmed");
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+    setShipBusy(false);
+  };
+
   if (!o) return <div className="py-32 text-center label-caps text-zinc-500">Loading...</div>;
+
+  const isBuyer = user?.id === o.buyer_id;
+  const isSeller = (o.artist_payouts || []).some((p) => p.artist_id === user?.id);
+  const fulfill = o.fulfillment || { status: "pending" };
+  const fm = FULFILLMENT_META[fulfill.status] || FULFILLMENT_META.pending;
 
   return (
     <div data-testid="order-detail" className="max-w-3xl mx-auto px-6 md:px-12 pt-16 pb-32">
-      <Link to="/orders" className="label-caps text-zinc-500 hover:text-[#CCFF00]">← All orders</Link>
+      <Link to={isSeller && !isBuyer ? "/selling" : "/orders"} className="label-caps text-zinc-500 hover:text-[#CCFF00]">← All orders</Link>
       <div className="mt-6 mb-8">
         <div className="label-caps text-[#CCFF00]">Order #{o.id.slice(0, 8)}</div>
         <h1 className="font-anton text-4xl md:text-6xl uppercase mt-3">Receipt</h1>
         <div className="label-caps text-zinc-500 mt-2">Placed {new Date(o.created_at).toLocaleString()}</div>
+      </div>
+
+      {/* Fulfillment status */}
+      <div className="mb-6 glass-card p-5 rounded-sm" data-testid="fulfillment-panel">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <div className="label-caps flex items-center gap-2"><Truck size={12} /> Fulfillment</div>
+            <div className="mt-2 label-caps px-2 py-1 rounded-sm inline-block" style={{ background: `${fm.color}20`, color: fm.color }}>{fm.label}</div>
+          </div>
+          {fulfill.tracking && (
+            <div className="text-right">
+              <div className="label-caps">Tracking</div>
+              <div className="font-unbounded text-sm mt-1">{fulfill.carrier} · {fulfill.tracking}</div>
+              {fulfill.shipped_at && <div className="text-xs text-zinc-500 mt-1">Shipped {new Date(fulfill.shipped_at).toLocaleDateString()}</div>}
+            </div>
+          )}
+        </div>
+        {isSeller && fulfill.status === "pending" && (
+          <form onSubmit={submitShip} className="mt-4 pt-4 border-t border-white/8 space-y-3" data-testid="ship-form">
+            <div className="grid md:grid-cols-2 gap-3">
+              <input required placeholder="Carrier (USPS, UPS...)" value={shipForm.carrier}
+                data-testid="ship-carrier"
+                onChange={(e) => setShipForm({ ...shipForm, carrier: e.target.value })}
+                className="bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#7C3AED]" />
+              <input required placeholder="Tracking number" value={shipForm.tracking}
+                data-testid="ship-tracking"
+                onChange={(e) => setShipForm({ ...shipForm, tracking: e.target.value })}
+                className="bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#7C3AED]" />
+            </div>
+            <input placeholder="Note to buyer (optional)" value={shipForm.note}
+              onChange={(e) => setShipForm({ ...shipForm, note: e.target.value })}
+              className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#7C3AED]" />
+            <button data-testid="ship-submit" disabled={shipBusy} className="btn-violet !py-2 !text-xs">
+              <Truck size={12} className="mr-2" />{shipBusy ? "Sending..." : "Mark Shipped"}
+            </button>
+          </form>
+        )}
+        {isBuyer && fulfill.status === "shipped" && (
+          <div className="mt-4 pt-4 border-t border-white/8">
+            <button data-testid="mark-delivered-btn" disabled={shipBusy} onClick={markDelivered} className="btn-lime !py-2 !text-xs">
+              <CheckCircle2 size={12} className="mr-2" />{shipBusy ? "..." : "Confirm Delivered — Release Payout"}
+            </button>
+            <div className="text-xs text-zinc-500 mt-2">Confirms receipt and releases the artist payout.</div>
+          </div>
+        )}
+        {fulfill.status === "delivered" && (
+          <div className="text-xs text-zinc-500 mt-3">Delivered {fulfill.delivered_at ? new Date(fulfill.delivered_at).toLocaleDateString() : ""}. Payouts released.</div>
+        )}
       </div>
 
       <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
@@ -103,10 +229,12 @@ export function OrderDetail() {
               <div className="label-caps mt-1">by {it.artist_name} · Qty {it.quantity}</div>
             </div>
             <div className="font-anton text-xl text-[#CCFF00]">${Number(it.price).toLocaleString()}</div>
-            {reviewed[it.artwork_id] ? (
-              <div className="badge-lime">Reviewed</div>
-            ) : (
-              <button data-testid={`review-btn-${i}`} onClick={() => setReviewFor(it.artwork_id)} className="btn-ghost !py-2 !text-xs"><Star size={12} className="mr-1" /> Review</button>
+            {isBuyer && fulfill.status === "delivered" && (
+              reviewed[it.artwork_id] ? (
+                <div className="badge-lime">Reviewed</div>
+              ) : (
+                <button data-testid={`review-btn-${i}`} onClick={() => setReviewFor(it.artwork_id)} className="btn-ghost !py-2 !text-xs"><Star size={12} className="mr-1" /> Review</button>
+              )
             )}
           </div>
         ))}
@@ -116,7 +244,9 @@ export function OrderDetail() {
         <div className="flex justify-between font-anton text-2xl mt-3 pt-3 border-t border-white/8">
           <span>Total</span><span className="text-[#CCFF00]">${o.total.toFixed(2)}</span>
         </div>
-        <div className="label-caps text-zinc-500 mt-4">Shipping coordinated by Art Core.</div>
+        <div className="label-caps text-zinc-500 mt-4">
+          {isBuyer && fulfill.status !== "delivered" && "You can leave a review once the piece is confirmed delivered."}
+        </div>
       </div>
 
       {reviewFor && (

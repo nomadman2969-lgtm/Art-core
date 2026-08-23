@@ -1,0 +1,58 @@
+{
+  "summary": "Backend testing for the Offers subsystem, hardened auction bidding (atomic CAS + scheduled + proxy + watchers + winner payment), order fulfillment (ship/mark-delivered/payout release), full commissions flow, notification enrichment and payment idempotency. 13/13 pytest tests passed against the deployed preview URL. All Stripe checkout endpoints (offer, auction win, commission deposit, commission balance) return real test-mode checkout_url + session_id. Concurrent-bid race guard confirmed: exactly one of two threaded bids succeeds (409/400 for loser). _apply_paid confirmed idempotent — second invocation on same session_id does not double-create the order. One correctness bug found in proxy-bid pricing (see below).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/auctions/{id}/proxy-bid",
+        "issue": "Proxy vs. proxy ping-pong prices under-market. When two users set competing proxy ceilings (e.g. buyer max=500 vs buyer2 max=300 on start_price=100), _process_proxies alternates by +1 per iteration and hits the internal 30-iter safety cap. Final current_bid ends around ~31 even though the higher proxy should immediately jump to loser_max+1 = 301. Leader identity is correct (higher proxy wins), but the final price is dramatically wrong. Fix: when contender's max exceeds all other proxies, immediately set price to (second_highest_proxy_max + 1) instead of +1 stepping.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "POST /api/offers/{id}/respond",
+        "issue": "Cosmetic: on artist counter/decline/accept, notification kind is `offer_accept`/`offer_counter`/`offer_decline` (from f\"offer_{req.action}\"). Downstream consumers must match these exact strings; consider standardising to `offer_countered`/`offer_declined`/`offer_accepted` to match the offer status names used elsewhere. Not a bug — flagging inconsistency."
+      },
+      {
+        "endpoint": "POST /api/orders/{id}/ship",
+        "issue": "Only allows transition from `pending` — no explicit support for correcting a wrongly-shipped state, no re-ship if buyer disputes. Also no validation that tracking string looks tracking-shaped (any 1–200 char string is accepted)."
+      },
+      {
+        "endpoint": "POST /api/payments/offers/{id}/pay",
+        "issue": "Race condition: if two accepted offers exist on same artwork (possible if seller accepts multiple offers before any pays), whichever pays first wins and other offers are auto-expired via _apply_paid. But between accept and pay, no lock — buyer B could accept-counter and pay while buyer A is on the Stripe page. Second /pay attempt correctly rejects with `Artwork no longer available` because status flips to `sold` in _apply_paid. Working as designed but worth documenting."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_commerce_full.py",
+    "/app/test_reports/pytest/commerce_full.xml"
+  ],
+  "action_items": [
+    "HIGH: Fix _process_proxies pricing — when higher proxy outbids lower, jump immediately to second-highest ceiling + 1 rather than +1 stepping. Current implementation lets a proxy war on a $500-max vs $300-max end at ~$31 (30-iter cap) instead of ~$301.",
+    "OPTIONAL: Rename offer_respond notification kinds to past-tense (`offer_accepted`, `offer_countered`, `offer_declined`) for consistency with offer.status strings.",
+    "OPTIONAL: Add regex/length validation on shipping tracking numbers.",
+    "OPTIONAL: Add explicit `already_shipped` / `already_paid` error codes to help frontend distinguish 400 states."
+  ],
+  "critical_code_review_comments": [
+    "auctions.py _process_proxies (line ~86): 30-iteration cap combined with +1 step means proxy bidding functionally broken for any ceiling delta > 30. Compute second_highest ceiling once and jump directly. Test proves this bug.",
+    "auctions.py _enrich (line ~209): calls _finalize inside a GET handler — any read on an expired auction triggers a write. Under bot/preview load this creates lock contention. Move finalize to background task or scheduled job.",
+    "offers.py _enrich: does 3 separate awaits per offer (artwork, buyer, artist); listing 200 offers = 600 sequential Mongo round-trips. Batch via $in on user_ids and single artwork lookup, or add caching.",
+    "orders.py my_orders / selling_orders: same N+1 pattern — one artwork + one user lookup per line item. For a heavy seller this scales poorly.",
+    "payments.py _apply_paid buyer_order branch (line ~366): if tx.items contains the SAME artwork twice, artwork is marked sold once but order records two line items — inventory tracking assumes unit sales but no guard against overselling a single-edition piece. Verify by-design.",
+    "auctions.py atomic CAS uses `current_bid: a['current_bid']` in match filter — good — but does NOT re-verify status is still 'live' or end_at hasn't passed. A bid placed exactly at auction end can slip through if _finalize is racing. Consider adding `end_at: {$gt: now}` to the match filter.",
+    "offers.py: no explicit expiry sweep — pending offers stay pending forever. Consider a TTL or background job flipping abandoned offers to `expired` after N days. Currently only offers on the same artwork as a paid one get auto-expired.",
+    "payments.py pay_offer / pay_auction / etc: five near-identical Stripe session creators. Extract a common helper _create_stripe_session(kind, line_items, metadata, ...) — will cut ~200 lines and reduce drift risk.",
+    "payments._apply_paid: no logging on side-effect completion — hard to audit which webhooks ran. Add structured logs (session_id, kind, order_id).",
+    "orders.py ship: no idempotency key — retrying a shipped webhook could cause spurious notifications. Guard on fulfillment.status transition (already partially done via 400)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_commerce_full.py (new — 13 tests covering offers, auctions advanced, orders fulfillment, commissions flow, payment idempotency, race conditions)"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "Admin monster@houseofmonster.com / MonsterAdmin2026! (from /app/memory/test_credentials.md). Test artists/buyers registered per run with TEST_ prefix (email format TEST_{role}_{ts}_{rand}@test.com).",
+  "seed_data_creation": "Per run: 1 TEST_ artist, 2 TEST_ buyers, ~10 TEST_ artworks (flipped to live directly via DB to skip upload fee), ~4 offers, ~5 auctions, 1 order (injected directly), 1 commission, 1 payment_transactions doc (injected for idempotency test). All test artworks/offers/orders/commissions remain in DB tagged TEST_.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test suite lives at /app/backend/tests/test_commerce_full.py. Run: `cd /app && python -m pytest backend/tests/test_commerce_full.py -v -n 0`. All 13 tests pass. Note the test loads /app/backend/.env at import time to make STRIPE_SECRET_KEY / MONGO_URL available for the direct internal-import idempotency test. Regression suites test_new_features.py (auctions/commissions/rankings basics) and test_studio.py (35 studio tests) are still valid. HIGH-PRIORITY BUG for main agent: _process_proxies pricing is broken (bids peak at ~31 in a 100→300 vs 500 proxy war instead of ~301). Leader identity is correct but price is wrong.",
+  "rca_of_the_issue": "Proxy-bid ping-pong: _process_proxies (auctions.py L83-131) iterates up to 30 times, each iteration bidding target=min(contender.max, current+1). With two active proxies whose ceilings straddle a wide range, the two users alternate as `contender` (since contender must be != current_bidder), and each hop only raises price by +1. After 30 iterations the safety cap trips and the loop returns leaving current_bid at start_price + ~30. Reproduction: create auction start=100 with buyer proxy max=500, then buyer2 proxy max=300 — observed final current_bid=31 with buyer as leader (test_proxy_bid_auto_outbids). Mitigation: before the loop, compute second_highest_active_ceiling = max ceiling among proxies excluding the top one; if the top proxy is not the current leader, set target = min(top.max, second_highest_ceiling + 1) in ONE atomic update instead of stepping."
+}

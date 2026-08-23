@@ -9,6 +9,11 @@ const KIND_META = {
   outbid: { label: "You were outbid", icon: <Gavel size={14} />, color: "#FF4D4D" },
   auction_won: { label: "You won an auction", icon: <Trophy size={14} />, color: "#CCFF00" },
   auction_sold: { label: "Your artwork sold", icon: <Trophy size={14} />, color: "#CCFF00" },
+  auction_paid: { label: "Auction paid — payout queued", icon: <Trophy size={14} />, color: "#CCFF00" },
+  auction_forfeited: { label: "Auction win forfeited", icon: <Gavel size={14} />, color: "#FF4D4D" },
+  auction_cancelled: { label: "Auction cancelled — no payer", icon: <Gavel size={14} />, color: "#FF4D4D" },
+  auction_deadline_soon: { label: "Payment deadline in <6h", icon: <Bell size={14} />, color: "#F5A623" },
+  watched_auction_leader: { label: "Watched auction has a new leader", icon: <Bell size={14} />, color: "#7C3AED" },
   commission_request: { label: "New commission request", icon: <Palette size={14} />, color: "#7C3AED" },
   commission_accept: { label: "Commission accepted", icon: <Check size={14} />, color: "#CCFF00" },
   commission_decline: { label: "Commission declined", icon: <Palette size={14} />, color: "#FF4D4D" },
@@ -16,6 +21,21 @@ const KIND_META = {
   commission_progress: { label: "Commission progress update", icon: <Palette size={14} />, color: "#00E5FF" },
   commission_delivered: { label: "Commission delivered", icon: <Palette size={14} />, color: "#CCFF00" },
   commission_approved: { label: "Commission approved", icon: <Check size={14} />, color: "#CCFF00" },
+  commission_deposit: { label: "Commission deposit received", icon: <Check size={14} />, color: "#CCFF00" },
+  commission_paid: { label: "Commission paid in full", icon: <Check size={14} />, color: "#CCFF00" },
+  order_confirmed: { label: "Order confirmed", icon: <Check size={14} />, color: "#CCFF00" },
+  order_shipped: { label: "Order shipped", icon: <Bell size={14} />, color: "#7C3AED" },
+  payout_released: { label: "Payout released", icon: <Check size={14} />, color: "#CCFF00" },
+  artwork_sold: { label: "Your artwork sold", icon: <Trophy size={14} />, color: "#CCFF00" },
+  offer_received: { label: "New offer received", icon: <Palette size={14} />, color: "#7C3AED" },
+  offer_accept: { label: "Offer accepted", icon: <Check size={14} />, color: "#CCFF00" },
+  offer_decline: { label: "Offer declined", icon: <Palette size={14} />, color: "#FF4D4D" },
+  offer_counter: { label: "Counter offer received", icon: <Palette size={14} />, color: "#F5A623" },
+  offer_accepted_by_buyer: { label: "Buyer accepted counter", icon: <Check size={14} />, color: "#CCFF00" },
+  offer_withdrawn: { label: "Offer withdrawn", icon: <Palette size={14} />, color: "#71717A" },
+  offer_paid: { label: "Offer paid — order created", icon: <Check size={14} />, color: "#CCFF00" },
+  offer_expired: { label: "Offer expired", icon: <Palette size={14} />, color: "#71717A" },
+  new_review: { label: "New review on your artwork", icon: <Check size={14} />, color: "#CCFF00" },
   new_follower: { label: "New follower", icon: <UserPlus size={14} />, color: "#7C3AED" },
 };
 
@@ -62,6 +82,8 @@ export default function Notifications() {
               const meta = KIND_META[n.kind] || { label: n.kind, icon: <Bell size={14} />, color: "#A1A1AA" };
               const to = n.commission?.id ? `/commissions/${n.commission.id}` :
                          n.auction?.id ? `/auctions/${n.auction.id}` :
+                         n.offer?.id ? "/offers" :
+                         n.order?.id ? `/orders/${n.order.id}` :
                          n.other?.id ? `/artist/${n.other.id}` : null;
               const inner = (
                 <div className={`p-4 flex items-start gap-4 hover:bg-white/[0.03] transition-colors ${!n.read ? "border-l-2 border-[#CCFF00]" : ""}`}>

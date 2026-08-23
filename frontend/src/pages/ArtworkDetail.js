@@ -4,7 +4,7 @@ import { api, fileUrl } from "../api";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Share2, Heart, MessageCircle, Send } from "lucide-react";
+import { Share2, Heart, MessageCircle, Send, Tag, X } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -18,6 +18,23 @@ export default function ArtworkDetail() {
   const { add, items } = useCart();
   const { user } = useAuth();
   const nav = useNavigate();
+  const [showOffer, setShowOffer] = useState(false);
+  const [offerAmt, setOfferAmt] = useState("");
+  const [offerMsg, setOfferMsg] = useState("");
+  const [offerBusy, setOfferBusy] = useState(false);
+
+  const submitOffer = async (e) => {
+    e.preventDefault();
+    if (!user) { toast("Sign in to make an offer"); return; }
+    setOfferBusy(true);
+    try {
+      await api.post("/offers", { artwork_id: id, amount: Number(offerAmt), message: offerMsg || undefined });
+      toast.success("Offer sent");
+      setShowOffer(false); setOfferAmt(""); setOfferMsg("");
+      nav("/offers");
+    } catch (er) { toast.error(er?.response?.data?.detail || "Offer failed"); }
+    setOfferBusy(false);
+  };
 
   const loadAll = () => {
     api.get(`/artworks/${id}`).then((r) => setArt(r.data)).catch(() => nav("/marketplace"));
@@ -94,6 +111,11 @@ export default function ArtworkDetail() {
             ) : (
               <button data-testid="add-to-cart" onClick={() => { add(art); toast.success("Added to cart"); }} className="btn-lime">Add to Cart</button>
             )}
+            {!isSold && user && art.artist?.id !== user.id && (
+              <button data-testid="make-offer-btn" onClick={() => { if (!user) { toast("Sign in to make an offer"); return; } setShowOffer(true); }} className="btn-violet">
+                <Tag size={14} className="mr-2" /> Make Offer
+              </button>
+            )}
             <button data-testid="like-btn" onClick={toggleLike} className="btn-ghost">
               <Heart size={14} className="mr-2" fill={likes.liked ? "#FF4D4D" : "none"} color={likes.liked ? "#FF4D4D" : undefined} />
               <span>{likes.count}</span>
@@ -106,6 +128,44 @@ export default function ArtworkDetail() {
               <button data-testid="submit-aotw" onClick={submitAotw} className="btn-violet">Submit AOTW</button>
             )}
           </div>
+
+          {showOffer && (
+            <div data-testid="offer-modal" className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowOffer(false)}>
+              <div className="glass-card p-6 md:p-8 max-w-md w-full rounded-sm" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="label-caps text-[#7C3AED]">Make an Offer</div>
+                    <div className="font-anton text-3xl mt-2">{art.title}</div>
+                    <div className="text-sm text-zinc-500 mt-1">List price ${Number(art.price).toLocaleString()}</div>
+                  </div>
+                  <button onClick={() => setShowOffer(false)} className="text-zinc-500 hover:text-white"><X size={20} /></button>
+                </div>
+                <form onSubmit={submitOffer} className="space-y-4">
+                  <div>
+                    <div className="label-caps mb-2">Your offer (USD)</div>
+                    <input data-testid="offer-amount-input" type="number" required step="1"
+                      min={Math.round(art.price * 0.5)} max={art.price}
+                      value={offerAmt} onChange={(e) => setOfferAmt(e.target.value)}
+                      placeholder={`$${Math.round(art.price * 0.5)}–$${art.price}`}
+                      className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none focus:border-[#7C3AED] font-unbounded" />
+                    <div className="text-xs text-zinc-500 mt-2">Offers must be at least 50% of list price.</div>
+                  </div>
+                  <div>
+                    <div className="label-caps mb-2">Message (optional)</div>
+                    <textarea data-testid="offer-message-input" rows={3} value={offerMsg} onChange={(e) => setOfferMsg(e.target.value)}
+                      placeholder="Anything you want the artist to know..."
+                      className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#7C3AED]" />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button data-testid="offer-submit" disabled={offerBusy || !offerAmt} className="btn-lime flex-1">
+                      {offerBusy ? "Sending..." : "Send Offer"}
+                    </button>
+                    <button type="button" onClick={() => setShowOffer(false)} className="btn-ghost">Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           <div className="mt-10 pt-8 border-t border-white/8">
             <div className="label-caps mb-4">About the piece</div>

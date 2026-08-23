@@ -37,17 +37,20 @@ function CountdownBadge({ endIso, small }) {
 
 export function AuctionsList() {
   const [live, setLive] = useState([]);
+  const [scheduled, setScheduled] = useState([]);
   const [ended, setEnded] = useState([]);
   const [tab, setTab] = useState("live");
   useEffect(() => {
-    api.get("/auctions?status=live").then((r) => setLive(r.data));
-    api.get("/auctions?status=ended").then((r) => setEnded(r.data));
-    const t = setInterval(() => {
+    const loadAll = () => {
       api.get("/auctions?status=live").then((r) => setLive(r.data));
-    }, 5000);
+      api.get("/auctions?status=scheduled").then((r) => setScheduled(r.data));
+      api.get("/auctions?status=ended").then((r) => setEnded(r.data));
+    };
+    loadAll();
+    const t = setInterval(loadAll, 5000);
     return () => clearInterval(t);
   }, []);
-  const list = tab === "live" ? live : ended;
+  const list = tab === "live" ? live : tab === "scheduled" ? scheduled : ended;
   return (
     <div data-testid="auctions-page" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-16 pb-32">
       <div className="mb-8">
@@ -56,14 +59,14 @@ export function AuctionsList() {
         <p className="text-zinc-400 mt-4 max-w-xl">Real-time bidding. When the clock runs out, the highest bid wins.</p>
       </div>
       <div className="flex gap-1 border-b border-white/8 mb-10">
-        {[["live", `Live (${live.length})`], ["ended", `Ended (${ended.length})`]].map(([k, l]) => (
+        {[["live", `Live (${live.length})`], ["scheduled", `Scheduled (${scheduled.length})`], ["ended", `Ended (${ended.length})`]].map(([k, l]) => (
           <button key={k} data-testid={`auction-tab-${k}`} onClick={() => setTab(k)}
             className={`label-caps px-4 py-3 border-b-2 ${tab === k ? "border-[#CCFF00] text-white" : "border-transparent text-zinc-500"}`}>{l}</button>
         ))}
       </div>
       {list.length === 0 ? (
         <div className="border border-dashed border-white/10 py-24 text-center label-caps text-zinc-500 rounded-sm">
-          {tab === "live" ? "No live auctions right now." : "No completed auctions yet."}
+          {tab === "live" ? "No live auctions right now." : tab === "scheduled" ? "No auctions scheduled." : "No completed auctions yet."}
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -76,25 +79,32 @@ export function AuctionsList() {
 
 function AuctionCard({ a }) {
   const { done } = useCountdown(a.end_at);
+  const isScheduled = a.status === "scheduled";
   return (
     <Link to={`/auctions/${a.id}`} data-testid={`auction-card-${a.id}`}
       className="block border border-white/8 hover-lift-card group bg-[#121214] rounded-sm">
       <div className="aspect-[4/3] overflow-hidden bg-black relative">
         <img src={resolveImg(a.artwork?.images?.[0])} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
-        <div className="absolute top-3 left-3 badge-violet">Live · {a.bid_count} bids</div>
-        {done && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><div className="badge-coral !text-sm !px-4 !py-2">Ending...</div></div>}
+        <div className="absolute top-3 left-3">
+          {isScheduled ? <div className="badge-violet !bg-[#F5A623]/20 !text-[#F5A623] !border-[#F5A623]/40">Scheduled</div> : <div className="badge-violet">Live · {a.bid_count} bids</div>}
+        </div>
+        {done && !isScheduled && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><div className="badge-coral !text-sm !px-4 !py-2">Ending...</div></div>}
       </div>
       <div className="p-5">
         <div className="font-unbounded font-semibold text-lg">{a.artwork?.title}</div>
         <div className="text-xs text-zinc-500 mt-1">by {a.seller?.name}</div>
         <div className="flex items-baseline justify-between mt-4">
           <div>
-            <div className="label-caps">Current bid</div>
-            <div className="font-anton text-3xl text-[#CCFF00] mt-1">${Number(a.current_bid || a.start_price).toLocaleString()}</div>
+            <div className="label-caps">{isScheduled ? "Starts at" : "Current bid"}</div>
+            {isScheduled ? (
+              <div className="font-anton text-xl mt-1">{new Date(a.start_at).toLocaleString()}</div>
+            ) : (
+              <div className="font-anton text-3xl text-[#CCFF00] mt-1">${Number(a.current_bid || a.start_price).toLocaleString()}</div>
+            )}
           </div>
           <div className="text-right">
-            <div className="label-caps">Ends in</div>
-            <div className="mt-1"><CountdownBadge endIso={a.end_at} small /></div>
+            <div className="label-caps">{isScheduled ? "Starts in" : "Ends in"}</div>
+            <div className="mt-1"><CountdownBadge endIso={isScheduled ? a.start_at : a.end_at} small /></div>
           </div>
         </div>
       </div>
@@ -156,7 +166,13 @@ export function AuctionDetail() {
 
         <div className="md:col-span-5">
           <div className="glass-card p-6 rounded-sm">
-            {a.status === "live" ? (
+            {a.status === "scheduled" ? (
+              <>
+                <div className="label-caps text-[#F5A623]">Starts in</div>
+                <div className="mt-2"><CountdownBadge endIso={a.start_at} /></div>
+                <div className="text-xs text-zinc-500 mt-3">Bidding opens {new Date(a.start_at).toLocaleString()}</div>
+              </>
+            ) : a.status === "live" ? (
               <>
                 <div className="label-caps text-[#7C3AED]">Ends in</div>
                 <div className="mt-2"><CountdownBadge endIso={a.end_at} /></div>
@@ -188,19 +204,23 @@ export function AuctionDetail() {
             </div>
 
             {a.status === "live" && !isSeller && (
-              <form onSubmit={placeBid} className="mt-6">
-                <div className="label-caps mb-2">Your bid (min ${minNext.toLocaleString()})</div>
-                <div className="flex gap-2">
-                  <input data-testid="bid-input" type="number" min={minNext} step="1" required
-                    value={amount} onChange={(e) => setAmount(e.target.value)}
-                    className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none focus:border-[#CCFF00] font-unbounded" />
-                  <button data-testid="bid-submit" disabled={placing} className="btn-lime">
-                    {placing ? "..." : "Bid"}
-                  </button>
-                </div>
-              </form>
+              <>
+                <form onSubmit={placeBid} className="mt-6">
+                  <div className="label-caps mb-2">Your bid (min ${minNext.toLocaleString()})</div>
+                  <div className="flex gap-2">
+                    <input data-testid="bid-input" type="number" min={minNext} step="1" required
+                      value={amount} onChange={(e) => setAmount(e.target.value)}
+                      className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none focus:border-[#CCFF00] font-unbounded" />
+                    <button data-testid="bid-submit" disabled={placing} className="btn-lime">
+                      {placing ? "..." : "Bid"}
+                    </button>
+                  </div>
+                </form>
+                <ProxyBidPanel auctionId={a.id} minNext={minNext} onSet={load} />
+                <WatchToggle auctionId={a.id} />
+              </>
             )}
-            {isSeller && a.status === "live" && <div className="mt-6 label-caps text-zinc-500">You're the seller.</div>}
+            {a.status === "live" && isSeller && <div className="mt-6 label-caps text-zinc-500">You're the seller.</div>}
             {iWon && !a.paid && (
               <div className="mt-6 p-4 border border-[#CCFF00] rounded-sm bg-[#CCFF00]/5" data-testid="winner-banner">
                 <div className="badge-lime"><Trophy size={12} className="inline mr-1" /> You won</div>
@@ -239,7 +259,7 @@ export function CreateAuction() {
   const nav = useNavigate();
   const { user } = useAuth();
   const [artworks, setArtworks] = useState([]);
-  const [form, setForm] = useState({ artwork_id: "", start_price: 100, reserve_price: 0, duration_minutes: 60 });
+  const [form, setForm] = useState({ artwork_id: "", start_price: 100, reserve_price: 0, duration_minutes: 60, when: "now", start_at: "" });
   useEffect(() => {
     api.get("/artworks/mine").then((r) => setArtworks(r.data.filter((a) => a.status === "live")));
   }, []);
@@ -247,16 +267,21 @@ export function CreateAuction() {
     e.preventDefault();
     if (!form.artwork_id) { toast.error("Pick an artwork"); return; }
     try {
-      const r = await api.post("/auctions", {
-        ...form,
+      const payload = {
+        artwork_id: form.artwork_id,
         start_price: Number(form.start_price),
         reserve_price: Number(form.reserve_price),
         duration_minutes: Number(form.duration_minutes),
-      });
-      toast.success("Auction live");
+      };
+      if (form.when === "scheduled" && form.start_at) {
+        payload.start_at = new Date(form.start_at).toISOString();
+      }
+      const r = await api.post("/auctions", payload);
+      toast.success(form.when === "scheduled" ? "Auction scheduled" : "Auction live");
       nav(`/auctions/${r.data.id}`);
     } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
   };
+  const minDT = new Date(Date.now() + 60_000).toISOString().slice(0, 16);
   return (
     <div data-testid="create-auction" className="max-w-2xl mx-auto px-6 pt-16 pb-32">
       <div className="label-caps text-[#7C3AED]"><Gavel size={12} className="inline mr-2" /> New Auction</div>
@@ -292,7 +317,24 @@ export function CreateAuction() {
             <option value={60 * 24 * 7}>7 days</option>
           </select>
         </label>
-        <button data-testid="auction-submit" className="btn-lime mt-6">Launch Live Auction</button>
+        <div>
+          <div className="label-caps mb-2">When</div>
+          <div className="flex gap-2">
+            {[["now", "Start now"], ["scheduled", "Schedule for later"]].map(([k, l]) => (
+              <button type="button" key={k} data-testid={`when-${k}`}
+                onClick={() => setForm({ ...form, when: k })}
+                className={`label-caps px-4 py-2 border rounded-sm ${form.when === k ? "border-[#CCFF00] text-[#CCFF00]" : "border-white/12 text-zinc-400"}`}>{l}</button>
+            ))}
+          </div>
+          {form.when === "scheduled" && (
+            <input data-testid="auction-start-at" type="datetime-local" min={minDT} required value={form.start_at}
+              onChange={(e) => setForm({ ...form, start_at: e.target.value })}
+              className="w-full mt-3 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none" />
+          )}
+        </div>
+        <button data-testid="auction-submit" className="btn-lime mt-6">
+          {form.when === "scheduled" ? "Schedule Auction" : "Launch Live Auction"}
+        </button>
       </form>
     </div>
   );
@@ -312,5 +354,69 @@ function PayAuctionButton({ auctionId, amount }) {
       <CreditCard size={14} className="mr-2" />
       {busy ? "Redirecting..." : `Pay $${Number(amount).toLocaleString()} Now`}
     </button>
+  );
+}
+
+function ProxyBidPanel({ auctionId, minNext, onSet }) {
+  const [mine, setMine] = useState(null);
+  const [max, setMax] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = () => api.get(`/auctions/${auctionId}/proxy-bid/mine`).then((r) => setMine(r.data)).catch(() => {});
+  useEffect(load, [auctionId]);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api.post(`/auctions/${auctionId}/proxy-bid`, { max_amount: Number(max) });
+      toast.success("Auto-bid set");
+      setMax(""); load(); onSet?.();
+    } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
+    setBusy(false);
+  };
+  const cancel = async () => {
+    try { await api.delete(`/auctions/${auctionId}/proxy-bid`); toast.success("Auto-bid off"); load(); }
+    catch { toast.error("Failed"); }
+  };
+  return (
+    <div className="mt-4 pt-4 border-t border-white/8" data-testid="proxy-panel">
+      <div className="label-caps mb-2">Auto-bid up to</div>
+      {mine?.active ? (
+        <div className="flex items-center gap-3">
+          <div className="font-anton text-2xl text-[#7C3AED]">${Number(mine.max_amount).toLocaleString()}</div>
+          <button data-testid="proxy-cancel" onClick={cancel} className="label-caps text-[#FF4D4D] hover:underline">Turn off</button>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="flex gap-2">
+          <input data-testid="proxy-input" type="number" min={minNext} step="1" placeholder={`min $${minNext}`} value={max} onChange={(e) => setMax(e.target.value)}
+            className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#7C3AED]" />
+          <button data-testid="proxy-set" disabled={busy || !max} className="btn-violet !py-2 !text-xs">Set Max</button>
+        </form>
+      )}
+      <div className="text-xs text-zinc-500 mt-2">We'll bid for you in increments up to this ceiling.</div>
+    </div>
+  );
+}
+
+function WatchToggle({ auctionId }) {
+  const [state, setState] = useState({ watching: false, count: 0 });
+  const load = () => api.get(`/auctions/${auctionId}/watch`).then((r) => setState(r.data)).catch(() => {});
+  useEffect(load, [auctionId]);
+  const toggle = async () => {
+    try {
+      if (state.watching) await api.delete(`/auctions/${auctionId}/watch`);
+      else await api.post(`/auctions/${auctionId}/watch`);
+      load();
+    } catch { toast.error("Failed"); }
+  };
+  return (
+    <div className="mt-4 pt-4 border-t border-white/8 flex items-center justify-between" data-testid="watch-panel">
+      <div>
+        <div className="label-caps">Watching · {state.count}</div>
+        <div className="text-xs text-zinc-500 mt-1">Get notified on leader changes and 6h before payment deadline.</div>
+      </div>
+      <button data-testid="watch-toggle" onClick={toggle} className={state.watching ? "btn-lime !py-2 !text-xs" : "btn-ghost !py-2 !text-xs"}>
+        {state.watching ? "Watching ✓" : "Watch"}
+      </button>
+    </div>
   );
 }

@@ -38,6 +38,7 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 - Social layer: follows, likes, comments, feed
 - Messages, search
 - Auctions, rankings, commissions
+
 - **Studio system (NEW)**: `/api/studio/themes`, `/api/studio/{artist_id}`, PATCH `/api/studio`, `/api/studio/analytics/me`, `POST /api/studio/ai-design` (Claude Sonnet 4.6)
 - **Studio Posts (NEW)**: `/api/posts` CRUD + pin + like
 
@@ -98,3 +99,41 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 - 2FA (structure ready, not wired)
 - Video posts / stories rail
 - Digital prints / print-on-demand
+
+## Production Commerce Hardening (Feb 23, 2026)
+Full commerce system audit + upgrade:
+
+### Offers (make-an-offer) — NEW module (`offers.py`)
+- Buyer offers on live artworks (50–100% of list price)
+- Seller accept / decline / counter (>original, ≤list)
+- Buyer accept-counter / decline-counter / withdraw
+- Stripe payment for accepted offers (`/api/payments/offers/{id}/pay`)
+- Auto-expires competing offers when one is paid
+- Full notifications chain
+
+### Auction hardening
+- Scheduled auctions with `start_at` (auto-activates on time)
+- Atomic compare-and-swap on bids using `find_one_and_update` with `current_bid` + `end_at` + `status` match filters — prevents concurrent-bid race conditions (returns 409 to loser)
+- eBay-style proxy bidding: top ceiling jumps directly to `second_highest_ceiling + 1` in ONE atomic bid (previously stepped +1 up to 30 iterations, capped at ~30)
+- Watchers notified on leader change and 6h before payment deadline
+- 48-hour payment window with next-bidder forfeit chain
+
+### Order fulfillment
+- `POST /api/orders/{id}/ship` (seller, requires carrier+tracking)
+- `POST /api/orders/{id}/mark-delivered` (buyer, releases payouts)
+- `GET /api/orders/selling` for artist fulfillment queue
+- fulfillment status pipeline: pending → shipped → delivered
+- Reviews gated behind delivered status
+
+### Frontend
+- `/offers` inbox (buyer & seller tabs) at `pages/Offers.js`
+- Make-an-Offer modal on `ArtworkDetail`
+- Fulfillment panel on `OrderDetail` (ship form + mark-delivered CTA)
+- `/orders` and `/selling` routes in nav
+- Scheduled tab + start_at picker on Auctions
+- Countdown works for both start_at and end_at
+
+### Testing
+- 13/13 pytest suite `tests/test_commerce_full.py` passing
+- Covers race conditions, idempotency, offer lifecycle, proxy pricing, fulfillment, commissions
+

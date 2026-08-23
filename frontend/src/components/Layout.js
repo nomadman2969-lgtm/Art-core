@@ -92,7 +92,10 @@ export default function Layout({ children }) {
               <div className="hidden md:flex items-center gap-3 ml-2">
                 {user.role === "admin" && <Link to="/admin" data-testid="nav-admin" className="label-caps hover:text-[#CCFF00]">Admin</Link>}
                 {(user.role === "artist" || user.role === "admin") && <Link to="/studio" data-testid="nav-studio" className="label-caps hover:text-[#CCFF00]">Studio</Link>}
+                {(user.role === "artist" || user.role === "admin") && <Link to="/selling" data-testid="nav-selling" className="label-caps hover:text-[#CCFF00]">Selling</Link>}
                 {user.role === "buyer" && <Link to="/dashboard" data-testid="nav-dashboard" className="label-caps hover:text-[#CCFF00]">Dashboard</Link>}
+                <Link to="/orders" data-testid="nav-orders" className="label-caps hover:text-[#CCFF00]">Orders</Link>
+                <Link to="/offers" data-testid="nav-offers" className="label-caps hover:text-[#CCFF00]">Offers</Link>
                 <Link to="/commissions" data-testid="nav-commissions" className="label-caps hover:text-[#CCFF00]">Commissions</Link>
                 <button data-testid="logout-btn" onClick={() => { logout(); nav("/"); }} className="label-caps hover:text-[#FF4D4D]">Logout</button>
               </div>
