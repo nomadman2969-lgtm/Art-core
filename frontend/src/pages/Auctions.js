@@ -161,6 +161,14 @@ export function AuctionDetail() {
                 <div className="label-caps text-[#7C3AED]">Ends in</div>
                 <div className="mt-2"><CountdownBadge endIso={a.end_at} /></div>
               </>
+            ) : a.status === "cancelled" ? (
+              <div className="badge-coral">Cancelled · No Payment</div>
+            ) : a.payment_deadline && !a.paid ? (
+              <>
+                <div className="label-caps text-[#F5A623]">Winner must pay in</div>
+                <div className="mt-2"><CountdownBadge endIso={a.payment_deadline} /></div>
+                <div className="text-xs text-zinc-500 mt-3">Payment window: 48 hours. If not paid, the auction passes to the next-highest bidder.</div>
+              </>
             ) : (
               <div className="badge-coral">Auction Ended</div>
             )}

@@ -1,5 +1,5 @@
 """Live auctions: create, bid, finalize with winner."""
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -15,6 +15,69 @@ def _iso_now():
 
 def _parse(dt: str) -> datetime:
     return datetime.fromisoformat(dt.replace("Z", "+00:00"))
+
+
+async def _reassign_if_expired(auction_id: str):
+    """If a winner's 48h payment window elapsed without payment, forfeit and pass to next bidder."""
+    a = await db.auctions.find_one({"id": auction_id})
+    if not a or a["status"] != "ended":
+        return
+    if a.get("paid"):
+        return
+    deadline = a.get("payment_deadline")
+    if not deadline:
+        return
+    if _iso_now() < _parse(deadline):
+        return
+    # Winner forfeited — find next highest bidder not in the forfeited set
+    forfeits = list(a.get("forfeits", []))
+    if a.get("winner_id"):
+        forfeits.append({"user_id": a["winner_id"], "amount": a.get("final_price"), "at": now_iso()})
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": a["winner_id"], "kind": "auction_forfeited",
+            "auction_id": auction_id, "artwork_id": a["artwork_id"],
+            "read": False, "created_at": now_iso(),
+        })
+    forfeited_users = {f["user_id"] for f in forfeits}
+    # Find next best bid from a distinct user not in forfeited
+    bids = await db.bids.find({"auction_id": auction_id}).sort("amount", -1).to_list(500)
+    next_winner = None
+    for b in bids:
+        if b["user_id"] not in forfeited_users:
+            next_winner = b
+            break
+    if next_winner:
+        new_deadline = datetime.now(timezone.utc) + timedelta(hours=48)
+        await db.auctions.update_one({"id": auction_id}, {"$set": {
+            "winner_id": next_winner["user_id"],
+            "final_price": next_winner["amount"],
+            "current_bid": next_winner["amount"],
+            "current_bidder_id": next_winner["user_id"],
+            "current_bidder_name": next_winner["user_name"],
+            "payment_deadline": new_deadline.isoformat(),
+            "forfeits": forfeits,
+            "ended_at": now_iso(),
+        }})
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": next_winner["user_id"], "kind": "auction_won",
+            "auction_id": auction_id, "artwork_id": a["artwork_id"],
+            "amount": next_winner["amount"], "read": False, "created_at": now_iso(),
+        })
+        # unmark artwork sold since we're re-opening to a different winner
+        await db.artworks.update_one({"id": a["artwork_id"]}, {"$set": {"status": "sold"}})
+    else:
+        # No more bidders — cancel
+        await db.auctions.update_one({"id": auction_id}, {"$set": {
+            "winner_id": None, "final_price": None,
+            "payment_deadline": None, "forfeits": forfeits,
+            "status": "cancelled",
+        }})
+        await db.artworks.update_one({"id": a["artwork_id"]}, {"$set": {"status": "live"}})
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": a["seller_id"], "kind": "auction_cancelled",
+            "auction_id": auction_id, "artwork_id": a["artwork_id"],
+            "read": False, "created_at": now_iso(),
+        })
 
 
 async def _enrich(a: dict) -> dict:
@@ -33,9 +96,16 @@ async def _enrich(a: dict) -> dict:
     # auto-finalize if end passed
     if a["status"] == "live" and _iso_now() >= _parse(a["end_at"]):
         await _finalize(a["id"])
-        fresh = await db.auctions.find_one({"id": a["id"]})
-        a["status"] = fresh["status"]
-        a["winner_id"] = fresh.get("winner_id")
+    # check payment deadline reassignment
+    if a["status"] == "ended" and a.get("payment_deadline"):
+        await _reassign_if_expired(a["id"])
+    fresh = await db.auctions.find_one({"id": a["id"]})
+    if fresh:
+        a = strip_mongo(fresh)
+        if art:
+            a["artwork"] = {"id": art["id"], "title": art["title"], "images": art.get("images", []), "price": art.get("price"), "medium": art.get("medium")}
+        if seller:
+            a["seller"] = {"id": seller["id"], "name": seller["name"]}
     return a
 
 
@@ -47,23 +117,24 @@ async def _finalize(auction_id: str):
     winning_bid = a.get("current_bid", 0)
     reserve = a.get("reserve_price", 0) or 0
     won = winner_id and winning_bid >= reserve
+    payment_deadline = None
+    if won:
+        payment_deadline = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
     updates = {
         "status": "ended",
         "winner_id": winner_id if won else None,
         "final_price": winning_bid if won else None,
+        "payment_deadline": payment_deadline,
         "ended_at": now_iso(),
     }
     await db.auctions.update_one({"id": auction_id}, {"$set": updates})
     if won:
-        # mark artwork sold
         await db.artworks.update_one({"id": a["artwork_id"]}, {"$set": {"status": "sold"}})
-        # winner notification (stored in generic notifications collection for future notification page)
         await db.notifications.insert_one({
             "id": new_id(), "user_id": winner_id, "kind": "auction_won",
             "auction_id": auction_id, "artwork_id": a["artwork_id"],
             "amount": winning_bid, "read": False, "created_at": now_iso(),
         })
-        # seller notification
         await db.notifications.insert_one({
             "id": new_id(), "user_id": a["seller_id"], "kind": "auction_sold",
             "auction_id": auction_id, "artwork_id": a["artwork_id"],

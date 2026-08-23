@@ -22,6 +22,7 @@ async def get_settings() -> dict:
             "commission_percent": 15.0,
             "upload_fee": 5.0,
             "currency": "usd",
+            "deposit_percent": 50.0,
             "aotw_artwork_id": None,
             "created_at": now_iso(),
         }
@@ -169,6 +170,16 @@ async def pay_auction(auction_id: str, req: AuctionPayReq, user: dict = Depends(
         raise HTTPException(403, "Not the winner")
     if au.get("paid"):
         raise HTTPException(400, "Already paid")
+    # Enforce 48h payment deadline
+    from datetime import datetime as _dt, timezone as _tz
+    deadline = au.get("payment_deadline")
+    if deadline:
+        try:
+            dl = _dt.fromisoformat(deadline.replace("Z", "+00:00"))
+            if _dt.now(_tz.utc) > dl:
+                raise HTTPException(400, "Payment window expired — auction passed to next bidder")
+        except ValueError:
+            pass
     amount = float(au.get("final_price") or au.get("current_bid") or 0)
     if amount <= 0:
         raise HTTPException(400, "Invalid amount")
@@ -202,9 +213,50 @@ async def pay_auction(auction_id: str, req: AuctionPayReq, user: dict = Depends(
     return {"checkout_url": session.url, "session_id": session.id}
 
 
-# ---------- Commission payment ----------
+# ---------- Commission payment (deposit + balance escrow) ----------
 class CommissionPayReq(BaseModel):
     origin_url: str
+
+
+@router.post("/payments/commissions/{commission_id}/deposit")
+async def pay_commission_deposit(commission_id: str, req: CommissionPayReq, user: dict = Depends(get_current_user)):
+    c = await db.commissions.find_one({"id": commission_id})
+    if not c:
+        raise HTTPException(404, "Commission not found")
+    if c["buyer_id"] != user["id"]:
+        raise HTTPException(403, "Not your commission")
+    if c["status"] != "in_progress":
+        raise HTTPException(400, "Deposit only after artist accepts")
+    if c.get("deposit_paid"):
+        raise HTTPException(400, "Deposit already paid")
+    settings = await get_settings()
+    total = float(c.get("counter_amount") or c["budget"])
+    pct = float(settings.get("deposit_percent", 50.0)) / 100.0
+    amount = round(total * pct, 2)
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": settings["currency"],
+                "product_data": {"name": f"Deposit ({int(pct*100)}%): {c['subject']}"},
+                "unit_amount": int(round(amount * 100)),
+            },
+            "quantity": 1,
+        }],
+        success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{req.origin_url}/payment/cancel",
+        customer_email=user["email"],
+        metadata={"kind": "commission_deposit", "commission_id": commission_id, "user_id": user["id"]},
+    )
+    await db.payment_transactions.insert_one({
+        "id": new_id(), "session_id": session.id,
+        "kind": "commission_deposit", "user_id": user["id"],
+        "commission_id": commission_id, "artist_id": c["artist_id"],
+        "amount": amount, "total": total, "currency": settings["currency"],
+        "status": "initiated", "payment_status": "pending",
+        "created_at": now_iso(), "updated_at": now_iso(),
+    })
+    return {"checkout_url": session.url, "session_id": session.id, "amount": amount}
 
 
 @router.post("/payments/commissions/{commission_id}/pay")
@@ -218,15 +270,21 @@ async def pay_commission(commission_id: str, req: CommissionPayReq, user: dict =
         raise HTTPException(400, "Commission not approved yet")
     if c.get("paid"):
         raise HTTPException(400, "Already paid")
-    amount = float(c.get("counter_amount") or c["budget"])
+    total = float(c.get("counter_amount") or c["budget"])
+    deposit = float(c.get("deposit_amount") or 0)
+    amount = round(total - deposit, 2)
+    if amount <= 0:
+        # No balance left → mark paid directly
+        await db.commissions.update_one({"id": commission_id}, {"$set": {"paid": True, "status": "paid", "paid_at": now_iso()}})
+        return {"checkout_url": None, "session_id": None, "free": True}
     settings = await get_settings()
-    artist = await db.users.find_one({"id": c["artist_id"]})
+    label = f"Balance: {c['subject']}" if deposit > 0 else f"Commission: {c['subject']}"
     session = stripe.checkout.Session.create(
         mode="payment",
         line_items=[{
             "price_data": {
                 "currency": settings["currency"],
-                "product_data": {"name": f"Commission: {c['subject']}"},
+                "product_data": {"name": label},
                 "unit_amount": int(round(amount * 100)),
             },
             "quantity": 1,
@@ -240,11 +298,11 @@ async def pay_commission(commission_id: str, req: CommissionPayReq, user: dict =
         "id": new_id(), "session_id": session.id,
         "kind": "commission_payment", "user_id": user["id"],
         "commission_id": commission_id, "artist_id": c["artist_id"],
-        "amount": amount, "currency": settings["currency"],
+        "amount": amount, "total": total, "currency": settings["currency"],
         "status": "initiated", "payment_status": "pending",
         "created_at": now_iso(), "updated_at": now_iso(),
     })
-    return {"checkout_url": session.url, "session_id": session.id}
+    return {"checkout_url": session.url, "session_id": session.id, "amount": amount}
 
 
 # ---------- Status ----------
@@ -335,6 +393,16 @@ async def _apply_paid(session_id: str):
         await db.notifications.insert_one({
             "id": new_id(), "user_id": tx["user_id"], "kind": "order_confirmed",
             "order_id": order["id"], "amount": gross,
+            "read": False, "created_at": now_iso(),
+        })
+    elif tx["kind"] == "commission_deposit":
+        gross = float(tx["amount"])
+        await db.commissions.update_one({"id": tx["commission_id"]}, {"$set": {
+            "deposit_paid": True, "deposit_amount": gross, "deposit_paid_at": now_iso(),
+        }})
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": tx["artist_id"], "kind": "commission_deposit",
+            "commission_id": tx["commission_id"], "amount": gross,
             "read": False, "created_at": now_iso(),
         })
     elif tx["kind"] == "commission_payment":

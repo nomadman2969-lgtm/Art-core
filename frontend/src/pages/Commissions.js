@@ -290,6 +290,9 @@ export function CommissionDetail() {
 
       {isArtist && c.status === "in_progress" && (
         <div className="mt-8 glass-card p-6 rounded-sm space-y-6" data-testid="artist-progress-panel">
+          {c.deposit_paid && (
+            <div className="badge-lime !text-xs" data-testid="deposit-paid">Deposit received · ${Number(c.deposit_amount).toLocaleString()}</div>
+          )}
           <div>
             <div className="label-caps mb-2">Post a progress update</div>
             <div className="flex gap-2">
@@ -307,6 +310,22 @@ export function CommissionDetail() {
             <textarea data-testid="deliver-message" value={deliverMsg} onChange={(e) => setDeliverMsg(e.target.value)} rows={2} placeholder="Delivery notes..." className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 mt-3 outline-none" />
             <button data-testid="deliver-submit" onClick={deliver} className="btn-lime mt-3"><Upload size={14} className="mr-2" /> Deliver</button>
           </div>
+        </div>
+      )}
+
+      {isBuyer && c.status === "in_progress" && !c.deposit_paid && (
+        <div className="mt-8 glass-card p-6 rounded-sm" data-testid="buyer-deposit-panel">
+          <div className="label-caps text-[#F5A623]">Deposit required to lock in the artist</div>
+          <div className="font-anton text-3xl mt-2">50% up front</div>
+          <div className="text-sm text-zinc-400 mt-2">Pay a deposit now to secure the commission. The remaining balance is due after you approve delivery.</div>
+          <PayDepositButton commissionId={c.id} total={c.counter_amount || c.budget} onDone={load} />
+        </div>
+      )}
+
+      {isBuyer && c.status === "in_progress" && c.deposit_paid && (
+        <div className="mt-8 border border-white/10 p-4 rounded-sm" data-testid="deposit-confirmed">
+          <div className="label-caps text-[#CCFF00]">Deposit paid · ${Number(c.deposit_amount).toLocaleString()}</div>
+          <div className="text-sm text-zinc-400 mt-2">Balance ${Number((c.counter_amount || c.budget) - c.deposit_amount).toLocaleString()} due after delivery is approved.</div>
         </div>
       )}
 
@@ -373,6 +392,24 @@ function PayCommissionButton({ commissionId, amount }) {
     <button data-testid="pay-commission-btn" onClick={pay} disabled={busy} className="btn-lime mt-4">
       <CreditCard size={14} className="mr-2" />
       {busy ? "Redirecting..." : `Pay $${Number(amount).toLocaleString()}`}
+    </button>
+  );
+}
+
+function PayDepositButton({ commissionId, total, onDone }) {
+  const [busy, setBusy] = React.useState(false);
+  const pay = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post(`/payments/commissions/${commissionId}/deposit`, { origin_url: ORIGIN });
+      window.location.href = r.data.checkout_url;
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); setBusy(false); }
+  };
+  const deposit = Math.round(Number(total) * 0.5);
+  return (
+    <button data-testid="pay-deposit-btn" onClick={pay} disabled={busy} className="btn-lime mt-4">
+      <CreditCard size={14} className="mr-2" />
+      {busy ? "Redirecting..." : `Pay Deposit $${deposit.toLocaleString()}`}
     </button>
   );
 }
