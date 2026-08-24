@@ -587,6 +587,83 @@ async def ai_design(req: AIDesignReq, user: dict = Depends(require_role("artist"
         raise HTTPException(500, f"AI design failed: {str(e)[:200]}")
 
 
+# ---------- Polish text (Claude rewrite in artist voice) ----------
+class PolishReq(BaseModel):
+    body: str = Field(min_length=3, max_length=4000)
+    kind: str = "text_block"  # text_block | announcement | button_cta | custom
+    tone: Optional[str] = None  # optional: "punchy", "warm", "clinical", etc — otherwise inferred from studio
+
+
+POLISH_SYSTEM = """You are a professional copywriter helping visual artists write compelling Studio content.
+
+You will receive:
+- The current draft text (may be rough, incomplete, or too long)
+- The kind of section (announcement, text_block, button_cta blurb, or custom section)
+- Context about the artist (studio theme + artist story)
+
+Rewrite the text in the artist's authentic voice. Rules:
+1. Preserve the artist's meaning and any specific facts (dates, prices, names) EXACTLY.
+2. Match the section kind:
+   - announcement: 1-3 punchy sentences, urgency-appropriate, avoids fluff
+   - text_block: 2-5 sentences, warm and personal, invites the reader in
+   - button_cta blurb: 1 tight sentence + a clear reason to click
+   - custom: whatever feels right for the theme
+3. Match the studio vibe: graffiti = raw + confident; luxury = refined + collected; dark = cinematic + minimal; neon = electric + direct; minimal = ultra-clean; industrial = grounded.
+4. Never invent facts the artist didn't provide.
+5. Keep it under the original length + 20 words unless the original was less than one sentence.
+6. Do NOT wrap output in quotes, markdown, or code fences. Return only the rewritten text.
+"""
+
+
+@router.post("/polish-text")
+async def polish_text(req: PolishReq, user: dict = Depends(require_role("artist", "admin"))):
+    """Rewrite a snippet in the artist's voice using Claude. Draft-safe — this endpoint
+    returns text only; the frontend decides where to apply it."""
+    try:
+        cfg = await _get_or_create_config(user["id"])
+        # Effective values: draft over published
+        d = cfg.get("draft") or {}
+        theme_id = d.get("theme") or cfg.get("theme") or "urban_graffiti"
+        theme = THEMES.get(theme_id, THEMES["urban_graffiti"])
+        story = d.get("artist_story") or cfg.get("artist_story") or {}
+        story_bits = [f"{k}: {v}" for k, v in story.items() if v and k in ("location", "style", "influences", "years_active")]
+        artist_context = f"Artist: {user['name']}\nStudio theme: {theme_id} ({theme['vibe']})\n" + ("\n".join(story_bits) if story_bits else "No artist story provided yet.")
+
+        prompt = f"""SECTION KIND: {req.kind}
+{'TONE: ' + req.tone if req.tone else ''}
+ARTIST CONTEXT:
+{artist_context}
+
+DRAFT TEXT:
+{req.body}
+
+Rewrite the draft above."""
+
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=os.environ["EMERGENT_LLM_KEY"],
+            session_id=f"polish-{user['id']}-{new_id()[:8]}",
+            system_message=POLISH_SYSTEM,
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        resp = await chat.send_message(UserMessage(text=prompt))
+        polished = resp if isinstance(resp, str) else str(resp)
+        polished = polished.strip()
+        # Strip accidental code fences or wrapping quotes
+        if polished.startswith("```"):
+            polished = polished.split("```", 2)[1]
+            if polished.startswith("text"):
+                polished = polished[4:]
+            polished = polished.strip()
+        if (polished.startswith('"') and polished.endswith('"')) or (polished.startswith('“') and polished.endswith('”')):
+            polished = polished[1:-1].strip()
+        # Safety: keep length reasonable
+        if len(polished) > 4200:
+            polished = polished[:4200]
+        return {"original": req.body, "polished": polished, "kind": req.kind}
+    except Exception as e:
+        raise HTTPException(500, f"Polish failed: {str(e)[:200]}")
+
+
 # ---------- Studio Posts (social feed) ----------
 class PostCreate(BaseModel):
     kind: str = "update"  # update | wip | studio_photo | announcement | auction | sold | commission
@@ -600,16 +677,20 @@ posts_router = APIRouter(prefix="/api/posts", tags=["studio-posts"])
 
 @posts_router.post("")
 async def create_post(req: PostCreate, user: dict = Depends(require_role("artist", "admin"))):
+    from social import _resolve_mentions, _notify_mentions
+    mentions = await _resolve_mentions(req.text)
     p = {
         "id": new_id(),
         "artist_id": user["id"],
         "artist_name": user["name"],
         "kind": req.kind, "text": req.text, "image": req.image,
         "pinned": req.pinned,
+        "mentions": mentions,
         "like_count": 0, "comment_count": 0,
         "created_at": now_iso(),
     }
     await db.studio_posts.insert_one(p)
+    await _notify_mentions(mentions, user, "mentioned_in_post", post_id=p["id"])
     return strip_mongo(p)
 
 

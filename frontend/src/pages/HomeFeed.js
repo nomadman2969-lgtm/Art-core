@@ -1,0 +1,199 @@
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { api, fileUrl } from "../api";
+import { toast } from "sonner";
+import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Palette } from "lucide-react";
+
+const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+
+const POST_KIND_META = {
+  update: { label: "Update", color: "#CCFF00" },
+  wip: { label: "Work in Progress", color: "#F5A623" },
+  studio_photo: { label: "Studio", color: "#7C3AED" },
+  announcement: { label: "Announcement", color: "#00E5FF" },
+  auction: { label: "Auction", color: "#FF4D4D" },
+  sold: { label: "Sold", color: "#CCFF00" },
+  commission: { label: "Commission", color: "#7C3AED" },
+  exhibition: { label: "Exhibition", color: "#D4AF37" },
+  behind_scenes: { label: "Behind the Scenes", color: "#FF6EC7" },
+};
+
+// Simple @handle rendering — links to /artist/{id} isn't easy without resolving,
+// so we just style them differently
+function renderText(text) {
+  if (!text) return null;
+  const parts = text.split(/(@[a-zA-Z0-9_\-\.]{2,32})/g);
+  return parts.map((p, i) =>
+    p.startsWith("@") ? <span key={i} className="text-[#CCFF00]">{p}</span> : <span key={i}>{p}</span>
+  );
+}
+
+export default function HomeFeed() {
+  const [feed, setFeed] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    api.get("/feed/home").then((r) => setFeed(r.data)).finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  if (loading) return <div className="py-32 text-center label-caps text-zinc-500">Loading your feed...</div>;
+  return (
+    <div data-testid="home-feed" className="max-w-2xl mx-auto px-4 md:px-6 pt-10 pb-32">
+      <div className="mb-8">
+        <div className="label-caps text-[#CCFF00]"><Users size={12} className="inline mr-2" /> Home Feed</div>
+        <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3">Your Feed</h1>
+        <div className="text-zinc-500 mt-2">
+          {feed.following_count > 0
+            ? `Latest from ${feed.following_count} artist${feed.following_count === 1 ? "" : "s"} you follow.`
+            : "You're not following any artists yet. Explore below to fill your feed."}
+        </div>
+      </div>
+      {feed.items.length === 0 ? (
+        <div className="border border-dashed border-white/10 py-24 text-center rounded-sm">
+          <Sparkles size={32} className="mx-auto text-zinc-600" />
+          <div className="label-caps mt-4 text-zinc-500">Nothing here yet</div>
+          <Link to="/artists" className="btn-lime mt-6 inline-flex">Discover Artists</Link>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {feed.items.map((it) => (
+            it.timeline_kind === "post"
+              ? <PostCard key={`p-${it.id}`} post={it} onChange={load} />
+              : <ArtworkFeedCard key={`a-${it.id}`} art={it} onChange={load} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TimeAgo({ iso }) {
+  if (!iso) return null;
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return <span>just now</span>;
+  if (m < 60) return <span>{m}m ago</span>;
+  const h = Math.floor(m / 60);
+  if (h < 24) return <span>{h}h ago</span>;
+  const d = Math.floor(h / 24);
+  if (d < 7) return <span>{d}d ago</span>;
+  return <span>{new Date(iso).toLocaleDateString()}</span>;
+}
+
+function PostCard({ post, onChange }) {
+  const meta = POST_KIND_META[post.kind] || POST_KIND_META.update;
+  const [liked, setLiked] = useState(!!post.liked);
+  const [likeCount, setLikeCount] = useState(post.like_count || 0);
+  const toggleLike = async () => {
+    try {
+      if (liked) { await api.delete(`/posts/${post.id}/like`); setLiked(false); setLikeCount((c) => Math.max(0, c - 1)); }
+      else { await api.post(`/posts/${post.id}/like`); setLiked(true); setLikeCount((c) => c + 1); }
+    } catch (e) { toast.error("Failed"); }
+  };
+  return (
+    <article data-testid={`post-${post.id}`} className="border border-white/8 rounded-sm bg-[#121214] overflow-hidden">
+      <div className="p-4 flex items-center gap-3">
+        <Link to={`/artist/${post.artist?.id}`} className="w-11 h-11 rounded-full bg-[#7C3AED]/30 flex items-center justify-center font-anton text-lg flex-shrink-0">
+          {post.artist?.name?.[0]?.toUpperCase() || "A"}
+        </Link>
+        <div className="flex-1 min-w-0">
+          <Link to={`/artist/${post.artist?.id}`} className="font-unbounded font-semibold hover:text-[#CCFF00]">{post.artist?.name}</Link>
+          <div className="text-xs text-zinc-500 flex items-center gap-2 flex-wrap">
+            <span className="label-caps px-2 py-0.5 rounded-sm" style={{ background: `${meta.color}20`, color: meta.color }}>{meta.label}</span>
+            · <TimeAgo iso={post.created_at} />
+            {post.pinned && <span className="label-caps text-[#F5A623]">· Pinned</span>}
+          </div>
+        </div>
+      </div>
+      {post.image && (
+        <img src={resolveImg(post.image)} className="w-full max-h-[70vh] object-cover bg-black" alt="" loading="lazy" />
+      )}
+      <div className="p-4">
+        <div className="text-zinc-100 whitespace-pre-wrap leading-relaxed">{renderText(post.text)}</div>
+        <div className="flex items-center gap-5 mt-4 pt-4 border-t border-white/8">
+          <button data-testid={`post-like-${post.id}`} onClick={toggleLike} className="flex items-center gap-2 label-caps hover:text-[#FF4D4D] transition-colors">
+            <Heart size={16} fill={liked ? "#FF4D4D" : "none"} color={liked ? "#FF4D4D" : "currentColor"} />
+            <span>{likeCount}</span>
+          </button>
+          <Link to={`/artist/${post.artist?.id}#post-${post.id}`} className="flex items-center gap-2 label-caps hover:text-[#CCFF00]">
+            <MessageCircle size={16} />
+            <span>{post.comment_count || 0}</span>
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ArtworkFeedCard({ art, onChange }) {
+  const [liked, setLiked] = useState(!!art.liked);
+  const [saved, setSaved] = useState(!!art.saved);
+  const [likeCount, setLikeCount] = useState(art.like_count || 0);
+  const toggleLike = async (e) => {
+    e.preventDefault();
+    try {
+      if (liked) { await api.delete(`/artworks/${art.id}/like`); setLiked(false); setLikeCount((c) => Math.max(0, c - 1)); }
+      else { await api.post(`/artworks/${art.id}/like`); setLiked(true); setLikeCount((c) => c + 1); }
+    } catch { toast.error("Failed"); }
+  };
+  const toggleSave = async (e) => {
+    e.preventDefault();
+    try {
+      if (saved) { await api.delete(`/artworks/${art.id}/save`); setSaved(false); toast("Removed from saved"); }
+      else { await api.post(`/artworks/${art.id}/save`, {}); setSaved(true); toast.success("Saved"); }
+    } catch { toast.error("Failed"); }
+  };
+  const share = async (e) => {
+    e.preventDefault();
+    const url = `${window.location.origin}/artwork/${art.id}`;
+    try { await navigator.clipboard.writeText(url); } catch {}
+    await api.post(`/artworks/${art.id}/share`, { target: "copy_link" }).catch(() => {});
+    toast.success("Link copied");
+  };
+  return (
+    <article data-testid={`feed-art-${art.id}`} className="border border-white/8 rounded-sm bg-[#121214] overflow-hidden">
+      <div className="p-4 flex items-center gap-3">
+        <Link to={`/artist/${art.artist?.id}`} className="w-11 h-11 rounded-full bg-[#CCFF00]/30 flex items-center justify-center font-anton text-lg flex-shrink-0">
+          {art.artist?.name?.[0]?.toUpperCase() || "A"}
+        </Link>
+        <div className="flex-1 min-w-0">
+          <Link to={`/artist/${art.artist?.id}`} className="font-unbounded font-semibold hover:text-[#CCFF00]">{art.artist?.name}</Link>
+          <div className="text-xs text-zinc-500 flex items-center gap-2">
+            <span className="label-caps px-2 py-0.5 rounded-sm" style={{ background: "#CCFF0020", color: "#CCFF00" }}>
+              <Palette size={10} className="inline mr-1" /> New Artwork
+            </span>
+            · <TimeAgo iso={art.created_at} />
+          </div>
+        </div>
+      </div>
+      <Link to={`/artwork/${art.id}`} className="block relative group">
+        <img src={resolveImg(art.images?.[0])} className="w-full max-h-[80vh] object-cover bg-black" alt={art.title} loading="lazy" />
+      </Link>
+      <div className="p-4">
+        <Link to={`/artwork/${art.id}`}>
+          <div className="font-anton text-2xl uppercase leading-tight">{art.title}</div>
+          <div className="text-xs text-zinc-500 mt-1">{art.medium} · <span className="text-[#CCFF00] font-anton">${Number(art.price).toLocaleString()}</span></div>
+        </Link>
+        {art.description && <p className="text-sm text-zinc-300 mt-3 line-clamp-3">{art.description}</p>}
+        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-white/8">
+          <button data-testid={`art-like-${art.id}`} onClick={toggleLike} className="flex items-center gap-2 label-caps hover:text-[#FF4D4D]">
+            <Heart size={16} fill={liked ? "#FF4D4D" : "none"} color={liked ? "#FF4D4D" : "currentColor"} />
+            <span>{likeCount}</span>
+          </button>
+          <Link to={`/artwork/${art.id}#comments`} className="flex items-center gap-2 label-caps hover:text-[#CCFF00]">
+            <MessageCircle size={16} /> <span>{art.comment_count || 0}</span>
+          </Link>
+          <button data-testid={`art-share-${art.id}`} onClick={share} className="flex items-center gap-2 label-caps hover:text-[#7C3AED]">
+            <Share2 size={16} />
+          </button>
+          <button data-testid={`art-save-${art.id}`} onClick={toggleSave} className="flex items-center gap-2 label-caps hover:text-[#CCFF00] ml-auto">
+            <Bookmark size={16} fill={saved ? "#CCFF00" : "none"} color={saved ? "#CCFF00" : "currentColor"} />
+            <span>{saved ? "Saved" : "Save"}</span>
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}

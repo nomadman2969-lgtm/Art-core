@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 9: Verified new social layer end-to-end — home feed timeline, saves + collections, threaded comment replies, @mentions with notifications, artwork shares (with throttled notification), post likes/comments, followers/following lists, and enriched notifications. Backend: 19/19 pytest passed against preview URL (isolated buyer+artist fixtures, forced artwork to live via pymongo). Frontend (Desktop 1920px + Mobile 375px): /feed shows PostCard + ArtworkFeedCard with optimistic Heart/Comment/Share/Save toggles; /saved renders SavedIndex with New Collection modal that successfully creates a collection; All Saved pseudo-collection opens CollectionDetail and shows the auto-saved artwork tile; ArtworkDetail has working save-btn / share-btn / reply-btn with inline reply-input and nested reply-{id} rendering; @UIArtistName rendered in #CCFF00 accent inside the comment body; Notifications page correctly renders 5 new social kinds with proper labels (Mentioned you, New comment on your artwork, Liked your post, Your artwork was shared, New follower). nav-feed and nav-saved appear only when logged in. No horizontal overflow at 375px. Only console noise is image 404s from placeholder /uploads/x.jpg used in seeded data — not a real bug.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Notifications", "issues": ["Notification subtitle concatenates artwork title and user name without separator, e.g. 'TESTArt 3b56ef81UIBuyer3b56ef81'. Add a space or dash between artwork.title and other.name in Notifications.js templates."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_social_feed.py",
+    "/app/test_reports/pytest/iter9_results.xml"
+  ],
+  "action_items": [
+    "Fix concatenation bug in Notifications.js for new social kinds (artwork title + other.name run together — needs a separator).",
+    "Consider adding an `artist` link/href resolution for @mentions so clicking a mention navigates to /artist/{id} — currently only styled, not clickable."
+  ],
+  "critical_code_review_comments": [
+    "Duplicate post-like route: /api/posts/{id}/like is defined in BOTH social.py (via /api prefix) and studio.py's posts_router (/api/posts prefix). Only the first one registered wins (social's), which is fortunate because it also fires the post_liked notification, but the studio-router version is dead code and confusing — remove it from studio.py.",
+    "social.py home_feed queries studio_posts + artworks with a fixed limit of `limit` each then merges and re-truncates; this ignores pagination and can miss older artworks if a followed artist has many posts. Consider proper cursor-based pagination.",
+    "collections/mine performs N+1 queries: for each collection loads 3 covers then a per-cover artworks lookup. For heavy users this is O(N*3) queries. Use $lookup aggregation.",
+    "Home feed's `renderText` in HomeFeed.js styles @mentions but they are not clickable/linkified — poor UX.",
+    "ArtworkDetail.js `share()` toasts 'Link copied' only in the non-native branch; if navigator.share exists it silently completes with no visual feedback."
+  ],
+  "updated_files": ["/app/backend/tests/test_social_feed.py"],
+  "success_rate": { "backend": "100% (19/19)", "frontend": "100% (home feed, saves + collections modal, artwork replies, mentions, shares, notifications, mobile viewport all verified)" },
+  "test_credentials": "monster@houseofmonster.com / MonsterAdmin2026! (admin). Ephemeral: TEST_uiartist_<uid>@t.com / pass123 & TEST_uibuyer_<uid>@t.com / pass123 created during the run.",
+  "seed_data_creation": "Created 1 TEST artist + 1 TEST buyer + 1 TEST artwork (forced status=live via pymongo) + 1 studio_post + 1 collection + several comments/replies/notifications during the run. All prefixed with TEST_ for easy cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend pytest.ini forces `-n 2 --dist loadscope`; use `-n 0` when running test_social_feed.py because module-scoped fixtures share buyer/artist across classes. Duplicate /posts/{id}/like route exists between social.py and studio.py — the social one wins because it's registered first. Artwork requires width_in/height_in fields in POST /api/artworks (they were missing from prior test setup docs)."
+}

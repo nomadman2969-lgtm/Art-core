@@ -25,6 +25,8 @@ import { AuctionsList, AuctionDetail, CreateAuction } from "@/pages/Auctions";
 import Rankings from "@/pages/Rankings";
 import { CommissionsInbox, CommissionCreate, CommissionDetail } from "@/pages/Commissions";
 import OffersInbox from "@/pages/Offers";
+import HomeFeed from "@/pages/HomeFeed";
+import { SavedIndex, CollectionDetail } from "@/pages/Saved";
 import { Orders, OrderDetail, SellingOrders } from "@/pages/Orders";
 import Notifications from "@/pages/Notifications";
 import NotFound from "@/pages/NotFound";
@@ -83,6 +85,9 @@ function App() {
                 <Route path="/commissions/new/:artistId" element={<RequireAuth><CommissionCreate /></RequireAuth>} />
                 <Route path="/commissions/:id" element={<RequireAuth><CommissionDetail /></RequireAuth>} />
                 <Route path="/offers" element={<RequireAuth><OffersInbox /></RequireAuth>} />
+                <Route path="/feed" element={<RequireAuth><HomeFeed /></RequireAuth>} />
+                <Route path="/saved" element={<RequireAuth><SavedIndex /></RequireAuth>} />
+                <Route path="/saved/:id" element={<RequireAuth><CollectionDetail /></RequireAuth>} />
                 <Route path="/orders" element={<RequireAuth><Orders /></RequireAuth>} />
                 <Route path="/orders/:id" element={<RequireAuth><OrderDetail /></RequireAuth>} />
                 <Route path="/selling" element={<RequireRole roles={["artist", "admin"]}><SellingOrders /></RequireRole>} />

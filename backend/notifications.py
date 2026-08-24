@@ -54,6 +54,22 @@ async def _enrich(n: dict) -> dict:
         f = await db.users.find_one({"id": n["follower_id"]})
         if f:
             n["other"] = {"id": f["id"], "name": f["name"]}
+    # New social kinds (comment reply, new comment, artwork share, post like/comment, mentions)
+    if kind in ("new_comment", "comment_reply", "artwork_shared",
+                "mentioned_in_comment", "mentioned_in_post_comment", "mentioned_in_post",
+                "post_liked", "post_comment"):
+        if n.get("from_user_id"):
+            u = await db.users.find_one({"id": n["from_user_id"]})
+            if u:
+                n["other"] = {"id": u["id"], "name": u["name"]}
+        if n.get("artwork_id"):
+            art = await db.artworks.find_one({"id": n["artwork_id"]})
+            if art:
+                n["artwork"] = {"id": art["id"], "title": art["title"], "images": art.get("images", [])[:1]}
+        if n.get("post_id"):
+            p = await db.studio_posts.find_one({"id": n["post_id"]})
+            if p:
+                n["post"] = {"id": p["id"], "text": (p.get("text") or "")[:80], "image": p.get("image")}
     return n
 
 

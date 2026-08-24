@@ -4,7 +4,7 @@ import { api, fileUrl } from "../api";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Share2, Heart, MessageCircle, Send, Tag, X } from "lucide-react";
+import { Share2, Heart, MessageCircle, Send, Tag, X, Bookmark } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -15,6 +15,9 @@ export default function ArtworkDetail() {
   const [likes, setLikes] = useState({ count: 0, liked: false });
   const [comments, setComments] = useState([]);
   const [comment, setComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyText, setReplyText] = useState("");
+  const [saved, setSaved] = useState(false);
   const { add, items } = useCart();
   const { user } = useAuth();
   const nav = useNavigate();
@@ -40,6 +43,7 @@ export default function ArtworkDetail() {
     api.get(`/artworks/${id}`).then((r) => setArt(r.data)).catch(() => nav("/marketplace"));
     api.get(`/artworks/${id}/likes`).then((r) => setLikes(r.data));
     api.get(`/artworks/${id}/comments`).then((r) => setComments(r.data));
+    if (user) api.get(`/artworks/${id}/saved`).then((r) => setSaved(r.data.saved)).catch(() => {});
   };
   useEffect(loadAll, [id]);
 
@@ -47,10 +51,18 @@ export default function ArtworkDetail() {
   const inCart = items.some((i) => i.id === art.id);
   const isSold = art.status === "sold";
 
-  const share = () => {
+  const share = async () => {
     const url = window.location.href;
-    if (navigator.share) navigator.share({ title: art.title, url }).catch(() => {});
-    else { navigator.clipboard.writeText(url); toast.success("Link copied"); }
+    if (navigator.share) { try { await navigator.share({ title: art.title, url }); } catch {} }
+    else { try { await navigator.clipboard.writeText(url); } catch {} toast.success("Link copied"); }
+    try { await api.post(`/artworks/${id}/share`, { target: navigator.share ? "native" : "copy_link" }); } catch {}
+  };
+  const toggleSave = async () => {
+    if (!user) { toast("Sign in to save"); return; }
+    try {
+      if (saved) { await api.delete(`/artworks/${id}/save`); setSaved(false); toast("Removed from saved"); }
+      else { await api.post(`/artworks/${id}/save`, {}); setSaved(true); toast.success("Saved to your library"); }
+    } catch { toast.error("Failed"); }
   };
   const toggleLike = async () => {
     if (!user) { toast("Sign in to like"); return; }
@@ -59,16 +71,25 @@ export default function ArtworkDetail() {
       else { await api.post(`/artworks/${id}/like`); setLikes({ liked: true, count: likes.count + 1 }); }
     } catch { toast.error("Try again"); }
   };
-  const postComment = async (e) => {
-    e.preventDefault();
+  const postComment = async (e, parentId = null, text = null) => {
+    if (e) e.preventDefault();
     if (!user) { toast("Sign in to comment"); return; }
-    if (!comment.trim()) return;
+    const body = text ?? comment;
+    if (!body.trim()) return;
     try {
-      await api.post(`/artworks/${id}/comments`, { text: comment });
-      setComment("");
+      await api.post(`/artworks/${id}/comments`, { text: body, parent_id: parentId });
+      if (parentId) { setReplyText(""); setReplyingTo(null); }
+      else setComment("");
       const r = await api.get(`/artworks/${id}/comments`);
       setComments(r.data);
     } catch { toast.error("Failed"); }
+  };
+
+  const renderCommentText = (text) => {
+    if (!text) return null;
+    return text.split(/(@[a-zA-Z0-9_\-\.]{2,32})/g).map((p, i) =>
+      p.startsWith("@") ? <span key={i} className="text-[#CCFF00]">{p}</span> : <span key={i}>{p}</span>
+    );
   };
   const submitAotw = async () => {
     try { await api.post(`/artworks/${id}/submit-aotw`); toast.success("Submitted for Feature"); }
@@ -121,6 +142,10 @@ export default function ArtworkDetail() {
               <span>{likes.count}</span>
             </button>
             <button data-testid="share-btn" onClick={share} className="btn-ghost"><Share2 size={14} className="mr-2" /> Share</button>
+            <button data-testid="save-btn" onClick={toggleSave} className="btn-ghost">
+              <Bookmark size={14} className="mr-2" fill={saved ? "#CCFF00" : "none"} color={saved ? "#CCFF00" : undefined} />
+              {saved ? "Saved" : "Save"}
+            </button>
             {user && art.artist?.id && user.id !== art.artist.id && (
               <Link to={`/messages/${art.artist.id}`} data-testid="msg-artist" className="btn-ghost"><MessageCircle size={14} className="mr-2" /> Message</Link>
             )}
@@ -172,22 +197,49 @@ export default function ArtworkDetail() {
             <p className="text-zinc-300 leading-relaxed whitespace-pre-wrap">{art.description}</p>
           </div>
 
-          <div className="mt-10 pt-8 border-t border-white/8">
-            <div className="label-caps mb-4">Comments ({comments.length})</div>
+          <div id="comments" className="mt-10 pt-8 border-t border-white/8">
+            <div className="label-caps mb-4">Comments ({comments.reduce((n, c) => n + 1 + (c.replies?.length || 0), 0)})</div>
             <form onSubmit={postComment} className="flex gap-2 mb-6">
               <input data-testid="comment-input" value={comment} onChange={(e) => setComment(e.target.value)}
-                placeholder={user ? "Add a comment..." : "Sign in to comment"} disabled={!user}
+                placeholder={user ? "Add a comment... (use @name to tag)" : "Sign in to comment"} disabled={!user}
                 className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm" />
               <button data-testid="comment-submit" disabled={!user || !comment.trim()} className="btn-lime !py-2"><Send size={14} /></button>
             </form>
-            <div className="space-y-4 max-h-80 overflow-y-auto">
+            <div className="space-y-5 max-h-[500px] overflow-y-auto">
               {comments.map((c) => (
                 <div key={c.id} data-testid={`comment-${c.id}`} className="border-b border-white/5 pb-3">
                   <div className="flex items-baseline justify-between">
-                    <div className="font-unbounded text-sm font-semibold">{c.user_name}</div>
+                    <Link to={c.user_id ? `/artist/${c.user_id}` : "#"} className="font-unbounded text-sm font-semibold hover:text-[#CCFF00]">{c.user_name}</Link>
                     <div className="text-xs text-zinc-500">{new Date(c.created_at).toLocaleDateString()}</div>
                   </div>
-                  <div className="text-sm text-zinc-300 mt-1">{c.text}</div>
+                  <div className="text-sm text-zinc-300 mt-1 whitespace-pre-wrap">{renderCommentText(c.text)}</div>
+                  {user && (
+                    <button data-testid={`reply-btn-${c.id}`} onClick={() => setReplyingTo(replyingTo === c.id ? null : c.id)}
+                      className="label-caps text-xs text-zinc-500 hover:text-[#CCFF00] mt-2">
+                      {replyingTo === c.id ? "Cancel" : "Reply"}
+                    </button>
+                  )}
+                  {replyingTo === c.id && (
+                    <form onSubmit={(e) => postComment(e, c.id, replyText)} className="flex gap-2 mt-3 ml-4">
+                      <input data-testid={`reply-input-${c.id}`} autoFocus value={replyText} onChange={(e) => setReplyText(e.target.value)}
+                        placeholder={`Reply to ${c.user_name}... (use @name to tag)`}
+                        className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm" />
+                      <button data-testid={`reply-submit-${c.id}`} disabled={!replyText.trim()} className="btn-lime !py-2 !text-xs"><Send size={12} /></button>
+                    </form>
+                  )}
+                  {c.replies && c.replies.length > 0 && (
+                    <div className="mt-4 ml-6 pl-4 border-l border-white/8 space-y-3">
+                      {c.replies.map((r) => (
+                        <div key={r.id} data-testid={`reply-${r.id}`}>
+                          <div className="flex items-baseline justify-between">
+                            <Link to={r.user_id ? `/artist/${r.user_id}` : "#"} className="font-unbounded text-sm font-semibold hover:text-[#CCFF00]">{r.user_name}</Link>
+                            <div className="text-xs text-zinc-500">{new Date(r.created_at).toLocaleDateString()}</div>
+                          </div>
+                          <div className="text-sm text-zinc-300 mt-1 whitespace-pre-wrap">{renderCommentText(r.text)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {comments.length === 0 && <div className="text-zinc-500 text-sm">No comments yet.</div>}

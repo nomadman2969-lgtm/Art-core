@@ -427,6 +427,55 @@ function Stat({ label, value, accent }) {
   );
 }
 
+// ---------- Polish button (Claude rewrite) ----------
+function PolishButton({ value, kind, onApply, testId }) {
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null); // { original, polished }
+  const run = async () => {
+    if (!value || value.trim().length < 3) { toast("Add a few words first"); return; }
+    setBusy(true);
+    try {
+      const r = await api.post("/studio/polish-text", { body: value, kind });
+      setPreview({ original: value, polished: r.data.polished });
+    } catch (e) { toast.error(e?.response?.data?.detail || "Polish failed"); }
+    setBusy(false);
+  };
+  const accept = () => { onApply(preview.polished); setPreview(null); toast.success("Polished text applied"); };
+  const decline = () => setPreview(null);
+  return (
+    <>
+      <button type="button" data-testid={testId} onClick={run} disabled={busy}
+        className="label-caps text-xs px-2 py-1 border border-[#7C3AED]/40 text-[#7C3AED] hover:bg-[#7C3AED]/10 rounded-sm inline-flex items-center gap-1 transition-colors">
+        <Sparkles size={11} /> {busy ? "Polishing..." : "Polish"}
+      </button>
+      {preview && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={decline} data-testid={`${testId}-preview`}>
+          <div className="glass-card max-w-2xl w-full rounded-sm p-6 md:p-8" onClick={(e) => e.stopPropagation()}>
+            <div className="label-caps text-[#7C3AED] flex items-center gap-2"><Sparkles size={14} /> Polished by Claude</div>
+            <div className="mt-5 space-y-4">
+              <div>
+                <div className="label-caps text-zinc-500 mb-2">Before</div>
+                <div className="p-4 bg-white/[0.03] border border-white/10 rounded-sm text-sm text-zinc-400 whitespace-pre-wrap">{preview.original}</div>
+              </div>
+              <div>
+                <div className="label-caps text-[#CCFF00] mb-2">After</div>
+                <div className="p-4 bg-[#CCFF00]/5 border border-[#CCFF00]/30 rounded-sm text-sm text-white whitespace-pre-wrap">{preview.polished}</div>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button data-testid={`${testId}-accept`} onClick={accept} className="btn-lime flex-1">Use This</button>
+              <button data-testid={`${testId}-decline`} onClick={decline} className="btn-ghost">Keep Original</button>
+              <button data-testid={`${testId}-retry`} onClick={run} disabled={busy} className="btn-ghost">
+                {busy ? "..." : "Try Again"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ---------- Templates picker ----------
 function TemplatesPicker({ save }) {
   const [templates, setTemplates] = useState([]);
@@ -581,9 +630,18 @@ function SectionsEditor({ config, save }) {
                   )}
                   {["announcement", "text_block", "custom"].includes(s.kind) && (
                     <div>
-                      <div className="label-caps mb-2">Body</div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="label-caps">Body</div>
+                        <PolishButton
+                          testId={`polish-body-${s.id}`}
+                          value={s.body || ""}
+                          kind={s.kind}
+                          onApply={(text) => update(s.id, { body: text })} />
+                      </div>
                       <textarea data-testid={`body-${s.id}`} rows={s.kind === "announcement" ? 3 : 6}
                         value={s.body || ""} onChange={(e) => update(s.id, { body: e.target.value })}
+                        onDragStart={(e) => e.stopPropagation()}
+                        draggable={false}
                         placeholder="Write here..."
                         className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#CCFF00]" />
                     </div>
@@ -602,8 +660,16 @@ function SectionsEditor({ config, save }) {
                   {s.kind === "button_cta" && (
                     <>
                       <div>
-                        <div className="label-caps mb-2">Blurb</div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="label-caps">Blurb</div>
+                          <PolishButton
+                            testId={`polish-blurb-${s.id}`}
+                            value={s.body || ""}
+                            kind="button_cta"
+                            onApply={(text) => update(s.id, { body: text })} />
+                        </div>
                         <textarea rows={2} value={s.body || ""} onChange={(e) => update(s.id, { body: e.target.value })}
+                          onDragStart={(e) => e.stopPropagation()} draggable={false}
                           className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#CCFF00]" />
                       </div>
                       <div className="grid md:grid-cols-2 gap-3">
@@ -762,7 +828,10 @@ function StoryEditor({ config, save, user, refresh }) {
   return (
     <div className="space-y-5 max-w-3xl">
       <label className="block">
-        <div className="label-caps mb-2">Bio (shown at top of your Studio)</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="label-caps">Bio (shown at top of your Studio)</div>
+          <PolishButton testId="polish-bio" value={bio} kind="text_block" onApply={(t) => setBio(t)} />
+        </div>
         <textarea data-testid="bio-input" value={bio} onChange={(e) => setBio(e.target.value)} rows={4}
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
       </label>
@@ -794,7 +863,10 @@ function StoryEditor({ config, save, user, refresh }) {
         </label>
       </div>
       <label className="block">
-        <div className="label-caps mb-2">Influences / Inspiration</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="label-caps">Influences / Inspiration</div>
+          <PolishButton testId="polish-influences" value={story.influences || ""} kind="text_block" onApply={(t) => patch("influences", t)} />
+        </div>
         <textarea data-testid="story-influences" value={story.influences || ""} onChange={(e) => patch("influences", e.target.value)} rows={3}
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
       </label>

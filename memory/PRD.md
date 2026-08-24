@@ -100,7 +100,25 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 - Video posts / stories rail
 - Digital prints / print-on-demand
 
-## Studio Templates + Drag-Drop + Refund Console (Feb 24, 2026 · pm)
+## Social Layer v2 (Feb 25, 2026)
+
+### Backend (`social.py` major rewrite + `studio.py` post mentions)
+- **Home feed**: `GET /api/feed/home` merges studio posts + new artworks from followed artists, sorted DESC, with per-item like/comment counts and liked flag
+- **Threaded comments**: `parent_id` on comments, `GET /artworks/{id}/comments` returns top-level with `replies[]`, reply notifies parent author
+- **@Mentions**: regex parser on comments + posts + post-comments, resolves handle → user, fires `mentioned_in_*` notifications
+- **Shares**: `POST /artworks/{id}/share` increments count + throttled artist notification (once per user per day)
+- **Saves + Collections**: full CRUD (`POST/GET/DELETE /collections`), "All Saved" pseudo-collection, save with optional `collection_id`, artwork covers precomputed
+- **Post engagement**: like/unlike posts, comment on posts, all with notifications
+- **Followers/Following lists**: `GET /users/{id}/followers` and `/following`
+
+### Frontend
+- **NEW `/feed`**: HomeFeed page — mixed timeline of `PostCard` + `ArtworkFeedCard` with optimistic like/save/share, kind badges (WIP, sold, exhibition...), TimeAgo, @mention highlighting
+- **NEW `/saved`**: SavedIndex + CollectionDetail — grid of collections with cover mosaic, New Collection modal, private toggle, unsave from detail
+- **ArtworkDetail**: Save button + Share button (fires API), reply-to-comment with inline input, threaded rendering with left border, @mentions styled in accent
+- **Notifications**: 9 new social kinds with proper labels/icons, click-through routing for artworks/posts, fixed concatenation bug (title · user separator)
+
+### Testing — 19/19 backend + 100% frontend at both desktop & mobile
+
 
 ### Studio Starter Templates
 - 4 curated one-tap layouts: **Emerging Artist**, **Gallery Owner**, **Print Shop**, **Dark Solo Show**

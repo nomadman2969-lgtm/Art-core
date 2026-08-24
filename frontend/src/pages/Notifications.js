@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
-import { Bell, Gavel, Trophy, Palette, UserPlus, Check, Trash2 } from "lucide-react";
+import { Bell, Gavel, Trophy, Palette, UserPlus, Check, Trash2, MessageSquare, Heart } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -37,6 +37,14 @@ const KIND_META = {
   offer_expired: { label: "Offer expired", icon: <Palette size={14} />, color: "#71717A" },
   new_review: { label: "New review on your artwork", icon: <Check size={14} />, color: "#CCFF00" },
   new_follower: { label: "New follower", icon: <UserPlus size={14} />, color: "#7C3AED" },
+  new_comment: { label: "New comment on your artwork", icon: <MessageSquare size={14} />, color: "#CCFF00" },
+  comment_reply: { label: "Replied to your comment", icon: <MessageSquare size={14} />, color: "#7C3AED" },
+  artwork_shared: { label: "Your artwork was shared", icon: <Bell size={14} />, color: "#00E5FF" },
+  mentioned_in_comment: { label: "Mentioned you", icon: <Bell size={14} />, color: "#F5A623" },
+  mentioned_in_post_comment: { label: "Mentioned you", icon: <Bell size={14} />, color: "#F5A623" },
+  mentioned_in_post: { label: "Mentioned you in a post", icon: <Bell size={14} />, color: "#F5A623" },
+  post_liked: { label: "Liked your post", icon: <Heart size={14} />, color: "#FF4D4D" },
+  post_comment: { label: "Commented on your post", icon: <MessageSquare size={14} />, color: "#CCFF00" },
 };
 
 export default function Notifications() {
@@ -84,6 +92,8 @@ export default function Notifications() {
                          n.auction?.id ? `/auctions/${n.auction.id}` :
                          n.offer?.id ? "/offers" :
                          n.order?.id ? `/orders/${n.order.id}` :
+                         n.artwork?.id ? `/artwork/${n.artwork.id}` :
+                         n.post?.id && n.other?.id ? `/artist/${n.other.id}` :
                          n.other?.id ? `/artist/${n.other.id}` : null;
               const inner = (
                 <div className={`p-4 flex items-start gap-4 hover:bg-white/[0.03] transition-colors ${!n.read ? "border-l-2 border-[#CCFF00]" : ""}`}>
@@ -94,9 +104,10 @@ export default function Notifications() {
                       <div className="text-xs text-zinc-500 flex-shrink-0">{new Date(n.created_at).toLocaleString()}</div>
                     </div>
                     <div className="text-sm text-zinc-300 mt-1 truncate">
-                      {n.commission?.subject}
-                      {n.artwork?.title}
-                      {n.other?.name}
+                      {n.other?.name && <span>{n.other.name}</span>}
+                      {n.other?.name && (n.artwork?.title || n.commission?.subject) && <span className="text-zinc-500"> · </span>}
+                      {n.artwork?.title && <span>{n.artwork.title}</span>}
+                      {n.commission?.subject && <span>{n.commission.subject}</span>}
                       {n.amount != null && <span className="ml-2 text-[#CCFF00] font-anton">${Number(n.amount).toLocaleString()}</span>}
                     </div>
                   </div>
