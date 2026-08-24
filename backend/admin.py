@@ -1,9 +1,13 @@
-"""Admin endpoints: settings, AOTW curation, orders, mentorship, featured artworks."""
+"""Admin endpoints: settings, AOTW curation, orders, mentorship, featured artworks, refunds."""
+import os
+import stripe
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from db import db, new_id, now_iso, strip_mongo
 from auth import require_role, public_user
+
+stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -178,3 +182,158 @@ async def newsletter_signup(req: NewsletterReq):
 async def list_newsletter(user=Depends(require_role("admin"))):
     cursor = db.newsletter.find({}).sort("created_at", -1)
     return [strip_mongo(n) for n in await cursor.to_list(1000)]
+
+
+# ---------- Refund Console ----------
+class RefundReq(BaseModel):
+    amount: Optional[float] = None
+    reason: Optional[str] = None
+    reverse_payouts: bool = True
+
+
+async def _refund_stripe_transaction(session_id: str, amount: Optional[float], reason: Optional[str]):
+    """Refund via the PaymentIntent that this Checkout Session created. Returns (refund_id, refunded_amount)."""
+    try:
+        s = stripe.checkout.Session.retrieve(session_id)
+        pi = s.payment_intent
+        if not pi:
+            raise HTTPException(400, "No PaymentIntent — payment may still be pending")
+        kwargs = {"payment_intent": pi}
+        if amount is not None:
+            kwargs["amount"] = int(round(amount * 100))
+        if reason in ("duplicate", "fraudulent", "requested_by_customer"):
+            kwargs["reason"] = reason
+        kwargs["reverse_transfer"] = True
+        kwargs["refund_application_fee"] = True
+        r = stripe.Refund.create(**kwargs)
+        return r.id, (r.amount or 0) / 100.0
+    except stripe.error.StripeError as e:
+        raise HTTPException(400, f"Stripe refund failed: {e.user_message or str(e)[:200]}")
+
+
+@router.get("/refundable")
+async def list_refundable(user=Depends(require_role("admin"))):
+    out = []
+    orders = await db.orders.find({"refunded": {"$ne": True}}).sort("created_at", -1).to_list(200)
+    for o in orders:
+        o = strip_mongo(o)
+        out.append({
+            "kind": "order",
+            "id": o["id"],
+            "session_id": o.get("session_id"),
+            "buyer_id": o.get("buyer_id"),
+            "amount": o.get("total"),
+            "currency": o.get("currency", "usd"),
+            "source": o.get("source", "buyer_order"),
+            "created_at": o.get("created_at"),
+            "fulfillment_status": (o.get("fulfillment") or {}).get("status"),
+            "artist_payouts": o.get("artist_payouts", []),
+        })
+    commissions = await db.commissions.find({"paid": True, "refunded": {"$ne": True}}).sort("paid_at", -1).to_list(200)
+    for c in commissions:
+        c = strip_mongo(c)
+        tx = await db.payment_transactions.find_one({"commission_id": c["id"], "kind": "commission_payment", "payment_status": "paid"})
+        deposit_tx = await db.payment_transactions.find_one({"commission_id": c["id"], "kind": "commission_deposit", "payment_status": "paid"})
+        out.append({
+            "kind": "commission",
+            "id": c["id"],
+            "subject": c.get("subject"),
+            "buyer_id": c.get("buyer_id"),
+            "artist_id": c.get("artist_id"),
+            "amount": float(c.get("counter_amount") or c.get("budget") or 0),
+            "currency": "usd",
+            "created_at": c.get("paid_at") or c.get("updated_at"),
+            "session_id": tx.get("session_id") if tx else None,
+            "deposit_session_id": deposit_tx.get("session_id") if deposit_tx else None,
+        })
+    return out
+
+
+@router.post("/orders/{oid}/refund")
+async def refund_order(oid: str, req: RefundReq, user=Depends(require_role("admin"))):
+    o = await db.orders.find_one({"id": oid})
+    if not o:
+        raise HTTPException(404, "Order not found")
+    if o.get("refunded"):
+        raise HTTPException(400, "Already refunded")
+    session_id = o.get("session_id")
+    if not session_id:
+        raise HTTPException(400, "No Stripe session on this order")
+    refund_id, refunded = await _refund_stripe_transaction(session_id, req.amount, req.reason)
+    payouts = o.get("artist_payouts", [])
+    if req.reverse_payouts:
+        for p in payouts:
+            if p.get("status") in ("auto_transferred", "transferred"):
+                p["status"] = "reversed"
+            elif p.get("status") == "released":
+                p["status"] = "clawback_needed"
+            elif p.get("status") == "pending":
+                p["status"] = "cancelled"
+    is_full = (req.amount is None) or (abs(refunded - float(o["total"])) < 0.01)
+    await db.orders.update_one({"id": oid}, {"$set": {
+        "refunded": is_full,
+        "refund_amount": refunded,
+        "refund_reason": req.reason,
+        "refunded_at": now_iso(),
+        "stripe_refund_id": refund_id,
+        "artist_payouts": payouts,
+    }})
+    if is_full:
+        for it in o.get("items", []):
+            await db.artworks.update_one({"id": it["artwork_id"], "status": "sold"}, {"$set": {"status": "live"}})
+    if o.get("buyer_id"):
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": o["buyer_id"], "kind": "order_refunded",
+            "order_id": oid, "amount": refunded, "read": False, "created_at": now_iso(),
+        })
+    for p in payouts:
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": p["artist_id"], "kind": "payout_reversed",
+            "order_id": oid, "amount": p.get("net"), "read": False, "created_at": now_iso(),
+        })
+    return {"refunded": refunded, "refund_id": refund_id, "full": is_full}
+
+
+@router.post("/commissions/{cid}/refund")
+async def refund_commission(cid: str, req: RefundReq, user=Depends(require_role("admin"))):
+    c = await db.commissions.find_one({"id": cid})
+    if not c:
+        raise HTTPException(404, "Commission not found")
+    if c.get("refunded"):
+        raise HTTPException(400, "Already refunded")
+    balance_tx = await db.payment_transactions.find_one({"commission_id": cid, "kind": "commission_payment", "payment_status": "paid"})
+    deposit_tx = await db.payment_transactions.find_one({"commission_id": cid, "kind": "commission_deposit", "payment_status": "paid"})
+    if not balance_tx and not deposit_tx:
+        raise HTTPException(400, "No paid transactions on this commission")
+    total_refunded = 0.0
+    refund_ids = []
+    remaining = req.amount
+    if balance_tx:
+        amt = remaining if remaining is not None else None
+        rid, r_amt = await _refund_stripe_transaction(balance_tx["session_id"], amt, req.reason)
+        refund_ids.append(rid); total_refunded += r_amt
+        if remaining is not None:
+            remaining -= r_amt
+    if deposit_tx and (remaining is None or remaining > 0.001):
+        amt = remaining if remaining is not None else None
+        rid, r_amt = await _refund_stripe_transaction(deposit_tx["session_id"], amt, req.reason)
+        refund_ids.append(rid); total_refunded += r_amt
+    total = float(c.get("counter_amount") or c.get("budget") or 0)
+    is_full = abs(total_refunded - total) < 0.01
+    await db.commissions.update_one({"id": cid}, {"$set": {
+        "refunded": is_full,
+        "refund_amount": total_refunded,
+        "refund_reason": req.reason,
+        "refunded_at": now_iso(),
+        "stripe_refund_ids": refund_ids,
+        "status": "refunded" if is_full else c["status"],
+    }})
+    await db.notifications.insert_one({
+        "id": new_id(), "user_id": c["buyer_id"], "kind": "commission_refunded",
+        "commission_id": cid, "amount": total_refunded, "read": False, "created_at": now_iso(),
+    })
+    await db.notifications.insert_one({
+        "id": new_id(), "user_id": c["artist_id"], "kind": "commission_refunded",
+        "commission_id": cid, "amount": total_refunded, "read": False, "created_at": now_iso(),
+    })
+    return {"refunded": total_refunded, "refund_ids": refund_ids, "full": is_full}

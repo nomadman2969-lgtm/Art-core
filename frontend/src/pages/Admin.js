@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [artists, setArtists] = useState([]);
   const [mentors, setMentors] = useState([]);
+  const [refundables, setRefundables] = useState([]);
 
   const load = () => {
     api.get("/admin/stats").then((r) => setStats(r.data));
@@ -23,6 +24,7 @@ export default function AdminDashboard() {
     api.get("/admin/orders").then((r) => setOrders(r.data));
     api.get("/admin/artists").then((r) => setArtists(r.data));
     api.get("/admin/mentorship").then((r) => setMentors(r.data));
+    api.get("/admin/refundable").then((r) => setRefundables(r.data)).catch(() => {});
   };
   useEffect(load, []);
 
@@ -63,6 +65,7 @@ export default function AdminDashboard() {
     ["orders", "Orders"],
     ["artists", "Artists"],
     ["mentorship", "Mentorship"],
+    ["refunds", "Refunds"],
   ];
 
   return (
@@ -194,6 +197,98 @@ export default function AdminDashboard() {
           </div>
         )
       )}
+
+      {tab === "refunds" && (
+        <RefundsPanel items={refundables} onReload={load} />
+      )}
+    </div>
+  );
+}
+
+function RefundsPanel({ items, onReload }) {
+  const [openId, setOpenId] = useState(null);
+  const [amt, setAmt] = useState("");
+  const [reason, setReason] = useState("requested_by_customer");
+  const [busy, setBusy] = useState(false);
+
+  const doRefund = async (item, full) => {
+    setBusy(true);
+    try {
+      const path = item.kind === "order" ? `/admin/orders/${item.id}/refund` : `/admin/commissions/${item.id}/refund`;
+      const payload = { reason, reverse_payouts: true };
+      if (!full) {
+        const v = Number(amt);
+        if (!v || v <= 0 || v > item.amount) { toast.error("Enter a valid partial amount"); setBusy(false); return; }
+        payload.amount = v;
+      }
+      const r = await api.post(path, payload);
+      toast.success(`Refunded $${r.data.refunded.toFixed(2)}${r.data.full ? " (full)" : ""}`);
+      setOpenId(null); setAmt("");
+      onReload();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Refund failed"); }
+    setBusy(false);
+  };
+
+  if (items.length === 0) {
+    return <div className="text-zinc-500 label-caps py-16 text-center">No refundable transactions right now.</div>;
+  }
+  return (
+    <div data-testid="refunds-panel" className="space-y-3">
+      <div className="text-sm text-zinc-400 mb-4 max-w-2xl">
+        One-click refund via Stripe. Platform commission is auto-refunded AND artist transfers are auto-reversed (Stripe Connect). Manually released payouts get flagged <span className="text-[#F5A623]">clawback_needed</span>.
+      </div>
+      {items.map((it) => {
+        const isOpen = openId === it.id;
+        return (
+          <div key={it.id} data-testid={`refundable-${it.id}`} className="border border-white/8 rounded-sm">
+            <div className="p-4 flex flex-wrap items-center gap-4">
+              <div className="label-caps text-xs px-2 py-1 rounded-sm" style={{ background: it.kind === "commission" ? "#7C3AED30" : "#CCFF0030", color: it.kind === "commission" ? "#7C3AED" : "#CCFF00" }}>
+                {it.kind === "commission" ? "Commission" : it.source || "Order"}
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <div className="font-unbounded text-sm font-semibold">{it.kind === "commission" ? it.subject : `Order #${it.id.slice(0, 8)}`}</div>
+                <div className="label-caps text-zinc-500 mt-1">{new Date(it.created_at).toLocaleString()}</div>
+              </div>
+              <div className="font-anton text-2xl text-[#CCFF00]">${Number(it.amount).toLocaleString()}</div>
+              <button data-testid={`refund-toggle-${it.id}`} onClick={() => setOpenId(isOpen ? null : it.id)}
+                className={`btn-ghost !py-2 !text-xs ${isOpen ? "!border-[#FF4D4D] !text-[#FF4D4D]" : ""}`}>
+                {isOpen ? "Cancel" : "Refund"}
+              </button>
+            </div>
+            {isOpen && (
+              <div className="p-4 border-t border-white/8 bg-white/[0.02] space-y-3">
+                <div className="grid md:grid-cols-2 gap-3">
+                  <label className="block">
+                    <div className="label-caps mb-2">Reason</div>
+                    <select data-testid={`reason-${it.id}`} value={reason} onChange={(e) => setReason(e.target.value)}
+                      className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#FF4D4D]">
+                      <option value="requested_by_customer">Requested by customer</option>
+                      <option value="duplicate">Duplicate charge</option>
+                      <option value="fraudulent">Fraudulent</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <div className="label-caps mb-2">Partial amount (leave empty = full)</div>
+                    <input data-testid={`amount-${it.id}`} type="number" step="0.01" min="0" max={it.amount}
+                      value={amt} onChange={(e) => setAmt(e.target.value)} placeholder={`$${Number(it.amount).toLocaleString()}`}
+                      className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#FF4D4D]" />
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button data-testid={`refund-full-${it.id}`} disabled={busy} onClick={() => doRefund(it, true)} className="btn-coral !py-2 !text-xs">
+                    {busy ? "Refunding..." : `Refund Full $${Number(it.amount).toLocaleString()}`}
+                  </button>
+                  {amt && (
+                    <button data-testid={`refund-partial-${it.id}`} disabled={busy} onClick={() => doRefund(it, false)} className="btn-ghost !py-2 !text-xs">
+                      Refund ${Number(amt).toLocaleString()}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

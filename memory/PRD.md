@@ -100,7 +100,25 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 - Video posts / stories rail
 - Digital prints / print-on-demand
 
-## Studio v2 + Commission Timeline + Stripe Connect (Feb 24, 2026)
+## Studio Templates + Drag-Drop + Refund Console (Feb 24, 2026 · pm)
+
+### Studio Starter Templates
+- 4 curated one-tap layouts: **Emerging Artist**, **Gallery Owner**, **Print Shop**, **Dark Solo Show**
+- `GET /api/studio/templates` + `POST /api/studio/apply-template` (applies to draft, unique section IDs)
+
+### True Drag-Drop Sections
+- HTML5 native drag-drop (up/down arrows kept as fallback)
+- Visual feedback + typing-safe (title input stops drag propagation)
+
+### Admin Refund Console
+- Refunds tab in `/admin` with one-click full/partial refunds for orders + commissions
+- Uses `stripe.Refund.create(reverse_transfer=True, refund_application_fee=True)` — Stripe Connect auto-reverses artist payouts + platform commission
+- Manually-released payouts marked `clawback_needed`; sold artworks auto-relist on full refund
+- Notifications fired to all parties (order_refunded / payout_reversed / commission_refunded)
+
+### Testing — 10/10 backend + 100% frontend, zero regressions
+
+
 
 ### Studio Signature Feature
 - **7 themes** aligned to spec: Urban Graffiti · Luxury Gallery · Dark Gallery · Industrial · Neon Digital · Minimal · Custom (with legacy alias migration)

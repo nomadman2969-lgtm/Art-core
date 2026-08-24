@@ -86,6 +86,102 @@ SECTION_KINDS_ALL = [
     "announcement", "text_block", "button_cta", "image_block",
 ]
 
+# ---------- Starter templates ----------
+TEMPLATES = {
+    "emerging_artist": {
+        "name": "Emerging Artist",
+        "description": "Bold and personal. Story-forward layout for artists getting started.",
+        "vibe": "Fresh · Personal · Story-first",
+        "config": {
+            "theme": "urban_graffiti",
+            "accent_color": "#CCFF00",
+            "background": {"type": "theme", "value": None, "texture": "graffiti", "texture_opacity": 30},
+            "lighting": {"preset": "gallery", "intensity": 70},
+            "typography": "brutalist",
+            "commission_open": True,
+            "commission_blurb": "New collectors welcome — DM me anything, no ask is too small.",
+            "sections": [
+                {"id": "t-announce", "kind": "announcement", "title": "Studio Update", "order": 0, "visible": True,
+                 "body": "Welcome to my studio. New drops every month — follow to catch them first.", "variant": "info"},
+                {"id": "t-featured", "kind": "featured_works", "title": "New Work", "order": 1, "visible": True, "layout": "showcase"},
+                {"id": "t-available", "kind": "available_now", "title": "Available Now", "order": 2, "visible": True, "layout": "grid"},
+                {"id": "t-story", "kind": "story", "title": "About Me", "order": 3, "visible": True},
+                {"id": "t-feed", "kind": "feed", "title": "Studio Journal", "order": 4, "visible": True},
+                {"id": "t-comm", "kind": "commission", "title": "Commission Me", "order": 5, "visible": True},
+                {"id": "t-sold", "kind": "sold_works", "title": "In Private Collections", "order": 6, "visible": True, "layout": "grid"},
+            ],
+        },
+    },
+    "gallery_owner": {
+        "name": "Gallery Owner",
+        "description": "Museum-grade presentation. Curator's voice, salon-wall showcase.",
+        "vibe": "Museum · Curated · Salon Wall",
+        "config": {
+            "theme": "luxury_gallery",
+            "accent_color": "#D4AF37",
+            "background": {"type": "theme", "value": None, "texture": "none", "texture_opacity": 15},
+            "lighting": {"preset": "spotlight", "intensity": 85},
+            "typography": "serif",
+            "commission_open": False,
+            "commission_blurb": "Commissions by invitation only. Approach through the gallery.",
+            "sections": [
+                {"id": "t-featured", "kind": "featured_works", "title": "Curator's Selection", "order": 0, "visible": True, "layout": "salon"},
+                {"id": "t-auctions", "kind": "upcoming_auctions", "title": "Now on the Block", "order": 1, "visible": True},
+                {"id": "t-available", "kind": "available_now", "title": "The Collection", "order": 2, "visible": True, "layout": "masonry"},
+                {"id": "t-story", "kind": "story", "title": "The Gallery", "order": 3, "visible": True},
+                {"id": "t-sold", "kind": "sold_works", "title": "Placed Works", "order": 4, "visible": True, "layout": "grid"},
+                {"id": "t-feed", "kind": "feed", "title": "News & Events", "order": 5, "visible": True},
+            ],
+        },
+    },
+    "print_shop": {
+        "name": "Print Shop",
+        "description": "High-volume, product-first. Carousels, big CTAs, bright energy.",
+        "vibe": "Retail · High-volume · Bold CTAs",
+        "config": {
+            "theme": "neon_digital",
+            "accent_color": "#00E5FF",
+            "background": {"type": "theme", "value": None, "texture": "grid", "texture_opacity": 20},
+            "lighting": {"preset": "neon", "intensity": 90},
+            "typography": "modern",
+            "commission_open": True,
+            "commission_blurb": "Custom prints from $25. Bulk pricing available — let's talk.",
+            "sections": [
+                {"id": "t-cta", "kind": "button_cta", "title": "Shop the Latest", "order": 0, "visible": True,
+                 "body": "New drops every Friday. Free shipping on orders over $75.",
+                 "button_text": "Browse New Prints", "button_link": "#available"},
+                {"id": "t-featured", "kind": "featured_works", "title": "Best Sellers", "order": 1, "visible": True, "layout": "carousel"},
+                {"id": "t-available", "kind": "available_now", "title": "In Stock Now", "order": 2, "visible": True, "layout": "grid"},
+                {"id": "t-announce", "kind": "announcement", "title": "Studio News", "order": 3, "visible": True,
+                 "body": "Free shipping this month on all orders over $75.", "variant": "success"},
+                {"id": "t-comm", "kind": "commission", "title": "Custom Orders", "order": 4, "visible": True},
+                {"id": "t-story", "kind": "story", "title": "The Shop", "order": 5, "visible": True},
+            ],
+        },
+    },
+    "dark_solo": {
+        "name": "Dark Solo Show",
+        "description": "One artist, cinematic. Dark, single-showcase focus.",
+        "vibe": "Cinematic · Focused · Minimal",
+        "config": {
+            "theme": "dark_gallery",
+            "accent_color": "#FF4D4D",
+            "background": {"type": "theme", "value": None, "texture": "noise", "texture_opacity": 15},
+            "lighting": {"preset": "spotlight", "intensity": 60},
+            "typography": "brutalist",
+            "commission_open": True,
+            "commission_blurb": "Selective commissions. One at a time, done right.",
+            "sections": [
+                {"id": "t-featured", "kind": "featured_works", "title": "The Piece", "order": 0, "visible": True, "layout": "showcase"},
+                {"id": "t-story", "kind": "story", "title": "The Artist", "order": 1, "visible": True},
+                {"id": "t-available", "kind": "available_now", "title": "Other Works", "order": 2, "visible": True, "layout": "masonry"},
+                {"id": "t-comm", "kind": "commission", "title": "Commission", "order": 3, "visible": True},
+                {"id": "t-feed", "kind": "feed", "title": "Notes", "order": 4, "visible": True},
+            ],
+        },
+    },
+}
+
 DEFAULT_SECTIONS = [
     {"id": "featured", "kind": "featured_works", "title": "Featured Works", "order": 0, "visible": True},
     {"id": "available", "kind": "available_now", "title": "Available Now", "order": 1, "visible": True},
@@ -97,9 +193,18 @@ DEFAULT_SECTIONS = [
 ]
 
 
+# Note: /templates and /apply-template must be defined BEFORE any /{artist_id} route
+# to prevent path matching issues in FastAPI's router.
 @router.get("/themes")
 async def list_themes():
     return [{"id": k, **v} for k, v in THEMES.items()]
+
+
+@router.get("/templates")
+async def list_templates():
+    return [{"id": k, "name": v["name"], "description": v["description"], "vibe": v["vibe"],
+             "theme": v["config"]["theme"], "accent": v["config"]["accent_color"]}
+            for k, v in TEMPLATES.items()]
 
 
 def default_config(artist_id: str) -> dict:
@@ -353,6 +458,40 @@ async def publish_studio(user: dict = Depends(require_role("artist", "admin"))):
 @router.post("/discard-draft")
 async def discard_draft(user: dict = Depends(require_role("artist", "admin"))):
     await db.studio_configs.update_one({"artist_id": user["id"]}, {"$set": {"draft": None, "updated_at": now_iso()}})
+    return await _get_or_create_config(user["id"])
+
+
+# ---------- Starter Templates ----------
+class ApplyTemplateReq(BaseModel):
+    template_id: str
+    publish: bool = False  # if true, apply straight to live
+
+
+@router.post("/apply-template")
+async def apply_template(req: ApplyTemplateReq, user: dict = Depends(require_role("artist", "admin"))):
+    if req.template_id not in TEMPLATES:
+        raise HTTPException(404, "Template not found")
+    template = TEMPLATES[req.template_id]
+    await _get_or_create_config(user["id"])
+    # Regenerate section IDs so they're unique per artist
+    payload = dict(template["config"])
+    payload["sections"] = [{**s, "id": new_id()} for s in payload["sections"]]
+    payload = _sanitize_patch(payload)
+    now = now_iso()
+    if req.publish:
+        updates = dict(payload)
+        updates["updated_at"] = now
+        updates["published_at"] = now
+        updates["draft"] = None
+        await db.studio_configs.update_one({"artist_id": user["id"]}, {"$set": updates})
+    else:
+        cfg = await db.studio_configs.find_one({"artist_id": user["id"]})
+        current_draft = (cfg or {}).get("draft") or {}
+        current_draft.update(payload)
+        current_draft["updated_at"] = now
+        current_draft["_applied_template"] = req.template_id
+        await db.studio_configs.update_one({"artist_id": user["id"]},
+            {"$set": {"draft": current_draft, "updated_at": now}})
     return await _get_or_create_config(user["id"])
 
 

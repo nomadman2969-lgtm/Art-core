@@ -158,6 +158,10 @@ export function StudioEditor() {
       )}
       {tab === "overview" && (
         <>
+          <SectionH title="Quick Start Templates">
+            <TemplatesPicker save={saveConfig} />
+          </SectionH>
+          <div className="mt-8" />
           <SectionH title="Studio Design AI">
             <div className="glass-card p-6 rounded-sm">
               <div className="label-caps mb-3 text-[#CCFF00]"><Sparkles size={12} className="inline mr-2" /> Describe your studio</div>
@@ -173,9 +177,9 @@ export function StudioEditor() {
             </div>
           </SectionH>
           <div className="mt-10 grid md:grid-cols-2 gap-4">
-            <Link to={`/artist/${user.id}`} className="glass-card p-8 rounded-sm hover-lift-card block">
+            <Link to={`/artist/${user.id}?preview=1`} className="glass-card p-8 rounded-sm hover-lift-card block">
               <div className="label-caps text-[#CCFF00]">Preview</div>
-              <div className="font-anton text-3xl mt-2">See your live studio →</div>
+              <div className="font-anton text-3xl mt-2">See your studio →</div>
             </Link>
             <button onClick={() => setTab("theme")} className="glass-card p-8 rounded-sm hover-lift-card text-left">
               <div className="label-caps text-[#7C3AED]">Design</div>
@@ -423,6 +427,42 @@ function Stat({ label, value, accent }) {
   );
 }
 
+// ---------- Templates picker ----------
+function TemplatesPicker({ save }) {
+  const [templates, setTemplates] = useState([]);
+  const [busy, setBusy] = useState(null);
+  useEffect(() => { api.get("/studio/templates").then((r) => setTemplates(r.data)); }, []);
+  const apply = async (t) => {
+    if (!confirm(`Apply the "${t.name}" template? This will replace your current sections and theme in draft — you can still Preview + Publish or Discard.`)) return;
+    setBusy(t.id);
+    try {
+      const r = await api.post("/studio/apply-template", { template_id: t.id });
+      toast.success(`${t.name} applied to draft`);
+      // Trigger parent to reload
+      if (save) save({});
+      window.location.reload();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+    setBusy(null);
+  };
+  return (
+    <div data-testid="templates-picker" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {templates.map((t) => (
+        <button key={t.id} data-testid={`template-${t.id}`} onClick={() => apply(t)}
+          disabled={busy === t.id}
+          className="glass-card p-5 rounded-sm text-left hover-lift-card border border-white/8 relative overflow-hidden">
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-40" style={{ background: t.accent }} />
+          <div className="relative">
+            <div className="label-caps text-xs" style={{ color: t.accent }}>{t.vibe}</div>
+            <div className="font-anton text-2xl uppercase mt-2">{t.name}</div>
+            <div className="text-sm text-zinc-400 mt-3 leading-relaxed">{t.description}</div>
+            <div className="mt-4 label-caps text-zinc-500">{busy === t.id ? "Applying..." : "Apply →"}</div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ---------- Sections editor ----------
 const SECTION_KINDS = [
   { kind: "featured_works", label: "Featured Works", gallery: true },
@@ -450,11 +490,23 @@ const LAYOUT_OPTIONS = [
 function SectionsEditor({ config, save }) {
   const sections = config.sections || [];
   const [expanded, setExpanded] = useState(null);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
+  const sorted = [...sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
   const move = (i, dir) => {
-    const arr = [...sections];
+    const arr = [...sorted];
     const j = i + dir;
     if (j < 0 || j >= arr.length) return;
     [arr[i], arr[j]] = [arr[j], arr[i]];
+    arr.forEach((s, idx) => (s.order = idx));
+    save({ sections: arr });
+  };
+  const reorderTo = (from, to) => {
+    if (from === to || from == null) return;
+    const arr = [...sorted];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
     arr.forEach((s, idx) => (s.order = idx));
     save({ sections: arr });
   };
@@ -479,23 +531,36 @@ function SectionsEditor({ config, save }) {
   };
   return (
     <div className="space-y-4">
+      <div className="text-xs text-zinc-500 mb-2">💡 Drag rows to reorder · Click <span className="text-[#CCFF00]">Edit</span> to customize each section.</div>
       <div className="border border-white/8 rounded-sm divide-y divide-white/8">
-        {sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s, i) => {
+        {sorted.map((s, i) => {
           const meta = SECTION_KINDS.find((k) => k.kind === s.kind);
           const isExpanded = expanded === s.id;
           const canExpand = ["custom", "text_block", "announcement", "button_cta", "image_block"].includes(s.kind) || meta?.gallery;
+          const isDragging = dragIdx === i;
+          const isDragOver = dragOverIdx === i && dragIdx !== null && dragIdx !== i;
           return (
-            <div key={s.id} data-testid={`section-row-${s.id}`}>
+            <div key={s.id} data-testid={`section-row-${s.id}`}
+              draggable
+              onDragStart={(e) => { setDragIdx(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverIdx(i); }}
+              onDragLeave={() => setDragOverIdx((v) => (v === i ? null : v))}
+              onDrop={(e) => { e.preventDefault(); const from = Number(e.dataTransfer.getData("text/plain")); reorderTo(from, i); setDragIdx(null); setDragOverIdx(null); }}
+              onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+              className={`transition-all ${isDragging ? "opacity-40" : ""} ${isDragOver ? "bg-[#CCFF00]/10 border-t-2 border-t-[#CCFF00]" : ""}`}
+              style={{ cursor: "move" }}>
               <div className="p-4 flex flex-wrap items-center gap-3">
-                <GripVertical size={14} className="text-zinc-500" />
+                <GripVertical size={16} className="text-zinc-500 cursor-grab active:cursor-grabbing" />
                 <div className="label-caps text-zinc-500 w-32 flex-shrink-0 truncate">{s.kind}</div>
                 <input value={s.title} onChange={(e) => update(s.id, { title: e.target.value })}
+                  onDragStart={(e) => e.stopPropagation()}
+                  draggable={false}
                   className="flex-1 min-w-[180px] bg-transparent border-b border-white/10 focus:border-[#CCFF00] px-2 py-1 outline-none" />
-                <label className="label-caps flex items-center gap-2">
+                <label className="label-caps flex items-center gap-2" onDragStart={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={s.visible !== false} onChange={(e) => update(s.id, { visible: e.target.checked })} /> Visible
                 </label>
-                <button onClick={() => move(i, -1)} className="label-caps hover:text-[#CCFF00]">↑</button>
-                <button onClick={() => move(i, 1)} className="label-caps hover:text-[#CCFF00]">↓</button>
+                <button onClick={() => move(i, -1)} title="Move up" className="label-caps hover:text-[#CCFF00] hidden md:inline">↑</button>
+                <button onClick={() => move(i, 1)} title="Move down" className="label-caps hover:text-[#CCFF00] hidden md:inline">↓</button>
                 {canExpand && (
                   <button data-testid={`toggle-${s.id}`} onClick={() => setExpanded(isExpanded ? null : s.id)} className="label-caps hover:text-[#CCFF00]">{isExpanded ? "Close" : "Edit"}</button>
                 )}

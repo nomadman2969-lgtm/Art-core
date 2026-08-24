@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 8: Verified Studio Starter Templates, Studio drag-drop reorder, and Admin Refund Console. Backend: 10/10 pytest passed (templates listing, apply w/ new IDs + draft, unknown template 404, publish clears draft, refundable admin-only 403 for non-admin, unknown refund IDs 404). Frontend: templates-picker with all 4 template cards renders on Studio Overview; clicking print_shop applied 6 sections with new IDs, unpublished-changes header + Publish button appeared. Section rows draggable=true with cursor:move; title input has draggable=false and typing 14 chars mid-word inserted all characters without focus loss (multi-char typing NOT regressed). Manual-mouse HTML5 drag-drop reordered a row from index 0 to index 2 as expected. Up/down arrow buttons remain visible for accessibility. Admin /admin → 'Refunds' tab renders RefundsPanel with 10 refundable items (real seeded orders), refund-toggle expands to reason dropdown + amount input + Refund Full button; Refund Partial button correctly hidden until amount entered, then appears.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_templates_refunds.py",
+    "/app/test_reports/pytest/iter8_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "StudioEditor.js is now 1097 lines — exceeds the 700-line guideline. Recommend splitting TemplatesPicker, SectionsEditor, StoryEditor, PostsEditor, ThemeEditor into separate files.",
+    "Admin.js RefundsPanel does not confirm before firing the refund (only a plain button click issues the Stripe refund). Consider a window.confirm or modal — refunds are irreversible on Stripe.",
+    "GET /api/admin/refundable pulls up to 200 orders + 200 commissions with no pagination — will get slow at scale. Add cursor-based pagination and a search filter.",
+    "Login page still has no data-testid on the submit button and no type='submit'; had to use keyboard Enter to submit. Adding data-testid='login-submit' would improve E2E stability."
+  ],
+  "updated_files": ["/app/backend/tests/test_templates_refunds.py"],
+  "success_rate": { "backend": "100% (10/10)", "frontend": "100% (templates, drag-drop, typing, refunds console all pass)" },
+  "test_credentials": "monster@houseofmonster.com / MonsterAdmin2026! (admin+artist)",
+  "seed_data_creation": "Applied print_shop template to Monster's draft (6 sections). One section title was edited to a partial string 'Shop the LateyCso al' during the typing verification — not published. Order of Monster's sections in draft was reordered via drag-drop for verification. Main agent may want to Discard draft to reset if a clean state is desired.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Templates + drag-drop + refund console all working end-to-end. Refund Stripe calls were not exercised against a live PaymentIntent (would fail on seeded placeholder session_ids; that is expected). Login submit lacks type='submit' and testid; use keyboard Enter. Monster has an active studio draft with print_shop template applied — Discard first if you need a clean baseline."
+}
