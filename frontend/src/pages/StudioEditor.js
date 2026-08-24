@@ -18,6 +18,7 @@ export function StudioEditor() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
 
   const loadAll = async () => {
     api.get("/artist/dashboard").then((r) => setDashboard(r.data));
@@ -28,14 +29,40 @@ export function StudioEditor() {
   };
   useEffect(() => { if (user) loadAll(); }, [user]);
 
+  // Merged live view of "current draft" — draft over published
+  const draftView = React.useMemo(() => {
+    if (!config) return null;
+    return { ...config, ...(config.draft || {}) };
+  }, [config]);
+
   const saveConfig = async (patch) => {
-    const next = { ...config, ...patch };
-    setConfig(next);
     setDirty(true);
     try {
-      await api.patch("/studio", patch);
+      const r = await api.patch("/studio", patch);
+      setConfig(r.data);
       setDirty(false);
-    } catch { toast.error("Save failed"); }
+    } catch (e) { toast.error(e?.response?.data?.detail || "Save failed"); setDirty(false); }
+  };
+
+  const publish = async () => {
+    setPublishBusy(true);
+    try {
+      const r = await api.post("/studio/publish");
+      setConfig(r.data);
+      toast.success("Studio published");
+    } catch (e) { toast.error(e?.response?.data?.detail || "Publish failed"); }
+    setPublishBusy(false);
+  };
+
+  const discard = async () => {
+    if (!confirm("Discard all unpublished changes?")) return;
+    setPublishBusy(true);
+    try {
+      const r = await api.post("/studio/discard-draft");
+      setConfig(r.data);
+      toast.success("Draft discarded");
+    } catch (e) { toast.error("Failed"); }
+    setPublishBusy(false);
   };
 
   const runAI = async () => {
@@ -44,14 +71,14 @@ export function StudioEditor() {
     try {
       const r = await api.post("/studio/ai-design", { prompt: aiPrompt });
       const c = r.data.config;
-      const nextSections = (config.sections || []).map((s) => ({
+      const nextSections = (draftView?.sections || []).map((s) => ({
         ...s, title: c.section_titles?.[s.kind] || s.title,
       }));
       await saveConfig({
         theme: c.theme, accent_color: c.accent_color, lighting: c.lighting,
         typography: c.typography, sections: nextSections,
       });
-      toast.success("Studio redesigned");
+      toast.success("Draft redesigned — review then Publish");
     } catch (er) { toast.error(er?.response?.data?.detail || "AI failed"); }
     setAiBusy(false);
   };
@@ -69,6 +96,7 @@ export function StudioEditor() {
   };
 
   if (!user || !config || !dashboard) return <div className="py-32 text-center label-caps text-zinc-500">Loading Studio...</div>;
+  const hasDraft = !!config.draft;
 
   const tabs = [
     ["overview", "Overview"],
@@ -77,6 +105,7 @@ export function StudioEditor() {
     ["story", "My Story"],
     ["posts", "Posts"],
     ["artworks", "Artworks"],
+    ["featured", "Featured"],
     ["requests", "Requests"],
     ["analytics", "Analytics"],
     ["payouts", "Payouts"],
@@ -88,10 +117,24 @@ export function StudioEditor() {
         <div>
           <div className="label-caps text-[#CCFF00]"><PaletteIcon size={12} className="inline mr-2" /> Studio Editor</div>
           <h1 className="font-anton text-5xl md:text-7xl uppercase mt-3">Hey, {user.name}.</h1>
-          <div className="text-zinc-500 text-sm mt-2">Customize your studio · Visitors see the live version. {dirty && <span className="text-[#F5A623] ml-2">saving...</span>}</div>
+          <div className="text-zinc-500 text-sm mt-2">
+            {hasDraft ? <span className="text-[#F5A623]">You have unpublished changes.</span> : "Visitors see the published version."}
+            {dirty && <span className="text-[#F5A623] ml-2">saving...</span>}
+          </div>
         </div>
         <div className="flex gap-3 flex-wrap">
-          <Link to={`/artist/${user.id}`} data-testid="view-studio" className="btn-ghost"><Eye size={14} className="mr-2" /> View Public Studio</Link>
+          <Link to={`/artist/${user.id}?preview=1`} data-testid="preview-studio" className="btn-ghost"><Eye size={14} className="mr-2" /> Preview</Link>
+          {hasDraft && (
+            <>
+              <button data-testid="publish-studio" onClick={publish} disabled={publishBusy} className="btn-lime">
+                {publishBusy ? "Publishing..." : "Publish Changes"}
+              </button>
+              <button data-testid="discard-draft" onClick={discard} disabled={publishBusy} className="btn-ghost">Discard</button>
+            </>
+          )}
+          {!hasDraft && (
+            <Link to={`/artist/${user.id}`} data-testid="view-studio" className="btn-ghost">View Live</Link>
+          )}
           <Link to="/auctions/new" className="btn-violet"><Gavel size={14} className="mr-2" /> Launch Auction</Link>
           <Link to="/studio/upload" data-testid="new-artwork-btn" className="btn-lime"><Plus size={14} className="mr-2" /> New Artwork</Link>
         </div>
@@ -149,13 +192,13 @@ export function StudioEditor() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {themes.map((t) => (
                 <button key={t.id} data-testid={`theme-${t.id}`} onClick={() => saveConfig({ theme: t.id })}
-                  className={`relative aspect-[4/3] overflow-hidden border rounded-sm text-left ${config.theme === t.id ? "border-[#CCFF00]" : "border-white/10"} hover:border-[#CCFF00] transition-colors`}>
+                  className={`relative aspect-[4/3] overflow-hidden border rounded-sm text-left ${draftView.theme === t.id ? "border-[#CCFF00]" : "border-white/10"} hover:border-[#CCFF00] transition-colors`}>
                   {t.bg_url ? <img src={t.bg_url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" /> : <div className="absolute inset-0 bg-gradient-to-br from-[#0A0A0C] to-[#1A1A1E]" />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
                   <div className="relative h-full flex flex-col justify-end p-4">
                     <div className="font-anton text-xl uppercase">{t.name}</div>
                     <div className="w-6 h-1 mt-1" style={{ background: t.accent }} />
-                    {config.theme === t.id && <div className="badge-lime absolute top-2 right-2">Active</div>}
+                    {draftView.theme === t.id && <div className="badge-lime absolute top-2 right-2">Active</div>}
                   </div>
                 </button>
               ))}
@@ -163,17 +206,17 @@ export function StudioEditor() {
           </SectionH>
 
           <SectionH title="Background">
-            <BackgroundEditor config={config} save={saveConfig} />
+            <BackgroundEditor config={draftView} save={saveConfig} />
           </SectionH>
 
           <SectionH title="Accent Color">
             <div className="flex flex-wrap gap-3 items-center">
               {["#CCFF00", "#7C3AED", "#FF4D4D", "#00E5FF", "#F5A623", "#FF6EC7", "#D4AF37", "#FFFFFF"].map((c) => (
                 <button key={c} data-testid={`accent-${c}`} onClick={() => saveConfig({ accent_color: c })}
-                  className={`w-10 h-10 rounded-sm border-2 ${config.accent_color === c ? "border-white" : "border-white/20"}`}
+                  className={`w-10 h-10 rounded-sm border-2 ${draftView.accent_color === c ? "border-white" : "border-white/20"}`}
                   style={{ background: c }} />
               ))}
-              <input type="color" data-testid="accent-picker" value={config.accent_color || "#CCFF00"}
+              <input type="color" data-testid="accent-picker" value={draftView.accent_color || "#CCFF00"}
                 onChange={(e) => saveConfig({ accent_color: e.target.value })}
                 className="w-10 h-10 rounded-sm bg-transparent border border-white/20 cursor-pointer" />
             </div>
@@ -183,16 +226,16 @@ export function StudioEditor() {
             <div className="grid md:grid-cols-3 gap-3">
               {["gallery", "spotlight", "neon", "warm", "cool", "ambient"].map((p) => (
                 <button key={p} data-testid={`lighting-${p}`}
-                  onClick={() => saveConfig({ lighting: { ...config.lighting, preset: p } })}
-                  className={`p-4 border rounded-sm text-left ${config.lighting?.preset === p ? "border-[#CCFF00]" : "border-white/10 hover:border-white/30"}`}>
+                  onClick={() => saveConfig({ lighting: { ...draftView.lighting, preset: p } })}
+                  className={`p-4 border rounded-sm text-left ${draftView.lighting?.preset === p ? "border-[#CCFF00]" : "border-white/10 hover:border-white/30"}`}>
                   <div className="font-unbounded uppercase text-sm">{p}</div>
                 </button>
               ))}
             </div>
             <div className="mt-4">
-              <div className="label-caps mb-2">Intensity ({config.lighting?.intensity ?? 70}%)</div>
-              <input data-testid="lighting-intensity" type="range" min="20" max="100" value={config.lighting?.intensity ?? 70}
-                onChange={(e) => saveConfig({ lighting: { ...config.lighting, intensity: Number(e.target.value) } })}
+              <div className="label-caps mb-2">Intensity ({draftView.lighting?.intensity ?? 70}%)</div>
+              <input data-testid="lighting-intensity" type="range" min="20" max="100" value={draftView.lighting?.intensity ?? 70}
+                onChange={(e) => saveConfig({ lighting: { ...draftView.lighting, intensity: Number(e.target.value) } })}
                 className="w-full accent-[#CCFF00]" />
             </div>
           </SectionH>
@@ -215,17 +258,22 @@ export function StudioEditor() {
 
       {/* SECTIONS */}
       {tab === "sections" && (
-        <SectionsEditor config={config} save={saveConfig} />
+        <SectionsEditor config={draftView} save={saveConfig} />
       )}
 
       {/* STORY */}
       {tab === "story" && (
-        <StoryEditor config={config} save={saveConfig} user={user} refresh={refresh} />
+        <StoryEditor config={draftView} save={saveConfig} user={user} refresh={refresh} />
       )}
 
       {/* POSTS */}
       {tab === "posts" && (
         <PostsEditor userId={user.id} />
+      )}
+
+      {/* FEATURED */}
+      {tab === "featured" && (
+        <FeaturedEditor config={draftView} save={saveConfig} artworks={artworks} />
       )}
 
       {/* ARTWORKS */}
@@ -293,7 +341,7 @@ function SectionH({ title, children }) {
 
 function BackgroundEditor({ config, save }) {
   const [uploading, setUploading] = useState(false);
-  const bg = config.background || { type: "theme" };
+  const bg = config.background || { type: "theme", texture: "none", texture_opacity: 25 };
   const upload = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -302,28 +350,67 @@ function BackgroundEditor({ config, save }) {
       const fd = new FormData(); fd.append("file", f);
       const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
       const url = `${api.defaults.baseURL}/files/${r.data.path}`;
-      save({ background: { type: "image", value: url } });
+      save({ background: { ...bg, type: "image", value: url } });
       toast.success("Background updated");
     } catch { toast.error("Upload failed"); }
     setUploading(false);
   };
+  const setTexture = (texture) => save({ background: { ...bg, texture } });
+  const setOpacity = (v) => save({ background: { ...bg, texture_opacity: Number(v) } });
+  const setColor = (color) => save({ background: { ...bg, type: "color", value: color } });
+
+  const TEXTURES = [
+    { id: "none", label: "None" },
+    { id: "graffiti", label: "Graffiti" },
+    { id: "brick", label: "Brick" },
+    { id: "concrete", label: "Concrete" },
+    { id: "grid", label: "Neon Grid" },
+    { id: "noise", label: "Grain" },
+    { id: "paper", label: "Paper" },
+  ];
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
-        <button data-testid="bg-theme" onClick={() => save({ background: { type: "theme" } })}
-          className={`px-4 py-3 border rounded-sm label-caps text-xs ${bg.type === "theme" ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400 hover:border-white/30"}`}>Use Theme Default</button>
-        <label className={`px-4 py-3 border rounded-sm label-caps text-xs cursor-pointer ${bg.type === "image" ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400 hover:border-white/30"}`}>
-          {uploading ? "Uploading..." : "Upload Custom"}
-          <input data-testid="bg-upload" type="file" accept="image/*" onChange={upload} className="hidden" />
-        </label>
-      </div>
-      {bg.type === "image" && bg.value && (
-        <div>
-          <div className="label-caps mb-2">Current background</div>
-          <img src={bg.value} alt="" className="w-full max-w-lg aspect-[16/6] object-cover border border-white/10 rounded-sm" />
-          <button onClick={() => save({ background: { type: "theme" } })} className="label-caps text-[#FF4D4D] hover:underline mt-2">Remove and use theme default</button>
+    <div className="space-y-6">
+      <div>
+        <div className="label-caps mb-2">Base</div>
+        <div className="flex flex-wrap gap-3 items-center">
+          <button data-testid="bg-theme" onClick={() => save({ background: { ...bg, type: "theme", value: null } })}
+            className={`px-4 py-3 border rounded-sm label-caps text-xs ${bg.type === "theme" ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400 hover:border-white/30"}`}>Theme Default</button>
+          <label className={`px-4 py-3 border rounded-sm label-caps text-xs cursor-pointer ${bg.type === "image" ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400 hover:border-white/30"}`}>
+            {uploading ? "Uploading..." : "Upload Image"}
+            <input data-testid="bg-upload" type="file" accept="image/*" onChange={upload} className="hidden" />
+          </label>
+          <button data-testid="bg-color" onClick={() => setColor(bg.value?.startsWith("#") ? bg.value : "#0A0A0C")}
+            className={`px-4 py-3 border rounded-sm label-caps text-xs ${bg.type === "color" ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400 hover:border-white/30"}`}>Solid Color</button>
+          {bg.type === "color" && (
+            <input type="color" data-testid="bg-color-picker" value={bg.value || "#0A0A0C"} onChange={(e) => setColor(e.target.value)}
+              className="w-10 h-10 rounded-sm bg-transparent border border-white/20 cursor-pointer" />
+          )}
         </div>
-      )}
+        {bg.type === "image" && bg.value && (
+          <div className="mt-3">
+            <img src={bg.value} alt="" className="w-full max-w-lg aspect-[16/6] object-cover border border-white/10 rounded-sm" />
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="label-caps mb-2">Texture Overlay</div>
+        <div className="flex flex-wrap gap-2">
+          {TEXTURES.map((t) => (
+            <button key={t.id} data-testid={`tex-${t.id}`} onClick={() => setTexture(t.id)}
+              className={`px-3 py-2 border rounded-sm label-caps text-xs ${bg.texture === t.id ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400 hover:border-white/30"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {bg.texture && bg.texture !== "none" && (
+          <div className="mt-3">
+            <div className="label-caps mb-2">Intensity ({bg.texture_opacity ?? 25}%)</div>
+            <input data-testid="tex-opacity" type="range" min="5" max="80" value={bg.texture_opacity ?? 25}
+              onChange={(e) => setOpacity(e.target.value)} className="w-full accent-[#CCFF00]" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -338,18 +425,31 @@ function Stat({ label, value, accent }) {
 
 // ---------- Sections editor ----------
 const SECTION_KINDS = [
-  { kind: "featured_works", label: "Featured Works" },
-  { kind: "available_now", label: "Available Now" },
-  { kind: "sold_works", label: "Sold Works" },
+  { kind: "featured_works", label: "Featured Works", gallery: true },
+  { kind: "available_now", label: "Available Now", gallery: true },
+  { kind: "sold_works", label: "Sold Works", gallery: true },
   { kind: "upcoming_auctions", label: "Live Auctions" },
   { kind: "feed", label: "Studio Feed" },
   { kind: "story", label: "My Story" },
   { kind: "commission", label: "Commission Me" },
-  { kind: "custom", label: "Custom Section" },
+  { kind: "announcement", label: "Announcement" },
+  { kind: "text_block", label: "Text Block" },
+  { kind: "button_cta", label: "Button / CTA" },
+  { kind: "image_block", label: "Image Block" },
+  { kind: "custom", label: "Custom" },
+];
+
+const LAYOUT_OPTIONS = [
+  { id: "grid", label: "Grid" },
+  { id: "masonry", label: "Masonry" },
+  { id: "salon", label: "Salon Wall" },
+  { id: "showcase", label: "Single Showcase" },
+  { id: "carousel", label: "Carousel" },
 ];
 
 function SectionsEditor({ config, save }) {
   const sections = config.sections || [];
+  const [expanded, setExpanded] = useState(null);
   const move = (i, dir) => {
     const arr = [...sections];
     const j = i + dir;
@@ -364,33 +464,203 @@ function SectionsEditor({ config, save }) {
   };
   const remove = (id) => save({ sections: sections.filter((s) => s.id !== id) });
   const add = (kind) => {
-    const label = SECTION_KINDS.find((k) => k.kind === kind)?.label || "New Section";
-    const s = { id: `s-${Date.now()}`, kind, title: label, order: sections.length, visible: true };
+    const meta = SECTION_KINDS.find((k) => k.kind === kind);
+    const s = {
+      id: `s-${Date.now()}`, kind, title: meta?.label || "New Section",
+      order: sections.length, visible: true,
+    };
+    if (meta?.gallery) s.layout = "grid";
+    if (kind === "announcement") { s.body = "Big news for my collectors..."; s.variant = "info"; }
+    if (kind === "text_block") s.body = "Write anything you'd like your visitors to know here.";
+    if (kind === "button_cta") { s.body = "Interested in a commission?"; s.button_text = "Get in touch"; s.button_link = "#commission"; }
+    if (kind === "image_block") { s.caption = "Add a caption"; s.body = ""; }
     save({ sections: [...sections, s] });
+    setExpanded(s.id);
   };
   return (
-    <div>
-      <div className="border border-white/8 rounded-sm divide-y divide-white/8 mb-8">
-        {sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s, i) => (
-          <div key={s.id} data-testid={`section-row-${s.id}`} className="p-4 flex flex-wrap items-center gap-3">
-            <GripVertical size={14} className="text-zinc-500" />
-            <div className="label-caps text-zinc-500 w-32 flex-shrink-0">{s.kind}</div>
-            <input value={s.title} onChange={(e) => update(s.id, { title: e.target.value })}
-              className="flex-1 min-w-[180px] bg-transparent border-b border-white/10 focus:border-[#CCFF00] px-2 py-1 outline-none" />
-            <label className="label-caps flex items-center gap-2">
-              <input type="checkbox" checked={s.visible !== false} onChange={(e) => update(s.id, { visible: e.target.checked })} /> Visible
-            </label>
-            <button onClick={() => move(i, -1)} className="label-caps hover:text-[#CCFF00]">↑</button>
-            <button onClick={() => move(i, 1)} className="label-caps hover:text-[#CCFF00]">↓</button>
-            <button onClick={() => remove(s.id)} className="text-zinc-500 hover:text-[#FF4D4D]"><Trash2 size={14} /></button>
-          </div>
-        ))}
+    <div className="space-y-4">
+      <div className="border border-white/8 rounded-sm divide-y divide-white/8">
+        {sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s, i) => {
+          const meta = SECTION_KINDS.find((k) => k.kind === s.kind);
+          const isExpanded = expanded === s.id;
+          const canExpand = ["custom", "text_block", "announcement", "button_cta", "image_block"].includes(s.kind) || meta?.gallery;
+          return (
+            <div key={s.id} data-testid={`section-row-${s.id}`}>
+              <div className="p-4 flex flex-wrap items-center gap-3">
+                <GripVertical size={14} className="text-zinc-500" />
+                <div className="label-caps text-zinc-500 w-32 flex-shrink-0 truncate">{s.kind}</div>
+                <input value={s.title} onChange={(e) => update(s.id, { title: e.target.value })}
+                  className="flex-1 min-w-[180px] bg-transparent border-b border-white/10 focus:border-[#CCFF00] px-2 py-1 outline-none" />
+                <label className="label-caps flex items-center gap-2">
+                  <input type="checkbox" checked={s.visible !== false} onChange={(e) => update(s.id, { visible: e.target.checked })} /> Visible
+                </label>
+                <button onClick={() => move(i, -1)} className="label-caps hover:text-[#CCFF00]">↑</button>
+                <button onClick={() => move(i, 1)} className="label-caps hover:text-[#CCFF00]">↓</button>
+                {canExpand && (
+                  <button data-testid={`toggle-${s.id}`} onClick={() => setExpanded(isExpanded ? null : s.id)} className="label-caps hover:text-[#CCFF00]">{isExpanded ? "Close" : "Edit"}</button>
+                )}
+                <button onClick={() => remove(s.id)} className="text-zinc-500 hover:text-[#FF4D4D]"><Trash2 size={14} /></button>
+              </div>
+              {isExpanded && canExpand && (
+                <div className="px-4 pb-5 pt-1 bg-white/[0.02] space-y-3" data-testid={`section-editor-${s.id}`}>
+                  {meta?.gallery && (
+                    <div>
+                      <div className="label-caps mb-2">Layout</div>
+                      <div className="flex flex-wrap gap-2">
+                        {LAYOUT_OPTIONS.map((l) => (
+                          <button key={l.id} data-testid={`layout-${s.id}-${l.id}`} onClick={() => update(s.id, { layout: l.id })}
+                            className={`px-3 py-2 border rounded-sm label-caps text-xs ${(s.layout || "grid") === l.id ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400"}`}>{l.label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {["announcement", "text_block", "custom"].includes(s.kind) && (
+                    <div>
+                      <div className="label-caps mb-2">Body</div>
+                      <textarea data-testid={`body-${s.id}`} rows={s.kind === "announcement" ? 3 : 6}
+                        value={s.body || ""} onChange={(e) => update(s.id, { body: e.target.value })}
+                        placeholder="Write here..."
+                        className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#CCFF00]" />
+                    </div>
+                  )}
+                  {s.kind === "announcement" && (
+                    <div>
+                      <div className="label-caps mb-2">Style</div>
+                      <div className="flex gap-2">
+                        {["info", "success", "warning"].map((v) => (
+                          <button key={v} data-testid={`variant-${s.id}-${v}`} onClick={() => update(s.id, { variant: v })}
+                            className={`px-3 py-2 border rounded-sm label-caps text-xs ${(s.variant || "info") === v ? "border-[#CCFF00] text-white" : "border-white/10 text-zinc-400"}`}>{v}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {s.kind === "button_cta" && (
+                    <>
+                      <div>
+                        <div className="label-caps mb-2">Blurb</div>
+                        <textarea rows={2} value={s.body || ""} onChange={(e) => update(s.id, { body: e.target.value })}
+                          className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#CCFF00]" />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-3">
+                        <label className="block">
+                          <div className="label-caps mb-2">Button label</div>
+                          <input data-testid={`btn-text-${s.id}`} value={s.button_text || ""} onChange={(e) => update(s.id, { button_text: e.target.value })}
+                            className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#CCFF00]" />
+                        </label>
+                        <label className="block">
+                          <div className="label-caps mb-2">Link (URL or #anchor)</div>
+                          <input data-testid={`btn-link-${s.id}`} value={s.button_link || ""} onChange={(e) => update(s.id, { button_link: e.target.value })}
+                            placeholder="https://... or #commission"
+                            className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#CCFF00]" />
+                        </label>
+                      </div>
+                    </>
+                  )}
+                  {s.kind === "image_block" && (
+                    <ImageBlockEditor s={s} update={update} />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-      <div className="label-caps mb-3">Add a section</div>
-      <div className="flex flex-wrap gap-2">
-        {SECTION_KINDS.map((k) => (
-          <button key={k.kind} data-testid={`add-section-${k.kind}`} onClick={() => add(k.kind)} className="btn-ghost !py-2 !text-xs">+ {k.label}</button>
-        ))}
+      <div>
+        <div className="label-caps mb-3">Add a section</div>
+        <div className="flex flex-wrap gap-2">
+          {SECTION_KINDS.map((k) => (
+            <button key={k.kind} data-testid={`add-section-${k.kind}`} onClick={() => add(k.kind)} className="btn-ghost !py-2 !text-xs">+ {k.label}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImageBlockEditor({ s, update }) {
+  const [uploading, setUploading] = useState(false);
+  const upload = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setUploading(true);
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      update(s.id, { image: r.data.path });
+    } catch { toast.error("Upload failed"); }
+    setUploading(false);
+  };
+  return (
+    <>
+      <div>
+        <div className="label-caps mb-2">Image</div>
+        {s.image && <img src={resolveImg(s.image)} className="w-full max-w-md aspect-video object-cover rounded-sm border border-white/10 mb-2" alt="" />}
+        <label className="btn-ghost !py-2 !text-xs cursor-pointer inline-flex">
+          {uploading ? "Uploading..." : s.image ? "Replace Image" : "Upload Image"}
+          <input data-testid={`img-upload-${s.id}`} type="file" accept="image/*" onChange={upload} className="hidden" />
+        </label>
+      </div>
+      <div>
+        <div className="label-caps mb-2">Caption</div>
+        <input value={s.caption || ""} onChange={(e) => update(s.id, { caption: e.target.value })}
+          className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#CCFF00]" />
+      </div>
+      <div>
+        <div className="label-caps mb-2">Description (optional)</div>
+        <textarea rows={3} value={s.body || ""} onChange={(e) => update(s.id, { body: e.target.value })}
+          className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#CCFF00]" />
+      </div>
+    </>
+  );
+}
+
+// ---------- Featured artwork picker ----------
+function FeaturedEditor({ config, save, artworks }) {
+  const picks = config.featured_artwork_ids || [];
+  const toggle = (id) => {
+    const next = picks.includes(id) ? picks.filter((p) => p !== id) : [...picks, id].slice(0, 12);
+    save({ featured_artwork_ids: next });
+  };
+  const liveArts = artworks.filter((a) => a.status === "live" || a.status === "sold");
+  return (
+    <div data-testid="featured-editor">
+      <div className="glass-card p-6 rounded-sm mb-6">
+        <div className="label-caps text-[#CCFF00]">Featured Works</div>
+        <div className="text-sm text-zinc-400 mt-2">Pick up to 12 pieces to spotlight in the Featured Works section (in the exact order you tap them). Leave empty to show the artworks you've flagged as Featured elsewhere.</div>
+      </div>
+      {picks.length > 0 && (
+        <div className="mb-6">
+          <div className="label-caps mb-3">Selected order</div>
+          <div className="flex gap-2 flex-wrap">
+            {picks.map((pid, i) => {
+              const a = liveArts.find((x) => x.id === pid);
+              if (!a) return null;
+              return (
+                <div key={pid} className="relative">
+                  <img src={resolveImg(a.images?.[0])} className="w-20 h-20 object-cover rounded-sm border-2 border-[#CCFF00]" alt="" />
+                  <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-[#CCFF00] text-black text-xs font-bold flex items-center justify-center">{i + 1}</div>
+                  <button onClick={() => toggle(pid)} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#FF4D4D] text-white text-xs flex items-center justify-center">×</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div className="label-caps mb-3">All artworks</div>
+      <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3">
+        {liveArts.map((a) => {
+          const isPicked = picks.includes(a.id);
+          return (
+            <button key={a.id} data-testid={`feat-toggle-${a.id}`} onClick={() => toggle(a.id)}
+              className={`relative aspect-square rounded-sm overflow-hidden border-2 transition-all ${isPicked ? "border-[#CCFF00] scale-95" : "border-white/10 hover:border-white/30"}`}>
+              <img src={resolveImg(a.images?.[0])} className="w-full h-full object-cover" alt="" />
+              {isPicked && <div className="absolute inset-0 bg-[#CCFF00]/20" />}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1 truncate">
+                <div className="text-xs font-unbounded truncate">{a.title}</div>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -518,37 +788,89 @@ function PostsEditor({ userId }) {
 
 // ---------- Payouts panel ----------
 function PayoutsPanel({ dashboard, refresh, refreshUser }) {
+  const [status, setStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const loadStatus = async () => {
+    try {
+      const r = await api.get("/connect/status");
+      setStatus(r.data);
+    } catch {}
+  };
+  React.useEffect(() => { loadStatus(); }, []);
+
   const startConnect = async () => {
-    const r = await api.post("/artist/connect/start");
-    window.open(r.data.onboarding_url, "_blank");
+    setBusy(true);
+    try {
+      const returnUrl = `${window.location.origin}/studio?connect=ok`;
+      const r = await api.post("/connect/onboarding-link", { return_url: returnUrl, refresh_url: returnUrl });
+      window.location.href = r.data.url;
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Connect onboarding unavailable");
+      setBusy(false);
+    }
   };
-  const completeConnect = async () => {
-    await api.post("/artist/connect/complete"); await refreshUser(); refresh();
-    toast.success("Stripe Connect linked");
+  const openDashboard = async () => {
+    try {
+      const r = await api.post("/connect/dashboard-link");
+      window.open(r.data.url, "_blank");
+    } catch (e) { toast.error(e?.response?.data?.detail || "Cannot open dashboard"); }
   };
+
+  const chargesOn = status?.charges_enabled;
+  const payoutsOn = status?.payouts_enabled;
+  const requirements = status?.requirements_due || [];
+
   return (
     <div className="space-y-8 max-w-3xl">
-      <div className="glass-card p-8 rounded-sm">
-        <div className="label-caps">Stripe Connect Status</div>
-        <div className="mt-2 text-sm text-zinc-300">Current: <span className="text-[#CCFF00]" data-testid="connect-status">{dashboard.stripe_connect_status}</span></div>
-        <div className="flex flex-wrap gap-3 mt-6">
-          {dashboard.stripe_connect_status !== "connected" ? (
-            <>
-              <button data-testid="connect-start" onClick={startConnect} className="btn-lime">Start Onboarding</button>
-              <button data-testid="connect-complete" onClick={completeConnect} className="btn-ghost">I've completed it</button>
-            </>
-          ) : <div className="text-[#CCFF00] font-unbounded">Ready for payouts.</div>}
+      <div className="glass-card p-8 rounded-sm" data-testid="connect-panel">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <div className="label-caps text-[#CCFF00]">Stripe Connect · Artist Payouts</div>
+            <div className="mt-3">
+              {!status ? <span className="text-zinc-500 label-caps">Loading...</span> :
+               !status.connected ? <span className="text-[#F5A623] font-unbounded">Not connected</span> :
+               chargesOn && payoutsOn ? <span className="text-[#CCFF00] font-unbounded">✓ Active — payouts flow direct to your bank</span> :
+               <span className="text-[#F5A623] font-unbounded">Onboarding in progress</span>}
+            </div>
+            {requirements.length > 0 && (
+              <div className="text-xs text-[#F5A623] mt-2">Stripe still needs: {requirements.slice(0, 4).join(", ")}{requirements.length > 4 ? "..." : ""}</div>
+            )}
+            <div className="text-xs text-zinc-500 mt-3 max-w-lg">
+              Art Core uses Stripe Connect Express to route your share of each sale directly to your bank. The platform keeps its commission automatically; you receive the rest.
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            {(!status?.connected || !chargesOn) && (
+              <button data-testid="connect-start" onClick={startConnect} disabled={busy} className="btn-lime">
+                {busy ? "Opening..." : status?.connected ? "Continue Onboarding" : "Connect Stripe"}
+              </button>
+            )}
+            {status?.connected && (
+              <button data-testid="connect-dashboard" onClick={openDashboard} className="btn-ghost">Open Stripe Dashboard</button>
+            )}
+          </div>
         </div>
       </div>
+
       <div>
         <div className="label-caps mb-3">Recent Payouts</div>
         {dashboard.payouts.length === 0 ? <div className="text-zinc-500 label-caps">No payouts yet.</div> : (
           <div className="border border-white/8 divide-y divide-white/8 text-sm rounded-sm">
             {dashboard.payouts.slice(0, 10).map((p, i) => (
-              <div key={i} className="p-4 flex justify-between items-center">
-                <div className="text-zinc-400">{new Date(p.created_at).toLocaleDateString()}</div>
+              <div key={i} className="p-4 flex justify-between items-center flex-wrap gap-3">
+                <div className="text-zinc-400 label-caps">{new Date(p.created_at).toLocaleDateString()}</div>
                 <div className="font-anton text-xl">${p.net.toFixed(2)} <span className="text-zinc-500 text-xs font-manrope">of ${p.gross.toFixed(2)}</span></div>
-                <div className="label-caps text-[#CCFF00]">{p.status}</div>
+                <div className="label-caps" style={{ color:
+                  p.status === "auto_transferred" ? "#CCFF00" :
+                  p.status === "transferred" ? "#CCFF00" :
+                  p.status === "released" ? "#F5A623" :
+                  "#71717A"
+                }}>{
+                  p.status === "auto_transferred" ? "Instant Payout" :
+                  p.status === "transferred" ? "Transferred" :
+                  p.status === "released" ? "Released (Manual)" :
+                  p.status
+                }</div>
               </div>
             ))}
           </div>

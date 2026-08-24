@@ -1,0 +1,41 @@
+{
+  "summary": "Full backend + frontend validation for Studio v2 (7 new themes, textures, draft/publish, rich sections, featured picker, commission availability), Stripe Connect endpoints (graceful fallback), and CommissionTimeline UI. Backend: 23/23 new tests + 13/13 regression tests all pass. Frontend: Studio editor (all tabs, all 7 themes, all 7 textures, all 12 section kinds, all 5 layouts, draft/publish workflow, preview mode banner, connect-panel) all rendered and interacted correctly. Found + fixed a P0 crash on /commissions/{id} caused by useEffect returning a Promise. After fix, CommissionTimeline renders with all 7 stages and correct color coding (green=done, orange=pending, red=declined).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CommissionDetail (Commissions.js)", "issue": "FIXED. `useEffect(load, [id])` where load returned a Promise caused React to try calling the Promise as cleanup → 'destroy is not a function' + 'Cannot destructure basename ... useContext(...) as it is null' at LinkWithRef. This crashed the entire /commissions/{id} route including the new CommissionTimeline. Fixed by wrapping in arrow function: `useEffect(() => { load(); }, [id])`.", "selector": "[data-testid='commission-detail']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_studio_connect.py",
+    "/app/backend/tests/test_commerce_full.py",
+    "/app/test_reports/pytest/new_studio_connect.xml",
+    "/app/test_reports/pytest/commerce_full.xml"
+  ],
+  "action_items": [
+    "None required — P0 commissions crash fixed by testing agent, all listed features verified end-to-end."
+  ],
+  "critical_code_review_comments": [
+    "StudioEditor.js is 993 lines — should be split into smaller focused modules (ThemeEditor, BackgroundEditor, SectionsEditor, FeaturedEditor, PayoutsPanel are all in one file).",
+    "Commissions.js is 573 lines with CommissionTimeline + TimelineNode + PayCommissionButton + PayDepositButton + all Detail/Inbox/Create in one file — split for maintainability.",
+    "connect.py onboarding-link creates a Stripe account on first call but does NOT delete it on subsequent 400 (Connect not enabled) failures. If Connect is later enabled, the stored account_id may be stale. Consider cleanup on 400.",
+    "studio.py _get_or_create_config performs migration on every read — heavy for hot studios. Consider a version stamp so migration only runs once per config.",
+    "studio.py update_studio merges into draft without any size cap on sections array. Malicious client could POST 10k sections. Add len(sections)<=50 guard.",
+    "studio.py section 'button_link' accepts any string up to 400 chars — no URL scheme validation (could be javascript: for XSS if rendered via href without sanitization). ArtistStudio renders it in <a href=...> — verify sanitization.",
+    "Commissions.js useEffect(load, [id]) was returning a Promise — same anti-pattern may exist elsewhere. Scan other pages: `grep -n 'useEffect(load' /app/frontend/src/**/*.js`.",
+    "connect.py imports payments.get_settings inside function to avoid circular import — fragile pattern; consider extracting settings.py."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/Commissions.js (fixed useEffect Promise cleanup crash on line 168)",
+    "/app/backend/tests/test_new_studio_connect.py (new — 23 tests: themes/textures/draft-publish/sections/featured/commission-flags/connect/timeline data)"
+  ],
+  "success_rate": {"backend": "100% (36/36 = 23 new + 13 regression)", "frontend": "100% for tested flows (studio editor UI + commission timeline)"},
+  "test_credentials": "Admin monster@houseofmonster.com / MonsterAdmin2026!. Fresh TEST_ artists/buyers registered per test run.",
+  "seed_data_creation": "Per run: ~2 TEST_ artists, ~2 TEST_ buyers, ~10 live artworks (upload_fee forced to 0), several commissions, ~5 offers, ~5 auctions. All prefixed TEST_.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Two test suites cover this domain: (1) /app/backend/tests/test_new_studio_connect.py — 23 tests for Studio v2 + Connect + Commission timeline data. (2) /app/backend/tests/test_commerce_full.py — 13 regression tests for offers/auctions/orders/commissions/payments. Both pass 100%. Run: `cd /app && python -m pytest backend/tests/test_new_studio_connect.py backend/tests/test_commerce_full.py -v -n 0`. Test_studio.py (older) uses legacy theme names (darkroom/digital/warm_studio) that are now aliases — still passes via _migrate_theme, but consider updating it to new names too. Frontend UI for Studio editor tested with real Playwright browser: all 7 themes/textures/12 section kinds/5 layouts/draft-publish/preview banner/connect-panel work. Fixed a P0 crash in Commissions.js (useEffect returning a Promise); verify no other page has this anti-pattern. Stripe Connect sandbox returns 400 'Connect not available' — graceful handling verified.",
+  "rca_of_the_issue": "P0 CRASH on /commissions/{id}: React error overlay with 'destroy is not a function' + 'Cannot destructure basename of useContext(...) as it is null at LinkWithRef'. RCA: Commissions.js line 168 was `useEffect(load, [id])` where load = `() => api.get(...).then((r) => setC(r.data)).catch(...)`. That returns a Promise. React 18 interprets the return value of a useEffect callback as the cleanup function — since a Promise is not a function, on unmount/re-run React attempts `promise()` which throws 'destroy is not a function'. The unhandled error then destabilizes the React tree, causing the next render's <Link> to see useContext(RouterContext) === null and throw the basename destructure error. Reproduction: navigate to any /commissions/{id}. Mitigation: wrap in an anonymous arrow — `useEffect(() => { load(); }, [id])`. Applied and verified — page now renders cleanly with 0 console errors and all 7 timeline stages visible with correct color coding."
+}

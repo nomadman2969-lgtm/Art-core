@@ -18,6 +18,7 @@ THEMES = {
         "accent": "#CCFF00", "secondary": "#FF4D4D",
         "text": "#FFFFFF", "surface": "rgba(10,10,12,0.85)",
         "vibe": "raw brick, neon paint drips, hand-tagged energy",
+        "default_texture": "graffiti",
     },
     "luxury_gallery": {
         "name": "Luxury Gallery",
@@ -25,13 +26,15 @@ THEMES = {
         "accent": "#D4AF37", "secondary": "#FFFFFF",
         "text": "#FFFFFF", "surface": "rgba(20,20,20,0.75)",
         "vibe": "high-end white walls, museum lighting, sophisticated typography",
+        "default_texture": "none",
     },
-    "darkroom": {
-        "name": "Darkroom",
+    "dark_gallery": {
+        "name": "Dark Gallery",
         "bg_url": None,
         "accent": "#FF4D4D", "secondary": "#CCFF00",
         "text": "#FFFFFF", "surface": "rgba(5,5,5,0.9)",
         "vibe": "pure black backdrop, dramatic single-source spotlights, cinematic",
+        "default_texture": "none",
     },
     "industrial": {
         "name": "Industrial",
@@ -39,13 +42,15 @@ THEMES = {
         "accent": "#F5A623", "secondary": "#00E5FF",
         "text": "#FFFFFF", "surface": "rgba(15,15,17,0.85)",
         "vibe": "steel + concrete + warehouse lighting",
+        "default_texture": "concrete",
     },
-    "digital": {
-        "name": "Digital",
+    "neon_digital": {
+        "name": "Neon Digital",
         "bg_url": None,
         "accent": "#00E5FF", "secondary": "#FF00FF",
         "text": "#FFFFFF", "surface": "rgba(5,10,20,0.85)",
         "vibe": "cyberpunk grid, neon glow, futuristic HUD interface",
+        "default_texture": "grid",
     },
     "minimal": {
         "name": "Minimal",
@@ -53,15 +58,33 @@ THEMES = {
         "accent": "#FFFFFF", "secondary": "#A1A1AA",
         "text": "#FFFFFF", "surface": "rgba(18,18,20,0.6)",
         "vibe": "ultra clean, negative space, no decoration",
+        "default_texture": "none",
     },
-    "warm_studio": {
-        "name": "Warm Studio",
-        "bg_url": "https://images.unsplash.com/photo-1541753866388-0b3c701627d3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxhcnRpc3QlMjBwYWludGluZyUyMHN0dWRpb3xlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85",
-        "accent": "#F5A623", "secondary": "#FF6EC7",
-        "text": "#FFFFFF", "surface": "rgba(28,20,15,0.85)",
-        "vibe": "cozy studio, wooden textures, warm amber lighting",
+    "custom": {
+        "name": "Custom",
+        "bg_url": None,
+        "accent": "#CCFF00", "secondary": "#7C3AED",
+        "text": "#FFFFFF", "surface": "rgba(10,10,12,0.85)",
+        "vibe": "your rules — pick your own background, textures, accents",
+        "default_texture": "none",
     },
 }
+
+# Legacy theme aliases → new IDs (for backward compatibility with existing studios)
+THEME_ALIASES = {
+    "darkroom": "dark_gallery",
+    "digital": "neon_digital",
+    "warm_studio": "industrial",
+}
+
+TEXTURES = ["none", "graffiti", "brick", "concrete", "grid", "noise", "paper"]
+LAYOUTS = ["grid", "masonry", "salon", "showcase", "carousel"]
+SECTION_KINDS_ALL = [
+    "featured_works", "available_now", "sold_works", "upcoming_auctions",
+    "feed", "story", "commission", "custom",
+    # New rich blocks
+    "announcement", "text_block", "button_cta", "image_block",
+]
 
 DEFAULT_SECTIONS = [
     {"id": "featured", "kind": "featured_works", "title": "Featured Works", "order": 0, "visible": True},
@@ -83,11 +106,19 @@ def default_config(artist_id: str) -> dict:
     return {
         "artist_id": artist_id,
         "theme": "urban_graffiti",
-        "background": {"type": "theme", "value": None},  # theme | image | color | preset
-        "lighting": {"preset": "gallery", "intensity": 70},  # gallery | spotlight | neon | warm | cool | ambient
-        "accent_color": None,  # override theme accent
-        "typography": "brutalist",  # brutalist | serif | mono | modern
+        "background": {
+            "type": "theme",   # theme | image | color
+            "value": None,
+            "texture": "graffiti",  # graffiti | brick | concrete | grid | noise | paper | none
+            "texture_opacity": 25,  # 0-100
+        },
+        "lighting": {"preset": "gallery", "intensity": 70},
+        "accent_color": None,
+        "typography": "brutalist",
         "sections": DEFAULT_SECTIONS,
+        "featured_artwork_ids": [],  # explicit override for featured_works section
+        "commission_open": True,  # commission availability toggle
+        "commission_blurb": None,  # custom copy on commission block
         "artist_story": {
             "location": "", "style": "", "years_active": None,
             "influences": "", "education": "", "awards": "", "exhibitions": "",
@@ -96,33 +127,78 @@ def default_config(artist_id: str) -> dict:
         "custom_css_accent": None,
         "visits": 0,
         "views_by_artwork": {},
+        "draft": None,  # holds unpublished changes
+        "published_at": now_iso(),
         "created_at": now_iso(),
         "updated_at": now_iso(),
     }
 
 
+def _migrate_theme(cfg: dict) -> dict:
+    """Rewrite legacy theme IDs to their new names on-the-fly."""
+    if cfg.get("theme") in THEME_ALIASES:
+        cfg["theme"] = THEME_ALIASES[cfg["theme"]]
+    d = cfg.get("draft") or {}
+    if isinstance(d, dict) and d.get("theme") in THEME_ALIASES:
+        d["theme"] = THEME_ALIASES[d["theme"]]
+        cfg["draft"] = d
+    return cfg
+
+
 async def _get_or_create_config(artist_id: str) -> dict:
     c = await db.studio_configs.find_one({"artist_id": artist_id})
     if c:
-        return strip_mongo(c)
+        migrated = _migrate_theme(strip_mongo(c))
+        # Persist migration + backfill new fields once
+        needs_save = migrated.get("theme") != c.get("theme")
+        for k, v in [("featured_artwork_ids", []), ("commission_open", True), ("commission_blurb", None), ("draft", None), ("published_at", c.get("updated_at"))]:
+            if k not in c:
+                migrated[k] = v
+                needs_save = True
+        if "texture" not in (c.get("background") or {}):
+            migrated["background"] = {**(c.get("background") or {"type": "theme"}), "texture": "none", "texture_opacity": 25}
+            needs_save = True
+        if needs_save:
+            await db.studio_configs.update_one({"artist_id": artist_id}, {"$set": migrated})
+        return migrated
     cfg = default_config(artist_id)
     await db.studio_configs.insert_one(cfg)
     return strip_mongo(await db.studio_configs.find_one({"artist_id": artist_id}))
 
 
 @router.get("/{artist_id}")
-async def get_studio(artist_id: str, viewer: Optional[dict] = Depends(get_optional_user)):
-    """Full public studio view: config + artist + artworks by section + rank + social + recent posts."""
+async def get_studio(artist_id: str, preview: bool = False, viewer: Optional[dict] = Depends(get_optional_user)):
+    """Public studio view. If preview=true and viewer is the owner, apply their unpublished draft."""
     artist = await db.users.find_one({"id": artist_id, "role": {"$in": ["artist", "admin"]}})
     if not artist:
         raise HTTPException(404, "Artist not found")
     cfg = await _get_or_create_config(artist_id)
+    is_owner = viewer and viewer["id"] == artist_id
+    if preview and is_owner and cfg.get("draft"):
+        # Merge draft over published fields (only known keys)
+        draft = cfg["draft"]
+        for k in ("theme", "background", "lighting", "accent_color", "typography", "sections",
+                  "featured_artwork_ids", "commission_open", "commission_blurb", "artist_story"):
+            if k in draft:
+                cfg[k] = draft[k]
+        cfg["is_preview"] = True
+    else:
+        cfg["is_preview"] = False
+    cfg["has_draft"] = bool(cfg.get("draft"))
     # Pull artworks by role
     all_arts = await db.artworks.find({"artist_id": artist_id, "status": {"$in": ["live", "sold"]}}).sort("created_at", -1).to_list(500)
     all_arts = [strip_mongo(a) for a in all_arts]
     available = [a for a in all_arts if a["status"] == "live"]
     sold = [a for a in all_arts if a["status"] == "sold"]
-    featured = [a for a in all_arts if a.get("featured")]
+    # Featured: explicit picks first, else artworks flagged featured=True
+    picks = cfg.get("featured_artwork_ids") or []
+    if picks:
+        picks_set = set(picks)
+        # preserve chosen order
+        by_id = {a["id"]: a for a in all_arts}
+        featured = [by_id[pid] for pid in picks if pid in by_id]
+    else:
+        featured = [a for a in all_arts if a.get("featured")]
     # Auctions
     auctions_c = db.auctions.find({"seller_id": artist_id, "status": {"$in": ["live", "scheduled"]}}).sort("end_at", 1)
     auctions_raw = await auctions_c.to_list(20)
@@ -165,15 +241,119 @@ class StudioUpdate(BaseModel):
     typography: Optional[str] = None
     sections: Optional[List[Dict[str, Any]]] = None
     artist_story: Optional[Dict[str, Any]] = None
+    featured_artwork_ids: Optional[List[str]] = None
+    commission_open: Optional[bool] = None
+    commission_blurb: Optional[str] = None
+    publish: bool = False  # if true, write straight to live (skip draft)
+
+
+def _validate_section(s: dict) -> dict:
+    """Sanitize a section dict."""
+    kind = s.get("kind", "custom")
+    if kind not in SECTION_KINDS_ALL:
+        raise HTTPException(400, f"Unknown section kind: {kind}")
+    out = {
+        "id": s.get("id") or new_id(),
+        "kind": kind,
+        "title": (s.get("title") or "Section")[:60],
+        "order": int(s.get("order", 0)),
+        "visible": bool(s.get("visible", True)),
+    }
+    # Optional layout (grid | masonry | salon | showcase | carousel)
+    if kind in ("featured_works", "available_now", "sold_works"):
+        layout = s.get("layout", "grid")
+        if layout not in LAYOUTS:
+            layout = "grid"
+        out["layout"] = layout
+    # Rich block payloads
+    if kind in ("custom", "text_block", "announcement"):
+        out["body"] = (s.get("body") or "")[:4000]
+    if kind == "announcement":
+        out["variant"] = s.get("variant", "info")  # info | success | warning
+    if kind == "button_cta":
+        out["button_text"] = (s.get("button_text") or "Click")[:60]
+        out["button_link"] = (s.get("button_link") or "#")[:400]
+        out["body"] = (s.get("body") or "")[:2000]
+    if kind == "image_block":
+        out["image"] = s.get("image")
+        out["caption"] = (s.get("caption") or "")[:400]
+        out["body"] = (s.get("body") or "")[:2000]
+    # Optional background override per section
+    if s.get("background_color"):
+        out["background_color"] = s["background_color"][:32]
+    return out
+
+
+def _sanitize_patch(patch: dict) -> dict:
+    if "sections" in patch and patch["sections"] is not None:
+        patch["sections"] = [_validate_section(s) for s in patch["sections"]]
+        # Renumber order
+        for i, s in enumerate(patch["sections"]):
+            s["order"] = i
+    if "theme" in patch and patch["theme"] is not None:
+        t = patch["theme"]
+        if t in THEME_ALIASES:
+            t = THEME_ALIASES[t]
+        if t not in THEMES:
+            raise HTTPException(400, f"Unknown theme: {t}")
+        patch["theme"] = t
+    if "background" in patch and patch["background"] is not None:
+        bg = patch["background"]
+        if bg.get("texture") and bg["texture"] not in TEXTURES:
+            raise HTTPException(400, f"Unknown texture: {bg['texture']}")
+    return patch
 
 
 @router.patch("")
 async def update_studio(req: StudioUpdate, user: dict = Depends(require_role("artist", "admin"))):
+    """Write to draft by default; if publish=true, apply directly to live config."""
     await _get_or_create_config(user["id"])
-    updates = {k: v for k, v in req.model_dump(exclude_none=True).items()}
-    updates["updated_at"] = now_iso()
-    await db.studio_configs.update_one({"artist_id": user["id"]}, {"$set": updates})
-    return strip_mongo(await db.studio_configs.find_one({"artist_id": user["id"]}))
+    payload = req.model_dump(exclude_none=True)
+    publish_flag = payload.pop("publish", False)
+    payload = _sanitize_patch(payload)
+    now = now_iso()
+    if publish_flag:
+        # Apply directly to live and clear any draft
+        updates = dict(payload)
+        updates["updated_at"] = now
+        updates["published_at"] = now
+        updates["draft"] = None
+        await db.studio_configs.update_one({"artist_id": user["id"]}, {"$set": updates})
+    else:
+        # Merge into draft
+        cfg = await db.studio_configs.find_one({"artist_id": user["id"]})
+        current_draft = (cfg or {}).get("draft") or {}
+        current_draft.update(payload)
+        current_draft["updated_at"] = now
+        await db.studio_configs.update_one({"artist_id": user["id"]},
+            {"$set": {"draft": current_draft, "updated_at": now}})
+    return await _get_or_create_config(user["id"])
+
+
+@router.post("/publish")
+async def publish_studio(user: dict = Depends(require_role("artist", "admin"))):
+    """Merge draft into live config and clear draft."""
+    cfg = await db.studio_configs.find_one({"artist_id": user["id"]})
+    if not cfg or not cfg.get("draft"):
+        raise HTTPException(400, "No draft to publish")
+    draft = cfg["draft"]
+    # Only allowed keys
+    apply = {}
+    for k in ("theme", "background", "lighting", "accent_color", "typography", "sections",
+              "featured_artwork_ids", "commission_open", "commission_blurb", "artist_story"):
+        if k in draft:
+            apply[k] = draft[k]
+    apply["published_at"] = now_iso()
+    apply["updated_at"] = now_iso()
+    apply["draft"] = None
+    await db.studio_configs.update_one({"artist_id": user["id"]}, {"$set": apply})
+    return await _get_or_create_config(user["id"])
+
+
+@router.post("/discard-draft")
+async def discard_draft(user: dict = Depends(require_role("artist", "admin"))):
+    await db.studio_configs.update_one({"artist_id": user["id"]}, {"$set": {"draft": None, "updated_at": now_iso()}})
+    return await _get_or_create_config(user["id"])
 
 
 @router.get("/analytics/me")

@@ -100,7 +100,34 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 - Video posts / stories rail
 - Digital prints / print-on-demand
 
-## Production Commerce Hardening (Feb 23, 2026)
+## Studio v2 + Commission Timeline + Stripe Connect (Feb 24, 2026)
+
+### Studio Signature Feature
+- **7 themes** aligned to spec: Urban Graffiti · Luxury Gallery · Dark Gallery · Industrial · Neon Digital · Minimal · Custom (with legacy alias migration)
+- **6 textures** rendered as SVG data-URI overlays: Graffiti / Brick / Concrete / Neon Grid / Grain / Paper — with intensity slider
+- **12 section kinds** including 4 new rich blocks: `announcement` (info/success/warning), `text_block`, `button_cta` (label + link), `image_block` (upload + caption)
+- **5 gallery layouts** per section: Grid, Masonry (CSS columns), Salon Wall (asymmetric), Single Showcase (thumbnail nav), Carousel (3-at-a-time)
+- **Featured artwork picker** — multi-select up to 12 pieces in exact order
+- **Commission availability toggle** with custom blurb (closed state renders "Commissions currently closed")
+- **Draft → Preview → Publish workflow** — all edits go to draft; preview via `/artist/{id}?preview=1` with sticky orange banner; Publish flips draft → live atomically
+
+### Commission Escrow Timeline UI
+- Added `CommissionTimeline` on `/commissions/{id}` — 7-stage vertical timeline (request → response → deposit → progress → delivered → approved → paid), computed from `progress[]` history
+- Escrow allocation bar showing deposit vs balance status
+- Color coded: green (done), orange (pending), red (declined/failed)
+
+### Stripe Connect Express (real artist payouts)
+- New `/api/connect/onboarding-link`, `/status`, `/dashboard-link` endpoints (module `connect.py`)
+- `build_transfer_options(seller_id, gross)` helper wired into auction/offer/commission checkouts — attaches `transfer_data.destination` + `application_fee_amount` when seller has active connected account
+- `transfer_manual` helper — orders.mark_delivered now attempts a real Stripe Transfer when payout wasn't auto-routed at checkout
+- Graceful fallback: sellers without Connect still get orders/notifications; funds land on platform (existing behavior)
+- Payouts panel in Studio Editor rewritten with real Connect status + Stripe Express dashboard link
+
+### Testing
+- 23/23 new tests + 13/13 regression tests passed via testing agent
+- Testing agent fixed one P0 useEffect Promise bug on CommissionDetail (git committed)
+
+
 Full commerce system audit + upgrade:
 
 ### Offers (make-an-offer) — NEW module (`offers.py`)

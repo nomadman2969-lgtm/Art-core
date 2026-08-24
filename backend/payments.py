@@ -185,6 +185,8 @@ async def pay_auction(auction_id: str, req: AuctionPayReq, user: dict = Depends(
         raise HTTPException(400, "Invalid amount")
     art = await db.artworks.find_one({"id": au["artwork_id"]})
     settings = await get_settings()
+    from connect import build_transfer_options
+    transfer_kwargs = await build_transfer_options(au["seller_id"], amount)
     session = stripe.checkout.Session.create(
         mode="payment",
         line_items=[{
@@ -200,6 +202,7 @@ async def pay_auction(auction_id: str, req: AuctionPayReq, user: dict = Depends(
         shipping_address_collection={"allowed_countries": ["US", "CA", "GB", "AU", "DE", "FR", "IT", "ES", "NL", "IE", "SE", "NO", "DK", "FI", "JP", "MX", "BR"]},
         customer_email=user["email"],
         metadata={"kind": "auction_win", "auction_id": auction_id, "user_id": user["id"]},
+        **transfer_kwargs,
     )
     await db.payment_transactions.insert_one({
         "id": new_id(), "session_id": session.id,
@@ -279,6 +282,8 @@ async def pay_commission(commission_id: str, req: CommissionPayReq, user: dict =
         return {"checkout_url": None, "session_id": None, "free": True}
     settings = await get_settings()
     label = f"Balance: {c['subject']}" if deposit > 0 else f"Commission: {c['subject']}"
+    from connect import build_transfer_options
+    transfer_kwargs = await build_transfer_options(c["artist_id"], amount)
     session = stripe.checkout.Session.create(
         mode="payment",
         line_items=[{
@@ -293,6 +298,7 @@ async def pay_commission(commission_id: str, req: CommissionPayReq, user: dict =
         cancel_url=f"{req.origin_url}/payment/cancel",
         customer_email=user["email"],
         metadata={"kind": "commission_payment", "commission_id": commission_id, "user_id": user["id"]},
+        **transfer_kwargs,
     )
     await db.payment_transactions.insert_one({
         "id": new_id(), "session_id": session.id,
@@ -328,6 +334,8 @@ async def pay_offer(offer_id: str, req: OfferPayReq, user: dict = Depends(get_cu
         raise HTTPException(400, "Artwork no longer available")
     amount = float(o["amount"])
     settings = await get_settings()
+    from connect import build_transfer_options
+    transfer_kwargs = await build_transfer_options(o["artist_id"], amount)
     session = stripe.checkout.Session.create(
         mode="payment",
         line_items=[{
@@ -343,6 +351,7 @@ async def pay_offer(offer_id: str, req: OfferPayReq, user: dict = Depends(get_cu
         shipping_address_collection={"allowed_countries": ["US", "CA", "GB", "AU", "DE", "FR", "IT", "ES", "NL", "IE", "SE", "NO", "DK", "FI", "JP", "MX", "BR"]},
         customer_email=user["email"],
         metadata={"kind": "offer_payment", "offer_id": offer_id, "user_id": user["id"]},
+        **transfer_kwargs,
     )
     await db.payment_transactions.insert_one({
         "id": new_id(), "session_id": session.id,
@@ -416,6 +425,10 @@ async def _apply_paid(session_id: str):
         settings = await get_settings()
         commission = float(settings["commission_percent"]) / 100.0
         gross = float(tx["amount"])
+        # Detect if Stripe already routed funds via destination charge
+        seller = await db.users.find_one({"id": tx["seller_id"]})
+        auto_paid = bool(seller and seller.get("stripe_charges_enabled") and seller.get("stripe_account_id"))
+        payout_status = "auto_transferred" if auto_paid else "pending"
         order = {
             "id": new_id(),
             "session_id": session_id,
@@ -427,7 +440,7 @@ async def _apply_paid(session_id: str):
             "platform_take": round(gross * commission, 2),
             "artist_payouts": [{
                 "artist_id": tx["seller_id"], "artwork_id": tx["artwork_id"],
-                "gross": gross, "net": round(gross * (1 - commission), 2), "status": "pending",
+                "gross": gross, "net": round(gross * (1 - commission), 2), "status": payout_status,
             }],
             "fulfillment": {"status": "pending", "shipped_at": None, "delivered_at": None, "tracking": None, "carrier": None},
             "source": "auction",
@@ -461,6 +474,9 @@ async def _apply_paid(session_id: str):
         settings = await get_settings()
         commission = float(settings["commission_percent"]) / 100.0
         gross = float(tx["amount"])
+        seller = await db.users.find_one({"id": tx["seller_id"]})
+        auto_paid = bool(seller and seller.get("stripe_charges_enabled") and seller.get("stripe_account_id"))
+        payout_status = "auto_transferred" if auto_paid else "pending"
         order = {
             "id": new_id(),
             "session_id": session_id,
@@ -472,7 +488,7 @@ async def _apply_paid(session_id: str):
             "platform_take": round(gross * commission, 2),
             "artist_payouts": [{
                 "artist_id": tx["seller_id"], "artwork_id": tx["artwork_id"],
-                "gross": gross, "net": round(gross * (1 - commission), 2), "status": "pending",
+                "gross": gross, "net": round(gross * (1 - commission), 2), "status": payout_status,
             }],
             "fulfillment": {"status": "pending", "shipped_at": None, "delivered_at": None, "tracking": None, "carrier": None},
             "source": "offer",

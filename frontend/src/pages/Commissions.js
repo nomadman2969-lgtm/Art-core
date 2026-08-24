@@ -165,7 +165,7 @@ export function CommissionDetail() {
   const [uploading, setUploading] = useState(false);
 
   const load = () => api.get(`/commissions/${id}`).then((r) => setC(r.data)).catch(() => nav("/commissions"));
-  useEffect(load, [id]);
+  useEffect(() => { load(); }, [id]);
 
   if (!c) return <div className="py-32 text-center label-caps text-zinc-500">Loading...</div>;
 
@@ -249,6 +249,8 @@ export function CommissionDetail() {
         <div className="label-caps mb-4">Brief</div>
         <p className="text-zinc-200 whitespace-pre-wrap">{c.instructions}</p>
       </div>
+
+      <CommissionTimeline c={c} />
 
       {c.reference_images?.length > 0 && (
         <div className="mt-6">
@@ -411,5 +413,160 @@ function PayDepositButton({ commissionId, total, onDone }) {
       <CreditCard size={14} className="mr-2" />
       {busy ? "Redirecting..." : `Pay Deposit $${deposit.toLocaleString()}`}
     </button>
+  );
+}
+
+
+// ---------- Commission Escrow Timeline ----------
+function CommissionTimeline({ c }) {
+  const total = Number(c.counter_amount || c.budget || 0);
+  const deposit = Math.round(total * 0.5);
+  const balance = total - deposit;
+  const platformPercent = Number(c.platform_take && total ? (c.platform_take / total) * 100 : 15);
+  const netToArtist = Number(c.net_to_artist || (total * (1 - platformPercent / 100))).toFixed(0);
+
+  // Find the earliest "at" for a given progress kind (or list of kinds)
+  const findAt = (kinds) => {
+    const set = Array.isArray(kinds) ? kinds : [kinds];
+    const hit = (c.progress || []).find((p) => set.includes(p.kind));
+    return hit?.at || null;
+  };
+  const fmt = (iso) => iso ? new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
+
+  // Build stages based on current status
+  const responseAt = findAt(["artist_accept", "artist_counter", "artist_decline"]);
+  const acceptedAt = findAt(["artist_accept", "buyer_accepted_counter"]);
+  const deliveredAt = findAt("artist_delivered");
+  const approvedAt = findAt("buyer_approved");
+  const isDeclined = c.status === "declined";
+  const isCancelled = c.status === "cancelled";
+
+  const stages = [
+    {
+      key: "request",
+      title: "Request submitted",
+      caption: `${c.buyer?.name || "Buyer"} sent brief · Budget $${Number(c.budget).toLocaleString()}`,
+      at: c.created_at,
+      done: true,
+    },
+    {
+      key: "response",
+      title: isDeclined ? "Artist declined" : c.status === "counter" ? "Artist countered" : "Artist accepted",
+      caption: c.counter_amount && c.status === "counter" ? `Counter offer: $${Number(c.counter_amount).toLocaleString()}` :
+               acceptedAt ? `Terms agreed at $${total.toLocaleString()}` : "Waiting for artist's response",
+      at: responseAt,
+      done: !!responseAt,
+      failed: isDeclined,
+    },
+    {
+      key: "deposit",
+      title: c.deposit_paid ? "Deposit paid · 50% held in escrow" : "Deposit due",
+      caption: c.deposit_paid
+        ? `$${deposit.toLocaleString()} secured by Art Core. Released to artist when work is approved.`
+        : `Buyer pays $${deposit.toLocaleString()} to start work.`,
+      at: c.deposit_paid_at,
+      done: !!c.deposit_paid,
+      pending: acceptedAt && !c.deposit_paid && !isDeclined && !isCancelled,
+    },
+    {
+      key: "progress",
+      title: "Work in progress",
+      caption: (c.progress || []).filter((p) => p.kind === "artist_update").length
+        ? `${(c.progress || []).filter((p) => p.kind === "artist_update").length} progress update(s) shared`
+        : "Artist working — updates will appear here",
+      at: c.deposit_paid ? c.deposit_paid_at : null,
+      done: c.status === "delivered" || c.status === "approved" || c.status === "paid",
+      pending: c.status === "in_progress" && c.deposit_paid,
+    },
+    {
+      key: "delivered",
+      title: "Final work delivered",
+      caption: "Buyer reviews the final piece. Approval unlocks the balance payment.",
+      at: deliveredAt,
+      done: !!deliveredAt,
+      pending: c.status === "in_progress" && c.deposit_paid,
+    },
+    {
+      key: "approved",
+      title: "Buyer approved",
+      caption: "Balance payment unlocked — funds ready for release.",
+      at: approvedAt,
+      done: !!approvedAt,
+      pending: c.status === "delivered",
+    },
+    {
+      key: "paid",
+      title: c.paid ? "Balance paid · Escrow released" : `Balance due · $${balance.toLocaleString()}`,
+      caption: c.paid
+        ? `Escrow released — artist receives $${netToArtist} net (Art Core keeps ${platformPercent.toFixed(0)}%).`
+        : `Buyer pays remaining $${balance.toLocaleString()}. Funds transfer to artist on payment.`,
+      at: c.paid_at,
+      done: !!c.paid,
+      pending: c.status === "approved" && !c.paid,
+    },
+  ];
+
+  return (
+    <div className="mt-8 glass-card p-6 md:p-8 rounded-sm" data-testid="commission-timeline">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <div className="label-caps text-[#CCFF00]">Escrow Timeline</div>
+          <div className="text-xs text-zinc-500 mt-1">Art Core holds payment in escrow to protect both sides.</div>
+        </div>
+        <div className="text-right">
+          <div className="label-caps">Total</div>
+          <div className="font-anton text-2xl">${total.toLocaleString()}</div>
+        </div>
+      </div>
+
+      {/* Escrow allocation bar */}
+      <div className="mb-8">
+        <div className="flex items-center text-xs label-caps mb-2 justify-between">
+          <span>Deposit ${deposit.toLocaleString()}</span>
+          <span>Balance ${balance.toLocaleString()}</span>
+        </div>
+        <div className="flex h-2 rounded-full overflow-hidden bg-white/8">
+          <div className="w-1/2 relative" style={{ background: c.deposit_paid ? "#CCFF00" : "rgba(255,255,255,0.15)" }} />
+          <div className="w-1/2 relative" style={{ background: c.paid ? "#CCFF00" : "rgba(255,255,255,0.15)" }} />
+        </div>
+        <div className="flex items-center text-xs mt-2 justify-between text-zinc-500">
+          <span>{c.deposit_paid ? "✓ Held in escrow" : "Pending"}</span>
+          <span>{c.paid ? "✓ Released" : "Pending"}</span>
+        </div>
+      </div>
+
+      {/* Vertical timeline */}
+      <div className="relative">
+        <div className="absolute left-3 top-2 bottom-2 w-px bg-white/8" />
+        <div className="space-y-5">
+          {stages.map((st) => (
+            <TimelineNode key={st.key} stage={st} fmt={fmt} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimelineNode({ stage, fmt }) {
+  const dot = stage.failed ? "#FF4D4D"
+    : stage.done ? "#CCFF00"
+    : stage.pending ? "#F5A623"
+    : "#3F3F46";
+  const textCls = stage.done ? "text-white" : stage.pending ? "text-zinc-100" : "text-zinc-500";
+  return (
+    <div className="relative pl-10" data-testid={`timeline-${stage.key}`}>
+      <div className="absolute left-0 top-1 w-6 h-6 rounded-full border-2 flex items-center justify-center"
+        style={{ borderColor: dot, background: stage.done ? dot : "#0A0A0C" }}>
+        {stage.done && !stage.failed && <Check size={12} color="#0A0A0C" strokeWidth={4} />}
+        {stage.failed && <X size={12} color={dot} strokeWidth={3} />}
+        {stage.pending && !stage.done && (
+          <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: dot }} />
+        )}
+      </div>
+      <div className={`font-unbounded text-sm md:text-base font-semibold ${textCls}`}>{stage.title}</div>
+      <div className="text-xs text-zinc-500 mt-1">{stage.caption}</div>
+      {stage.at && <div className="label-caps mt-1 text-zinc-600">{fmt(stage.at)}</div>}
+    </div>
   );
 }
