@@ -626,7 +626,7 @@ function FeaturedEditor({ config, save, artworks }) {
     <div data-testid="featured-editor">
       <div className="glass-card p-6 rounded-sm mb-6">
         <div className="label-caps text-[#CCFF00]">Featured Works</div>
-        <div className="text-sm text-zinc-400 mt-2">Pick up to 12 pieces to spotlight in the Featured Works section (in the exact order you tap them). Leave empty to show the artworks you've flagged as Featured elsewhere.</div>
+        <div className="text-sm text-zinc-400 mt-2">Pick up to 12 pieces to spotlight in the Featured Works section (in the exact order you tap them). Leave empty to show the artworks you&apos;ve flagged as Featured elsewhere.</div>
       </div>
       {picks.length > 0 && (
         <div className="mb-6">
@@ -670,20 +670,30 @@ function FeaturedEditor({ config, save, artworks }) {
 function StoryEditor({ config, save, user, refresh }) {
   const [story, setStory] = useState(config.artist_story || {});
   const [bio, setBio] = useState(user.bio || "");
-  const patch = (k, v) => setStory({ ...story, [k]: v });
+  const [saving, setSaving] = useState(false);
+
+  // Keep local state in sync when the parent reloads config (e.g. after publish/discard)
+  const configStoryKey = JSON.stringify(config.artist_story || {});
+  React.useEffect(() => {
+    setStory(config.artist_story || {});
+  }, [configStoryKey]);
+  React.useEffect(() => {
+    setBio(user.bio || "");
+  }, [user.bio]);
+
+  const patch = (k, v) => setStory((prev) => ({ ...prev, [k]: v }));
   const saveAll = async () => {
-    await save({ artist_story: story });
-    await api.patch("/auth/me", { bio });
-    await refresh();
-    toast.success("Story saved");
+    setSaving(true);
+    try {
+      await save({ artist_story: story });
+      await api.patch("/auth/me", { bio });
+      await refresh();
+      toast.success("Story saved to draft — hit Publish to make it live");
+    } catch (e) { toast.error(e?.response?.data?.detail || "Save failed"); }
+    setSaving(false);
   };
-  const F = ({ label, field, ...rest }) => (
-    <label className="block">
-      <div className="label-caps mb-2">{label}</div>
-      <input value={story[field] || ""} onChange={(e) => patch(field, e.target.value)}
-        className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2.5 outline-none focus:border-[#CCFF00]" {...rest} />
-    </label>
-  );
+
+  const inputCls = "w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2.5 outline-none focus:border-[#CCFF00]";
   return (
     <div className="space-y-5 max-w-3xl">
       <label className="block">
@@ -692,24 +702,54 @@ function StoryEditor({ config, save, user, refresh }) {
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
       </label>
       <div className="grid md:grid-cols-2 gap-4">
-        <F label="Location" field="location" />
-        <F label="Style" field="style" placeholder="Abstract, street, mixed media..." />
-        <F label="Active since (year)" field="years_active" />
-        <F label="Education" field="education" />
-        <F label="Exhibitions" field="exhibitions" />
-        <F label="Awards" field="awards" />
+        <label className="block">
+          <div className="label-caps mb-2">Location</div>
+          <input data-testid="story-location" value={story.location || ""} onChange={(e) => patch("location", e.target.value)} className={inputCls} />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Style</div>
+          <input data-testid="story-style" value={story.style || ""} onChange={(e) => patch("style", e.target.value)}
+            placeholder="Abstract, street, mixed media..." className={inputCls} />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Active since (year)</div>
+          <input data-testid="story-years" value={story.years_active || ""} onChange={(e) => patch("years_active", e.target.value)} className={inputCls} />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Education</div>
+          <input data-testid="story-education" value={story.education || ""} onChange={(e) => patch("education", e.target.value)} className={inputCls} />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Exhibitions</div>
+          <input data-testid="story-exhibitions" value={story.exhibitions || ""} onChange={(e) => patch("exhibitions", e.target.value)} className={inputCls} />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Awards</div>
+          <input data-testid="story-awards" value={story.awards || ""} onChange={(e) => patch("awards", e.target.value)} className={inputCls} />
+        </label>
       </div>
       <label className="block">
         <div className="label-caps mb-2">Influences / Inspiration</div>
-        <textarea value={story.influences || ""} onChange={(e) => patch("influences", e.target.value)} rows={3}
+        <textarea data-testid="story-influences" value={story.influences || ""} onChange={(e) => patch("influences", e.target.value)} rows={3}
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
       </label>
       <div className="grid md:grid-cols-3 gap-4">
-        <F label="Website" field="website" placeholder="https://" />
-        <F label="Instagram" field="instagram" placeholder="@handle" />
-        <F label="Twitter / X" field="twitter" placeholder="@handle" />
+        <label className="block">
+          <div className="label-caps mb-2">Website</div>
+          <input data-testid="story-website" value={story.website || ""} onChange={(e) => patch("website", e.target.value)} placeholder="https://" className={inputCls} />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Instagram</div>
+          <input data-testid="story-instagram" value={story.instagram || ""} onChange={(e) => patch("instagram", e.target.value)} placeholder="@handle" className={inputCls} />
+        </label>
+        <label className="block">
+          <div className="label-caps mb-2">Twitter / X</div>
+          <input data-testid="story-twitter" value={story.twitter || ""} onChange={(e) => patch("twitter", e.target.value)} placeholder="@handle" className={inputCls} />
+        </label>
       </div>
-      <button data-testid="save-story" onClick={saveAll} className="btn-lime mt-4">Save Story</button>
+      <button data-testid="save-story" onClick={saveAll} disabled={saving} className="btn-lime mt-4">
+        {saving ? "Saving..." : "Save Story"}
+      </button>
     </div>
   );
 }
@@ -794,7 +834,7 @@ function PayoutsPanel({ dashboard, refresh, refreshUser }) {
     try {
       const r = await api.get("/connect/status");
       setStatus(r.data);
-    } catch {}
+    } catch { /* ignore */ }
   };
   React.useEffect(() => { loadStatus(); }, []);
 
