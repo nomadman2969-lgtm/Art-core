@@ -165,6 +165,38 @@ async def _notify_watchers_leader_change(auction_id: str, new_leader_id: str, am
         })
 
 
+async def _check_ending_soon(auction_id: str):
+    """Notify current bidder + watchers 1h before end. Fire once (dedup via marker doc)."""
+    a = await db.auctions.find_one({"id": auction_id})
+    if not a or a["status"] != "live":
+        return
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    try:
+        end = _parse(a["end_at"])
+    except Exception:
+        return
+    delta = end - now
+    if delta > timedelta(hours=1) or delta < timedelta(seconds=0):
+        return
+    if a.get("ending_soon_notified"):
+        return
+    await db.auctions.update_one({"id": auction_id}, {"$set": {"ending_soon_notified": True}})
+    recipients = set()
+    if a.get("current_bidder_id"):
+        recipients.add(a["current_bidder_id"])
+    watchers = await db.watchers.find({"auction_id": auction_id}).to_list(500)
+    for w in watchers:
+        recipients.add(w["user_id"])
+    for uid in recipients:
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": uid, "kind": "auction_ending",
+            "auction_id": auction_id, "artwork_id": a["artwork_id"],
+            "current_bid": a.get("current_bid"), "end_at": a["end_at"],
+            "read": False, "created_at": now_iso(),
+        })
+
+
 async def _check_deadline_warning(auction_id: str):
     a = await db.auctions.find_one({"id": auction_id})
     if not a or a["status"] != "ended" or a.get("paid") or a.get("deadline_warned"):
@@ -230,6 +262,9 @@ async def _enrich(a: dict) -> dict:
     # auto-finalize if end passed
     if a["status"] == "live" and _iso_now() >= _parse(a["end_at"]):
         await _finalize(a["id"])
+    # check "ending soon" (within 1h) — fires once
+    if a["status"] == "live":
+        await _check_ending_soon(a["id"])
     # check payment deadline reassignment
     if a["status"] == "ended" and a.get("payment_deadline"):
         await _reassign_if_expired(a["id"])

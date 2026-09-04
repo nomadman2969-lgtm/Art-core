@@ -45,6 +45,8 @@ const KIND_META = {
   mentioned_in_post: { label: "Mentioned you in a post", icon: <Bell size={14} />, color: "#F5A623" },
   post_liked: { label: "Liked your post", icon: <Heart size={14} />, color: "#FF4D4D" },
   post_comment: { label: "Commented on your post", icon: <MessageSquare size={14} />, color: "#CCFF00" },
+  new_message: { label: "New message", icon: <MessageSquare size={14} />, color: "#7C3AED" },
+  auction_ending: { label: "Auction ending soon", icon: <Gavel size={14} />, color: "#F5A623" },
 };
 
 export default function Notifications() {
@@ -92,6 +94,7 @@ export default function Notifications() {
                          n.auction?.id ? `/auctions/${n.auction.id}` :
                          n.offer?.id ? "/offers" :
                          n.order?.id ? `/orders/${n.order.id}` :
+                         n.kind === "new_message" && n.other?.id ? `/messages/${n.other.id}` :
                          n.artwork?.id ? `/artwork/${n.artwork.id}` :
                          n.post?.id && n.other?.id ? `/artist/${n.other.id}` :
                          n.other?.id ? `/artist/${n.other.id}` : null;

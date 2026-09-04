@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
 import { toast } from "sonner";
-import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Palette } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Palette, Filter, X } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -16,7 +16,20 @@ const POST_KIND_META = {
   commission: { label: "Commission", color: "#7C3AED" },
   exhibition: { label: "Exhibition", color: "#D4AF37" },
   behind_scenes: { label: "Behind the Scenes", color: "#FF6EC7" },
+  event: { label: "Event", color: "#00E5FF" },
 };
+
+const FILTER_CHIPS = [
+  { key: "artwork", label: "New Artwork", color: "#CCFF00" },
+  { key: "wip", label: "WIP", color: "#F5A623" },
+  { key: "auction", label: "Auctions", color: "#FF4D4D" },
+  { key: "sold", label: "Sold", color: "#CCFF00" },
+  { key: "exhibition", label: "Exhibitions", color: "#D4AF37" },
+  { key: "behind_scenes", label: "BTS", color: "#FF6EC7" },
+  { key: "announcement", label: "News", color: "#00E5FF" },
+  { key: "commission", label: "Commissions", color: "#7C3AED" },
+  { key: "event", label: "Events", color: "#00E5FF" },
+];
 
 // Simple @handle rendering — links to /artist/{id} isn't easy without resolving,
 // so we just style them differently
@@ -31,17 +44,28 @@ function renderText(text) {
 export default function HomeFeed() {
   const [feed, setFeed] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeFilters, setActiveFilters] = useState([]);
 
-  const load = () => {
+  const load = (filters = activeFilters) => {
     setLoading(true);
-    api.get("/feed/home").then((r) => setFeed(r.data)).finally(() => setLoading(false));
+    const q = filters.length > 0 ? `?kinds=${filters.join(",")}` : "";
+    api.get(`/feed/home${q}`).then((r) => setFeed(r.data)).finally(() => setLoading(false));
   };
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
-  if (loading) return <div className="py-32 text-center label-caps text-zinc-500">Loading your feed...</div>;
+  const toggleFilter = (key) => {
+    const next = activeFilters.includes(key)
+      ? activeFilters.filter((f) => f !== key)
+      : [...activeFilters, key];
+    setActiveFilters(next);
+    load(next);
+  };
+  const clearFilters = () => { setActiveFilters([]); load([]); };
+
+  if (loading && !feed) return <div className="py-32 text-center label-caps text-zinc-500">Loading your feed...</div>;
   return (
     <div data-testid="home-feed" className="max-w-2xl mx-auto px-4 md:px-6 pt-10 pb-32">
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="label-caps text-[#CCFF00]"><Users size={12} className="inline mr-2" /> Home Feed</div>
         <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3">Your Feed</h1>
         <div className="text-zinc-500 mt-2">
@@ -50,11 +74,42 @@ export default function HomeFeed() {
             : "You're not following any artists yet. Explore below to fill your feed."}
         </div>
       </div>
+
+      {/* Filter chips */}
+      <div className="mb-6 -mx-4 md:-mx-6 px-4 md:px-6 overflow-x-auto scrollbar-none" data-testid="feed-filters">
+        <div className="flex gap-2 items-center pb-2 flex-nowrap">
+          <span className="label-caps text-zinc-500 flex items-center gap-1 flex-shrink-0"><Filter size={12} /> Filter</span>
+          {FILTER_CHIPS.map((c) => {
+            const active = activeFilters.includes(c.key);
+            return (
+              <button key={c.key} data-testid={`filter-${c.key}`} onClick={() => toggleFilter(c.key)}
+                className="label-caps text-xs px-3 py-1.5 rounded-full border flex-shrink-0 transition-colors"
+                style={{
+                  borderColor: active ? c.color : "rgba(255,255,255,0.12)",
+                  background: active ? `${c.color}20` : "transparent",
+                  color: active ? c.color : "#A1A1AA",
+                }}>{c.label}</button>
+            );
+          })}
+          {activeFilters.length > 0 && (
+            <button data-testid="filter-clear" onClick={clearFilters} className="label-caps text-xs text-zinc-500 hover:text-white flex-shrink-0 flex items-center gap-1">
+              <X size={11} /> Clear
+            </button>
+          )}
+        </div>
+      </div>
+
       {feed.items.length === 0 ? (
         <div className="border border-dashed border-white/10 py-24 text-center rounded-sm">
           <Sparkles size={32} className="mx-auto text-zinc-600" />
-          <div className="label-caps mt-4 text-zinc-500">Nothing here yet</div>
-          <Link to="/artists" className="btn-lime mt-6 inline-flex">Discover Artists</Link>
+          <div className="label-caps mt-4 text-zinc-500">
+            {activeFilters.length > 0 ? "Nothing matches these filters" : "Nothing here yet"}
+          </div>
+          {activeFilters.length > 0 ? (
+            <button onClick={clearFilters} className="btn-ghost mt-6">Clear Filters</button>
+          ) : (
+            <Link to="/artists" className="btn-lime mt-6 inline-flex">Discover Artists</Link>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
@@ -107,9 +162,12 @@ function PostCard({ post, onChange }) {
           </div>
         </div>
       </div>
-      {post.image && (
+      {post.video ? (
+        <video data-testid={`post-video-${post.id}`} src={resolveImg(post.video)} controls playsInline preload="metadata"
+          className="w-full max-h-[80vh] bg-black object-contain" />
+      ) : post.image ? (
         <img src={resolveImg(post.image)} className="w-full max-h-[70vh] object-cover bg-black" alt="" loading="lazy" />
-      )}
+      ) : null}
       <div className="p-4">
         <div className="text-zinc-100 whitespace-pre-wrap leading-relaxed">{renderText(post.text)}</div>
         <div className="flex items-center gap-5 mt-4 pt-4 border-t border-white/8">

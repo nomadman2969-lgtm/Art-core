@@ -665,10 +665,14 @@ Rewrite the draft above."""
 
 
 # ---------- Studio Posts (social feed) ----------
+POST_KINDS = ["update", "wip", "studio_photo", "announcement", "auction", "sold", "commission", "exhibition", "behind_scenes", "event"]
+
+
 class PostCreate(BaseModel):
-    kind: str = "update"  # update | wip | studio_photo | announcement | auction | sold | commission
+    kind: str = "update"
     text: str = Field(min_length=1, max_length=2000)
     image: Optional[str] = None  # storage path
+    video: Optional[str] = None  # storage path (mp4/webm/mov)
     pinned: bool = False
 
 
@@ -677,13 +681,15 @@ posts_router = APIRouter(prefix="/api/posts", tags=["studio-posts"])
 
 @posts_router.post("")
 async def create_post(req: PostCreate, user: dict = Depends(require_role("artist", "admin"))):
+    if req.kind not in POST_KINDS:
+        raise HTTPException(400, f"Unknown kind — allowed: {', '.join(POST_KINDS)}")
     from social import _resolve_mentions, _notify_mentions
     mentions = await _resolve_mentions(req.text)
     p = {
         "id": new_id(),
         "artist_id": user["id"],
         "artist_name": user["name"],
-        "kind": req.kind, "text": req.text, "image": req.image,
+        "kind": req.kind, "text": req.text, "image": req.image, "video": req.video,
         "pinned": req.pinned,
         "mentions": mentions,
         "like_count": 0, "comment_count": 0,

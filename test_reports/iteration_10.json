@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 10 testing: Video upload/post backend, feed filters backend+frontend, mention search+autocomplete backend+frontend. 19/19 backend tests passing (+1 environmental skip). Frontend feed filters, mention autocomplete, and Studio Posts editor (after 1 fix) all working. Video posts render as HTML5 <video controls> in Studio Editor. Fixed one blocking React runtime error (useEffect returning a Promise) in StudioEditor PostsEditor.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter10_features.py",
+    "/app/test_reports/pytest/iter10_results.xml"
+  ],
+  "action_items": [
+    "None — all features verified functional. One test-blocking bug fixed by testing agent (see updated_files); please review the fix."
+  ],
+  "critical_code_review_comments": [
+    "StudioEditor.js PostsEditor line 903 had `useEffect(load, [])` where `load` returns a Promise (async .then chain). This caused React runtime errors 'useEffect must not return anything besides a function' and cascaded into 'destroy is not a function' + Link crashes, entirely breaking the Posts tab UI. Fixed to `useEffect(() => { load(); }, [])`. Audit other useEffect calls in the codebase for the same pattern.",
+    "social.py home_feed: when `kinds` param is present but only contains 'artwork', include_posts=False — correct. But note that a user with 0 follows will always get empty items regardless of filter; tests assumed follows exist.",
+    "backend/tests: pytest.ini forces xdist loadscope which broke module-scoped fixture sharing across workers. The initial test failure was fixture-based, not code. Now self-contained.",
+    "MentionInput input `Hey @Iter` produced valid dropdown + keyboard nav + selection close — no issues.",
+    "artworks.py upload_video correctly caps at 60MB, validates MIME, normalizes m4v→mp4, and stores db.files metadata with kind='video'. Contract {path,url,content_type,size} verified."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/StudioEditor.js (line 903: useEffect(load, []) → useEffect(() => { load(); }, []))",
+    "/app/backend/tests/test_iter10_features.py (new)"
+  ],
+  "success_rate": {"backend": "100% (19/19 executed passing, 1 env-dependent skip)", "frontend": "100% after 1 fix"},
+  "test_credentials": "Registered fresh artists/buyers per-test via /api/auth/register",
+  "seed_data_creation": "No persistent seed; each test creates its own artist/buyer/artwork/post",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 10 features (video upload, feed filters with kinds= csv, mention search /api/users/search, MentionInput component) all verified. StudioEditor PostsEditor useEffect pattern was fixed — main agent should verify the fix is preserved. Test file at /app/backend/tests/test_iter10_features.py can be reused. Mention notification test is skip-safe: relies on registered user name matching MENTION_RE (2-32 alphanumeric).",
+  "rca_of_the_issue": "PostsEditor crash RCA: `useEffect(load, [])` passes the async `load` function reference directly to useEffect. Because `load` returns a Promise (via .then), React sees a non-function return value and throws. In stricter React versions this crashes the subtree, which in turn caused the Link component in the same tree to error with 'Cannot destructure property basename of useContext(...)' as React unmounted the router context. Fix: wrap in `useEffect(() => { load(); }, [])` so the effect returns undefined."
+}

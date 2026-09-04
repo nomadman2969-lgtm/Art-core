@@ -349,28 +349,44 @@ async def delete_collection(collection_id: str, me: dict = Depends(get_current_u
 
 # --- Home feed (personalized timeline) ---
 @router.get("/feed/home")
-async def home_feed(limit: int = 40, me: dict = Depends(get_current_user)):
-    """Timeline of posts + new artworks from artists the user follows.
-    Falls back to trending if not following anyone yet."""
+async def home_feed(
+    limit: int = 40,
+    kinds: Optional[str] = None,   # csv of post kinds (wip,announcement...) — also 'artwork' includes new artworks, 'post' includes all post kinds
+    type: str = "all",              # all | post | artwork
+    me: dict = Depends(get_current_user),
+):
+    """Timeline of posts + new artworks from artists the user follows."""
     limit = max(1, min(limit, 100))
     follows = await db.follows.find({"follower_id": me["id"]}).to_list(500)
     followed_ids = [f["followed_id"] for f in follows]
     items = []
-    if followed_ids:
-        # Studio posts from followed
-        async for p in db.studio_posts.find({"artist_id": {"$in": followed_ids}}).sort("created_at", -1).limit(limit):
+    include_posts = type in ("all", "post")
+    include_artworks = type in ("all", "artwork")
+    # If kinds is provided, treat 'artwork' as a special token for new-artwork items
+    kind_set = None
+    if kinds:
+        kind_set = set(k.strip() for k in kinds.split(",") if k.strip())
+        if kind_set:
+            include_artworks = "artwork" in kind_set
+            include_posts = any(k != "artwork" for k in kind_set)
+    if followed_ids and include_posts:
+        post_filter = {"artist_id": {"$in": followed_ids}}
+        if kind_set:
+            post_kinds = [k for k in kind_set if k != "artwork"]
+            if post_kinds:
+                post_filter["kind"] = {"$in": post_kinds}
+        async for p in db.studio_posts.find(post_filter).sort("created_at", -1).limit(limit):
             p = strip_mongo(p)
             artist = await db.users.find_one({"id": p["artist_id"]})
             if artist:
                 p["artist"] = {"id": artist["id"], "name": artist["name"]}
             p["timeline_kind"] = "post"
             p["timeline_at"] = p["created_at"]
-            # engagement counts
             p["like_count"] = await db.post_likes.count_documents({"post_id": p["id"]})
             p["comment_count"] = await db.post_comments.count_documents({"post_id": p["id"]})
             p["liked"] = bool(await db.post_likes.find_one({"post_id": p["id"], "user_id": me["id"]}))
             items.append(p)
-        # New artworks by followed
+    if followed_ids and include_artworks:
         async for a in db.artworks.find({"artist_id": {"$in": followed_ids}, "status": {"$in": ["live", "sold"]}}).sort("created_at", -1).limit(limit):
             a = strip_mongo(a)
             artist = await db.users.find_one({"id": a["artist_id"]})
@@ -382,10 +398,44 @@ async def home_feed(limit: int = 40, me: dict = Depends(get_current_user)):
             a["comment_count"] = await db.comments.count_documents({"artwork_id": a["id"]})
             a["liked"] = bool(await db.likes.find_one({"user_id": me["id"], "artwork_id": a["id"]}))
             items.append(a)
-    # Sort merged
     items.sort(key=lambda i: i.get("timeline_at") or "", reverse=True)
     items = items[:limit]
     return {"following_count": len(followed_ids), "items": items}
+
+
+# --- Mention autocomplete ---
+@router.get("/users/search")
+async def users_search(q: str = "", limit: int = 8, me: Optional[dict] = Depends(get_optional_user)):
+    """Fuzzy-search users by name for @mention autocomplete."""
+    q = (q or "").strip()
+    if not q or len(q) < 1:
+        return []
+    limit = max(1, min(limit, 20))
+    rx = re.compile(re.escape(q), re.IGNORECASE)
+    cursor = db.users.find({
+        "$or": [
+            {"name": rx},
+            {"handle": rx},
+            {"email": {"$regex": f"^{re.escape(q)}", "$options": "i"}},
+        ],
+    }).limit(limit * 2)
+    out = []
+    seen = set()
+    for u in await cursor.to_list(limit * 2):
+        if u["id"] in seen or (me and u["id"] == me["id"]):
+            continue
+        seen.add(u["id"])
+        out.append({
+            "id": u["id"],
+            "name": u["name"],
+            "role": u.get("role"),
+            "bio": (u.get("bio") or "")[:100],
+        })
+        if len(out) >= limit:
+            break
+    # Prioritize artists (they're the main mention targets)
+    out.sort(key=lambda u: (0 if u.get("role") == "artist" else 1, u["name"].lower()))
+    return out
 
 
 # --- Post engagement (likes + comments on studio_posts) ---

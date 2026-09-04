@@ -24,7 +24,7 @@ async def _get_settings():
     if not s:
         default = {"id": "global", "commission_percent": 15.0, "upload_fee": 5.0, "currency": "usd", "aotw_artwork_id": None, "created_at": now_iso()}
         await db.settings.insert_one(default)
-        return default
+        s = await db.settings.find_one({"id": "global"})
     return strip_mongo(s)
 
 

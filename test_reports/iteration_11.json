@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 11 testing: DM messaging (send/threads/thread/search/unread/read-receipts), 7-kind attachments with enrichment, new_message notification (throttled), auction_ending notification (idempotent), and end-to-end frontend UX for inbox, thread, attachment preview/removal, and notification click-through to /messages/{from_user_id}. 16/16 backend pytest passing. All frontend flows verified in a real browser session.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "auctions._check_ending_soon", "issue": "Reads db.auction_watchers but the rest of the codebase writes/reads db.watchers. Watchers therefore never receive 'auction_ending' notifications — only the current bidder does. Change line 188 in /app/backend/auctions.py to `db.watchers` for consistency."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_messaging_iter11.py",
+    "/app/test_reports/pytest/iter11_results.xml"
+  ],
+  "action_items": [
+    "Fix _check_ending_soon watcher collection name (db.auction_watchers → db.watchers) in /app/backend/auctions.py so auction-watchers get the 1h-ending notification, not just the current bidder."
+  ],
+  "critical_code_review_comments": [
+    "auctions.py _check_ending_soon uses `db.auction_watchers` collection whereas the watch/unwatch endpoints and _check_deadline_warning use `db.watchers`. Watchers won't receive 'auction_ending' notifications until this is unified.",
+    "messages.py POST /messages fires 'new_message' notification but never enriches artist name or artwork on the notification doc — the /notifications enrichment handler picks up from_user_id → other, which works. Good.",
+    "messages.py get_thread does a bulk update_many then iterates the ALREADY-fetched `raw` list and mutates each doc's read status locally; this is correct because raw was fetched before the update. Just noting the ordering guarantee.",
+    "Messages.js MessageThread polls the thread every 5s via setInterval — good for read-receipt refresh; consider WebSocket in future for lower latency and to reduce load.",
+    "Attachment enrichment for the 'artwork' kind sets image=(a['images'] or [None])[0]; if images is [] and title is None the frontend AttachmentCard may render empty. Minor edge case."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_messaging_iter11.py (new — 16 tests)"
+  ],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100%"},
+  "test_credentials": "Uses /api/auth/register to create isolated per-test users; admin creds unused.",
+  "seed_data_creation": "Each test creates its own artist/buyer/artwork; auction test uses direct pymongo write to force artwork status='live' and to set end_at 30min in future.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_messaging_iter11.py is fully self-contained and can be reused. If retesting auction_ending after the db.watchers fix, add a watcher via POST /auctions/{id}/watch before triggering GET /auctions/{id} and assert the watcher also receives kind='auction_ending'. Frontend Messages.js and Notifications.js are fully wired for new_message routing."
+}

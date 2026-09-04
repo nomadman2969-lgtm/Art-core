@@ -5,6 +5,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Share2, Heart, MessageCircle, Send, Tag, X, Bookmark } from "lucide-react";
+import MentionInput from "../components/MentionInput";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -200,9 +201,9 @@ export default function ArtworkDetail() {
           <div id="comments" className="mt-10 pt-8 border-t border-white/8">
             <div className="label-caps mb-4">Comments ({comments.reduce((n, c) => n + 1 + (c.replies?.length || 0), 0)})</div>
             <form onSubmit={postComment} className="flex gap-2 mb-6">
-              <input data-testid="comment-input" value={comment} onChange={(e) => setComment(e.target.value)}
-                placeholder={user ? "Add a comment... (use @name to tag)" : "Sign in to comment"} disabled={!user}
-                className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm" />
+              <MentionInput testId="comment-input" value={comment} onChange={setComment}
+                placeholder={user ? "Add a comment... (type @ to tag)" : "Sign in to comment"} disabled={!user}
+                className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm w-full" />
               <button data-testid="comment-submit" disabled={!user || !comment.trim()} className="btn-lime !py-2"><Send size={14} /></button>
             </form>
             <div className="space-y-5 max-h-[500px] overflow-y-auto">
@@ -221,9 +222,9 @@ export default function ArtworkDetail() {
                   )}
                   {replyingTo === c.id && (
                     <form onSubmit={(e) => postComment(e, c.id, replyText)} className="flex gap-2 mt-3 ml-4">
-                      <input data-testid={`reply-input-${c.id}`} autoFocus value={replyText} onChange={(e) => setReplyText(e.target.value)}
-                        placeholder={`Reply to ${c.user_name}... (use @name to tag)`}
-                        className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm" />
+                      <MentionInput testId={`reply-input-${c.id}`} value={replyText} onChange={setReplyText} autoFocus
+                        placeholder={`Reply to ${c.user_name}... (type @ to tag)`}
+                        className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm w-full" />
                       <button data-testid={`reply-submit-${c.id}`} disabled={!replyText.trim()} className="btn-lime !py-2 !text-xs"><Send size={12} /></button>
                     </form>
                   )}

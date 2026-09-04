@@ -13,7 +13,7 @@ async def _enrich(n: dict) -> dict:
     if not n:
         return n
     kind = n.get("kind")
-    if kind in ("outbid", "auction_won", "auction_sold", "auction_forfeited", "auction_cancelled", "auction_deadline_soon", "watched_auction_leader", "auction_paid") and n.get("auction_id"):
+    if kind in ("outbid", "auction_won", "auction_sold", "auction_forfeited", "auction_cancelled", "auction_deadline_soon", "auction_ending", "watched_auction_leader", "auction_paid") and n.get("auction_id"):
         au = await db.auctions.find_one({"id": n["auction_id"]})
         if au and au.get("artwork_id"):
             art = await db.artworks.find_one({"id": au["artwork_id"]})
@@ -54,10 +54,10 @@ async def _enrich(n: dict) -> dict:
         f = await db.users.find_one({"id": n["follower_id"]})
         if f:
             n["other"] = {"id": f["id"], "name": f["name"]}
-    # New social kinds (comment reply, new comment, artwork share, post like/comment, mentions)
+    # New social kinds (comment reply, new comment, artwork share, post like/comment, mentions, DM)
     if kind in ("new_comment", "comment_reply", "artwork_shared",
                 "mentioned_in_comment", "mentioned_in_post_comment", "mentioned_in_post",
-                "post_liked", "post_comment"):
+                "post_liked", "post_comment", "new_message"):
         if n.get("from_user_id"):
             u = await db.users.find_one({"id": n["from_user_id"]})
             if u:

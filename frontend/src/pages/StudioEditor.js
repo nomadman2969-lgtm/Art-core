@@ -896,10 +896,11 @@ function PostsEditor({ userId }) {
   const [text, setText] = useState("");
   const [kind, setKind] = useState("update");
   const [image, setImage] = useState(null);
+  const [video, setVideo] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [posts, setPosts] = useState([]);
   const load = () => api.get(`/posts?artist_id=${userId}`).then((r) => setPosts(r.data));
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const uploadImage = async (e) => {
     const f = e.target.files?.[0];
@@ -908,15 +909,27 @@ function PostsEditor({ userId }) {
     try {
       const fd = new FormData(); fd.append("file", f);
       const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setImage(r.data.path);
+      setImage(r.data.path); setVideo(null);
     } catch { toast.error("Upload failed"); }
+    setUploading(false);
+  };
+  const uploadVideo = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 60 * 1024 * 1024) { toast.error("Video too large — max 60MB"); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await api.post("/upload/video", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setVideo(r.data.path); setImage(null);
+    } catch (er) { toast.error(er?.response?.data?.detail || "Upload failed"); }
     setUploading(false);
   };
   const post = async () => {
     if (!text.trim()) return;
     try {
-      await api.post("/posts", { text, kind, image });
-      setText(""); setImage(null); toast.success("Posted"); load();
+      await api.post("/posts", { text, kind, image, video });
+      setText(""); setImage(null); setVideo(null); toast.success("Posted"); load();
     } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
   };
   const del = async (id) => {
@@ -932,17 +945,36 @@ function PostsEditor({ userId }) {
             <option value="update">Update</option>
             <option value="wip">Work in progress</option>
             <option value="studio_photo">Studio photo</option>
+            <option value="behind_scenes">Behind the scenes</option>
             <option value="announcement">Announcement</option>
             <option value="auction">Auction</option>
             <option value="sold">Sold</option>
+            <option value="commission">Commission</option>
+            <option value="exhibition">Exhibition</option>
+            <option value="event">Event</option>
           </select>
-          <div><input type="file" accept="image/*" onChange={uploadImage} className="text-xs" /></div>
+          <div className="flex gap-2">
+            <label className="label-caps text-xs px-2 py-2 border border-white/12 rounded-sm cursor-pointer hover:border-[#CCFF00] flex-1 text-center">
+              📷 Photo
+              <input data-testid="post-image-upload" type="file" accept="image/*" onChange={uploadImage} className="hidden" />
+            </label>
+            <label className="label-caps text-xs px-2 py-2 border border-white/12 rounded-sm cursor-pointer hover:border-[#7C3AED] flex-1 text-center">
+              🎥 Video
+              <input data-testid="post-video-upload" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={uploadVideo} className="hidden" />
+            </label>
+          </div>
         </div>
         <textarea data-testid="post-text" value={text} onChange={(e) => setText(e.target.value)} rows={4}
-          placeholder="What's happening in the studio?" className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
+          placeholder="What's happening in the studio? Use @name to tag." className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
         {image && <img src={fileUrl(image)} className="mt-3 w-40 rounded-sm" alt="" />}
+        {video && (
+          <div className="mt-3 flex items-center gap-3">
+            <video src={fileUrl(video)} className="w-40 rounded-sm" controls muted />
+            <button onClick={() => setVideo(null)} className="label-caps text-[#FF4D4D] hover:underline text-xs">Remove</button>
+          </div>
+        )}
         {uploading && <div className="text-xs text-[#CCFF00] mt-2">Uploading...</div>}
-        <button data-testid="post-create" onClick={post} className="btn-lime mt-4">Publish</button>
+        <button data-testid="post-create" disabled={uploading} onClick={post} className="btn-lime mt-4">Publish</button>
       </div>
       <div className="space-y-3">
         {posts.map((p) => (
@@ -955,7 +987,11 @@ function PostsEditor({ userId }) {
               </div>
             </div>
             <div className="text-zinc-200 whitespace-pre-wrap">{p.text}</div>
-            {p.image && <img src={resolveImg(p.image)} className="mt-3 w-64 rounded-sm" alt="" />}
+            {p.video ? (
+              <video src={resolveImg(p.video)} className="mt-3 w-full max-w-md rounded-sm" controls preload="metadata" />
+            ) : p.image ? (
+              <img src={resolveImg(p.image)} className="mt-3 w-64 rounded-sm" alt="" />
+            ) : null}
           </div>
         ))}
       </div>

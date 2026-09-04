@@ -15,6 +15,12 @@ MIME = {
     "gif": "image/gif", "webp": "image/webp",
 }
 
+VIDEO_MIME = {
+    "mp4": "video/mp4", "webm": "video/webm", "mov": "video/quicktime",
+    "m4v": "video/mp4",
+}
+MAX_VIDEO_SIZE = 60 * 1024 * 1024  # 60 MB (short vertical clips)
+
 
 # ---------- Upload ----------
 @router.post("/upload/image")
@@ -39,6 +45,36 @@ async def upload_image(file: UploadFile = File(...), user: dict = Depends(get_cu
         "created_at": now_iso(),
     })
     return {"path": result["path"], "url": f"/api/files/{result['path']}"}
+
+
+@router.post("/upload/video")
+async def upload_video(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    """Short-form vertical clips for feed posts. Max 60MB, mp4/webm/mov."""
+    ext = (file.filename or "vid").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "mp4"
+    if ext not in VIDEO_MIME:
+        raise HTTPException(400, "Unsupported video type — use mp4, webm, or mov")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty file")
+    if len(data) > MAX_VIDEO_SIZE:
+        raise HTTPException(400, f"Video too large — max {MAX_VIDEO_SIZE // (1024 * 1024)}MB")
+    ctype = VIDEO_MIME[ext]
+    # Normalize .m4v to .mp4
+    save_ext = "mp4" if ext in ("mp4", "m4v") else ext
+    path = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.{save_ext}"
+    result = put_object(path, data, ctype)
+    await db.files.insert_one({
+        "id": new_id(),
+        "storage_path": result["path"],
+        "user_id": user["id"],
+        "original_filename": file.filename,
+        "content_type": ctype,
+        "size": result.get("size", len(data)),
+        "kind": "video",
+        "is_deleted": False,
+        "created_at": now_iso(),
+    })
+    return {"path": result["path"], "url": f"/api/files/{result['path']}", "content_type": ctype, "size": len(data)}
 
 
 @router.get("/files/{path:path}")

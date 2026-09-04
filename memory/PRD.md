@@ -100,7 +100,25 @@ Evolved from "House of Monster" (initial MVP) — same repo, React + FastAPI + M
 - Video posts / stories rail
 - Digital prints / print-on-demand
 
-## Social Layer v2 (Feb 25, 2026)
+## Communication System v2 (Feb 25, 2026 · pm)
+
+### Messages (`messages.py` rewritten)
+- **7 attachment kinds**: artwork · studio · image · commission · auction · offer · order — each enriched on send + fetch with title/price/image/status
+- **Read receipts**: `read_at`, `delivered_at`; auto-mark-read on thread open; explicit `POST /thread/{id}/read`
+- **Threads endpoint**: last message + unread count + `last_from_me` + `last_read` for correct Check/CheckCheck icons
+- **Search**: `GET /messages/search?q=` full-text; `GET /threads?q=` filters by name or last message
+- **Throttled DM notifications**: kind=new_message dedup per sender per hour
+
+### Auction Ending Reminder
+- New `_check_ending_soon` fires kind=auction_ending to current bidder + watchers when <1h remains (idempotent via `ending_soon_notified` flag)
+
+### Frontend
+- **Rewrote `/messages`** with avatar circles, Check/CheckCheck read icons, unread badges, debounced search
+- **Rewrote thread page** with sticky header (studio link), 5-min timestamp grouping, Paperclip/Palette attachment buttons, pending-attachment preview + removal, `AttachmentCard` component for all 7 kinds
+- **Notifications**: added new_message + auction_ending kinds with proper routing (new_message → /messages/{sender_id})
+
+### Testing — 16/16 backend + 100% frontend, plus watchers-collection fix verified via self-test
+
 
 ### Backend (`social.py` major rewrite + `studio.py` post mentions)
 - **Home feed**: `GET /api/feed/home` merges studio posts + new artworks from followed artists, sorted DESC, with per-item like/comment counts and liked flag
