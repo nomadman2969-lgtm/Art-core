@@ -90,6 +90,7 @@ async def create_offer(req: OfferCreate, me: dict = Depends(get_current_user)):
             title="New offer",
             body=f"{me['name']} offered ${int(req.amount):,}",
             url="/offers",
+            kind="offer_received",
         ))
     except Exception:
         pass
@@ -185,6 +186,7 @@ async def seller_respond(oid: str, req: SellerResponse, me: dict = Depends(get_c
             title=titles.get(req.action, "Offer update"),
             body=f"${int(counter or o['amount']):,}",
             url="/offers",
+            kind=f"offer_{req.action}",
         ))
     except Exception:
         pass

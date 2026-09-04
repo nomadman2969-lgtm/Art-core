@@ -28,6 +28,7 @@ from orders import router as orders_router
 from offers import router as offers_router
 from connect import router as connect_router
 from push import router as push_router
+from events import router as events_router
 from storage import init_storage
 
 app = FastAPI(title="Art Core")
@@ -52,6 +53,7 @@ app.include_router(orders_router)
 app.include_router(offers_router)
 app.include_router(connect_router)
 app.include_router(push_router)
+app.include_router(events_router)
 
 
 @app.get("/api/")

@@ -122,6 +122,7 @@ async def send_message(req: SendReq, me: dict = Depends(get_current_user)):
                 title=f"New message from {me['name']}",
                 body=(text or f"Shared a {attachment['kind']}")[:140],
                 url=f"/messages/{me['id']}",
+                kind="new_message",
             ))
         except Exception:
             pass

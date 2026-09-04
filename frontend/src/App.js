@@ -29,6 +29,8 @@ import HomeFeed from "@/pages/HomeFeed";
 import { SavedIndex, CollectionDetail } from "@/pages/Saved";
 import { Orders, OrderDetail, SellingOrders } from "@/pages/Orders";
 import Notifications from "@/pages/Notifications";
+import Events from "@/pages/Events";
+import EventDetail from "@/pages/EventDetail";
 import NotFound from "@/pages/NotFound";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -91,10 +93,8 @@ function App() {
                 <Route path="/orders" element={<RequireAuth><Orders /></RequireAuth>} />
                 <Route path="/orders/:id" element={<RequireAuth><OrderDetail /></RequireAuth>} />
                 <Route path="/selling" element={<RequireRole roles={["artist", "admin"]}><SellingOrders /></RequireRole>} />
-                <Route path="/events" element={<ComingSoon title="Events" accent="#FF4D4D"
-                  tagline="Openings, festivals, pop-ups — near you."
-                  description="Discover gallery openings, art festivals, street fairs, pop-up markets, live painting events, and meetups near you. RSVP, buy tickets, save events."
-                  icon={<MapPin size={20} className="text-[#FF4D4D]" />} />} />
+                <Route path="/events" element={<Events />} />
+                <Route path="/events/:id" element={<EventDetail />} />
                 <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
                 <Route path="/studio-custom" element={<ComingSoon title="Studio Themes" accent="#CCFF00"
                   tagline="Make your profile yours."

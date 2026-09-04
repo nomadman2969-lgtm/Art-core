@@ -107,3 +107,79 @@ async def delete_notif(nid: str, user: dict = Depends(get_current_user)):
     if r.deleted_count == 0:
         raise HTTPException(404, "Not found")
     return {"deleted": 1}
+
+
+
+# --- Preferences (mute categories) ---
+DEFAULT_PREFS = {
+    "dm": True,
+    "bid": True,
+    "offer": True,
+    "follow": True,
+    "commission": True,
+    "mention": True,
+    "post": True,
+}
+
+
+def _prefs_for(row: Optional[dict]) -> dict:
+    """Merge defaults with saved row (missing keys default to True)."""
+    saved = (row or {}).get("categories") or {}
+    return {k: bool(saved.get(k, DEFAULT_PREFS[k])) for k in DEFAULT_PREFS}
+
+
+async def get_prefs(user_id: str) -> dict:
+    row = await db.notification_prefs.find_one({"user_id": user_id})
+    return _prefs_for(row)
+
+
+# Maps notification kinds → category
+KIND_TO_CATEGORY = {
+    "new_message": "dm",
+    "outbid": "bid", "auction_won": "bid", "auction_sold": "bid",
+    "auction_paid": "bid", "auction_forfeited": "bid", "auction_cancelled": "bid",
+    "auction_deadline_soon": "bid", "watched_auction_leader": "bid", "auction_ending": "bid",
+    "offer_received": "offer", "offer_accept": "offer", "offer_decline": "offer",
+    "offer_counter": "offer", "offer_accepted_by_buyer": "offer",
+    "offer_withdrawn": "offer", "offer_paid": "offer", "offer_expired": "offer",
+    "new_follower": "follow",
+    "commission_request": "commission", "commission_accept": "commission",
+    "commission_decline": "commission", "commission_counter": "commission",
+    "commission_progress": "commission", "commission_delivered": "commission",
+    "commission_approved": "commission", "commission_deposit": "commission",
+    "commission_paid": "commission",
+    "mentioned_in_comment": "mention", "mentioned_in_post_comment": "mention",
+    "mentioned_in_post": "mention",
+    "post_liked": "post", "post_comment": "post",
+    "new_comment": "post", "comment_reply": "post", "artwork_shared": "post",
+    "new_review": "post",
+}
+
+
+async def push_allowed(user_id: str, kind: str) -> bool:
+    """Called from push helper to decide whether to fan out a web-push for a given notif kind."""
+    cat = KIND_TO_CATEGORY.get(kind)
+    if not cat:
+        return True  # unknown categories always deliver
+    prefs = await get_prefs(user_id)
+    return prefs.get(cat, True)
+
+
+@router.get("/prefs")
+async def read_prefs(user: dict = Depends(get_current_user)):
+    return await get_prefs(user["id"])
+
+
+class PrefsReq(BaseModel):
+    categories: dict  # {dm: bool, bid: bool, ...}
+
+
+@router.patch("/prefs")
+async def update_prefs(req: PrefsReq, user: dict = Depends(get_current_user)):
+    clean = {k: bool(v) for k, v in req.categories.items() if k in DEFAULT_PREFS}
+    await db.notification_prefs.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"user_id": user["id"], "categories": clean, "updated_at": now_iso()}},
+        upsert=True,
+    )
+    return await get_prefs(user["id"])

@@ -32,7 +32,7 @@ export default function Layout({ children }) {
     { to: "/artists", label: "Artists", testid: "nav-artists" },
     { to: "/auctions", label: "Auctions", testid: "nav-auctions" },
     { to: "/rankings", label: "Rankings", testid: "nav-rankings" },
-    { to: "/events", label: "Events", testid: "nav-events", badge: "Soon" },
+    { to: "/events", label: "Events", testid: "nav-events" },
   ];
 
   const submitSearch = (e) => {

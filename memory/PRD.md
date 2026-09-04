@@ -254,3 +254,35 @@ Full commerce system audit + upgrade:
 - Frontend: Smoke screenshots of Feed Composer modal, Messages reactions/typing UI, Notifications push card — all rendering correctly.
 - testing_agent iteration 12 dispatched but not returned before this write; iteration_13 will re-run with push included.
 
+
+## Notification Prefs + Events/Map + Studio Refactor (Feb 27, 2026)
+
+### Notification Preferences
+- `notification_prefs` collection with 7 category flags: dm, bid, offer, follow, commission, mention, post (all default true).
+- Endpoints: `GET /api/notifications/prefs` and `PATCH /api/notifications/prefs`.
+- `KIND_TO_CATEGORY` map + `push_allowed(user_id, kind)` helper.
+- `send_push()` now accepts a `kind` parameter and checks prefs before sending; all 5 push call-sites updated (new_message, outbid ×2, auction_ending, offer_received, offer_action).
+- Frontend: `/notifications` has a "Preferences" toggle button revealing a card of 7 stylized on/off toggles, each colored per category.
+
+### Events & Map (Live!)
+- Backend `events.py` module: `POST /api/events` (artist-only host), `GET /api/events` (with `category`, `host_id`, `upcoming_only`, `near_lat/near_lng/radius_km` haversine filter), `GET/DELETE /api/events/{id}`, `POST /api/events/{id}/rsvp` (toggle), `GET /api/events/{id}/attendees`.
+- 8 categories: gallery_opening, pop_up, festival, meetup, workshop, live_painting, virtual, market.
+- Location model with lat/lng/address/city; free vs paid events with ticket_price.
+- RSVP fires host notification (once per user).
+- Cancel event → notifies all RSVPed users.
+- Frontend: `leaflet` + `react-leaflet` installed. `/events` page with Map view (auto-fitBounds, click pins for popup) + List/Grid view, category filter chips, Host CTA (artist/admin only). `/events/:id` detail with map preview, RSVP toggle button, attendee list, host actions (cancel).
+- Create Event modal has OpenStreetMap Nominatim geocoding — enter address+city, click "Find coordinates" to auto-fill lat/lng.
+- Nav badge "Soon" removed from Events.
+
+### Studio Refactor
+- `pages/StudioEditor.js` shrunk from **1205 → 314 lines** (74% reduction).
+- Extracted 11 subcomponents to `components/studio/StudioParts.js`:
+  SectionH, Stat, BackgroundEditor, PolishButton, TemplatesPicker, SectionsEditor, ImageBlockEditor, FeaturedEditor, StoryEditor, PostsEditor, PayoutsPanel, ArtworkRow, CommissionRequestsPanel.
+- Also exports `SECTION_KINDS` and `LAYOUT_OPTIONS` constants.
+- All `data-testid`s preserved verbatim; no functional changes.
+
+### Testing
+- Backend: prefs GET/PATCH curl-verified, events create/list/RSVP/toggle curl-verified.
+- Frontend: smoke-tested — Events map renders 3 pins auto-fit-bounded, side list, filter chips; Notification prefs card toggles render; Studio Editor tabs still load after refactor.
+
+

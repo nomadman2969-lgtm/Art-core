@@ -143,8 +143,16 @@ def _send_one(subject: str, private_pem: str, sub: Dict[str, Any], payload: str)
         return False
 
 
-async def send_push(user_id: str, title: str, body: str, url: str = "/") -> int:
-    """Fan out a push to every subscription the user has. Deletes 404/410 endpoints."""
+async def send_push(user_id: str, title: str, body: str, url: str = "/", kind: Optional[str] = None) -> int:
+    """Fan out a push to every subscription the user has. Deletes 404/410 endpoints.
+    If `kind` is provided, respects the user's per-category preferences."""
+    if kind:
+        try:
+            from notifications import push_allowed
+            if not await push_allowed(user_id, kind):
+                return 0
+        except Exception:
+            pass
     cfg = await _load_or_create_vapid()
     cursor = db.push_subscriptions.find({"user_id": user_id})
     subs = await cursor.to_list(50)

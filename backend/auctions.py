@@ -158,6 +158,7 @@ async def _process_proxies(auction_id: str):
                     title="You've been outbid",
                     body=f"New top bid: ${int(target):,}",
                     url=f"/auctions/{auction_id}",
+                    kind="outbid",
                 ))
             except Exception:
                 pass
@@ -214,6 +215,7 @@ async def _check_ending_soon(auction_id: str):
                 title="Auction ending soon",
                 body=f"Ends in under 1h · Current bid ${int(a.get('current_bid') or 0):,}",
                 url=f"/auctions/{auction_id}",
+                kind="auction_ending",
             ))
         except Exception:
             pass
@@ -493,6 +495,7 @@ async def place_bid(auction_id: str, req: BidReq, user: dict = Depends(get_curre
                 title="You've been outbid",
                 body=f"New top bid: ${int(req.amount):,}",
                 url=f"/auctions/{auction_id}",
+                kind="outbid",
             ))
         except Exception:
             pass
