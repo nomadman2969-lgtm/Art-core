@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
 import { toast } from "sonner";
-import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Palette, Filter, X } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Palette, Filter, X, Plus } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import FeedComposer from "../components/FeedComposer";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -42,9 +44,13 @@ function renderText(text) {
 }
 
 export default function HomeFeed() {
+  const { user } = useAuth();
   const [feed, setFeed] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeFilters, setActiveFilters] = useState([]);
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  const canPost = user?.role === "artist" || user?.role === "admin";
 
   const load = (filters = activeFilters) => {
     setLoading(true);
@@ -65,15 +71,42 @@ export default function HomeFeed() {
   if (loading && !feed) return <div className="py-32 text-center label-caps text-zinc-500">Loading your feed...</div>;
   return (
     <div data-testid="home-feed" className="max-w-2xl mx-auto px-4 md:px-6 pt-10 pb-32">
-      <div className="mb-6">
-        <div className="label-caps text-[#CCFF00]"><Users size={12} className="inline mr-2" /> Home Feed</div>
-        <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3">Your Feed</h1>
-        <div className="text-zinc-500 mt-2">
-          {feed.following_count > 0
-            ? `Latest from ${feed.following_count} artist${feed.following_count === 1 ? "" : "s"} you follow.`
-            : "You're not following any artists yet. Explore below to fill your feed."}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="label-caps text-[#CCFF00]"><Users size={12} className="inline mr-2" /> Home Feed</div>
+          <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3">Your Feed</h1>
+          <div className="text-zinc-500 mt-2">
+            {feed.following_count > 0
+              ? `Latest from ${feed.following_count} artist${feed.following_count === 1 ? "" : "s"} you follow.`
+              : "You're not following any artists yet. Explore below to fill your feed."}
+          </div>
         </div>
+        {canPost && (
+          <button
+            data-testid="open-composer-btn"
+            onClick={() => setComposerOpen(true)}
+            className="btn-lime !py-2 !px-3 flex items-center gap-2 flex-shrink-0 mt-2">
+            <ImagePlus size={14} />
+            <span className="hidden md:inline">New Post</span>
+          </button>
+        )}
       </div>
+
+      {/* Quick-post prompt card for artists */}
+      {canPost && (
+        <button
+          data-testid="composer-prompt"
+          onClick={() => setComposerOpen(true)}
+          className="w-full text-left mb-6 border border-white/8 rounded-sm p-4 flex items-center gap-3 hover:border-[#CCFF00]/40 transition-colors bg-[#121214]">
+          <div className="w-10 h-10 rounded-full bg-[#CCFF00]/20 flex items-center justify-center font-anton text-lg flex-shrink-0">
+            {user?.name?.[0]?.toUpperCase() || "A"}
+          </div>
+          <div className="text-sm text-zinc-500 flex-1">Share a WIP, drop new work, tag a collector...</div>
+          <div className="btn-ghost !py-1.5 !px-3 flex items-center gap-1 text-xs">
+            <Plus size={12} /> Post
+          </div>
+        </button>
+      )}
 
       {/* Filter chips */}
       <div className="mb-6 -mx-4 md:-mx-6 px-4 md:px-6 overflow-x-auto scrollbar-none" data-testid="feed-filters">
@@ -119,6 +152,21 @@ export default function HomeFeed() {
               : <ArtworkFeedCard key={`a-${it.id}`} art={it} onChange={load} />
           ))}
         </div>
+      )}
+
+      {/* Floating "New Post" button (mobile-first) for artists */}
+      {canPost && (
+        <button
+          data-testid="fab-new-post"
+          onClick={() => setComposerOpen(true)}
+          className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-[#CCFF00] text-black shadow-2xl flex items-center justify-center hover:scale-110 transition-transform md:hidden"
+          aria-label="New Post">
+          <Plus size={22} />
+        </button>
+      )}
+
+      {composerOpen && (
+        <FeedComposer onClose={() => setComposerOpen(false)} onCreated={() => load()} />
       )}
     </div>
   );

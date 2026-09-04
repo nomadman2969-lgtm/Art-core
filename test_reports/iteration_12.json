@@ -1,0 +1,26 @@
+{
+  "summary": "Iter 12: Full backend + frontend testing of typing indicators, message reactions (add/toggle/replace/invalid/403 not-in-thread), Feed Composer role-gating + kind whitelist + image upload readiness, Home feed pickup of new artist posts, and PWA assets (manifest.json, service-worker.js, icons). 14/14 backend pytest passing; all frontend UI flows verified in browser with real registered artist + buyer sessions.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter12_typing_reactions_composer.py",
+    "/app/test_reports/pytest/iter12_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "messages.py: _other_typing compares expires_at (ISO string) with now_iso() lexicographically — works while both are UTC ISO with the same offset (+00:00 / Z consistency). Current now_iso is presumably UTC ISO; keep it that way. Consider using a MongoDB TTL index on db.typing.expires_at (as a date) instead of a string compare for automatic cleanup.",
+    "messages.py react() removes any prior emoji from user then adds new one — correct 'one reaction per user' semantics per spec. No count is stored per emoji; frontend computes counts from reactions list. Fine for small threads; O(N) per read.",
+    "service-worker.js: install pre-caches only '/' and '/manifest.json'. The main JS/CSS bundles get cached later via stale-while-revalidate on first visit. Offline first-load will fail; acceptable per current scope (no VAPID push server anyway).",
+    "index.js registers SW only on https — good. Note: no unregister/upgrade path if CACHE_VERSION changes; bumping version will still clean old caches via activate handler which is present. OK.",
+    "Frontend Messages.js reactions UI: relies on hover to reveal react-btn — on touch devices there's no hover so the button may never appear. Consider tap-to-reveal on mobile.",
+    "HomeFeed composer only shows for role artist/admin — verified. Buyer sees neither prompt, open button, nor mobile FAB. Good."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter12_typing_reactions_composer.py"],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100%"},
+  "test_credentials": "Uses /api/auth/register to create isolated per-test users (TEST_iter12_*@t.com); admin creds unused.",
+  "seed_data_creation": "Each test creates ephemeral artist+buyer+message. Frontend flow created 1 studio_post via composer, 1 message + reactions, and typing state. All prefixed with TEST_iter12.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Auth token localStorage key is 'hom_token' (NOT 'token'). Backend register response key is 'token' (NOT 'access_token'). Follow endpoint is /api/users/{id}/follow (social router is mounted at /api). /api/feed/home returns {following_count, items:[...]} — items live under 'items'. Reactions require hover to reveal react-btn on desktop; mobile may need tap-only reveal. Everything in iter 12 works end-to-end.",
+  "rca of the issue": "N/A — no bugs found in iter 12 scope."
+}

@@ -3,7 +3,17 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, fileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Search, Send, Paperclip, Image as ImageIcon, Palette, Check, CheckCheck, X } from "lucide-react";
+import { Search, Send, Paperclip, Image as ImageIcon, Palette, Check, CheckCheck, X, Smile } from "lucide-react";
+
+const REACTION_EMOJIS = [
+  { key: "heart", char: "❤️" },
+  { key: "fire", char: "🔥" },
+  { key: "mind_blown", char: "🤯" },
+  { key: "wow", char: "😮" },
+  { key: "clap", char: "👏" },
+  { key: "eye", char: "👀" },
+];
+const emojiChar = (key) => REACTION_EMOJIS.find((e) => e.key === key)?.char || key;
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -86,12 +96,31 @@ export function MessageThread() {
   const [sending, setSending] = useState(false);
   const [attachment, setAttachment] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [reactingTo, setReactingTo] = useState(null);
   const endRef = useRef(null);
   const fileRef = useRef(null);
+  const lastTypeRef = useRef(0);
 
   const load = () => api.get(`/messages/thread/${userId}`).then((r) => setData(r.data));
-  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [userId]);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [data?.messages?.length]);
+  useEffect(() => { load(); const t = setInterval(load, 3000); return () => clearInterval(t); }, [userId]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [data?.messages?.length, data?.other_typing]);
+
+  const onTextChange = (v) => {
+    setText(v);
+    const now = Date.now();
+    if (v && now - lastTypeRef.current > 2500) {
+      lastTypeRef.current = now;
+      api.post(`/messages/thread/${userId}/typing`).catch(() => {});
+    }
+  };
+
+  const react = async (messageId, emoji) => {
+    try {
+      const r = await api.post(`/messages/${messageId}/react`, { emoji });
+      setData((d) => ({ ...d, messages: d.messages.map((m) => m.id === messageId ? { ...m, reactions: r.data.reactions } : m) }));
+      setReactingTo(null);
+    } catch { toast.error("Failed"); }
+  };
 
   const uploadImg = async (e) => {
     const f = e.target.files?.[0];
@@ -137,11 +166,27 @@ export function MessageThread() {
             const mine = m.from_id === user.id;
             const prev = data.messages[i - 1];
             const showTime = !prev || (new Date(m.created_at) - new Date(prev.created_at)) > 5 * 60 * 1000;
+            const grouped = (m.reactions || []).reduce((acc, r) => {
+              acc[r.emoji] = acc[r.emoji] || { count: 0, mine: false };
+              acc[r.emoji].count += 1;
+              if (r.user_id === user.id) acc[r.emoji].mine = true;
+              return acc;
+            }, {});
+            const showPicker = reactingTo === m.id;
             return (
               <div key={m.id} data-testid={`msg-${m.id}`}>
                 {showTime && <div className="text-center text-xs text-zinc-600 label-caps my-3">{new Date(m.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>}
-                <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[80%] rounded-sm ${mine ? "bg-[#CCFF00] text-black" : "bg-[#1A1A1E] text-white"} overflow-hidden`}>
+                <div className={`group flex items-end gap-1 ${mine ? "justify-end" : "justify-start"}`}>
+                  {mine && (
+                    <button
+                      data-testid={`react-btn-${m.id}`}
+                      onClick={() => setReactingTo(showPicker ? null : m.id)}
+                      className="opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 text-zinc-500 hover:text-[#CCFF00] transition-opacity p-1"
+                      aria-label="React">
+                      <Smile size={14} />
+                    </button>
+                  )}
+                  <div className={`max-w-[80%] rounded-sm ${mine ? "bg-[#CCFF00] text-black" : "bg-[#1A1A1E] text-white"} overflow-hidden relative`}>
                     {m.attachment && <AttachmentCard att={m.attachment} mine={mine} />}
                     {m.text && <div className={`px-3 py-2 text-sm whitespace-pre-wrap ${m.attachment ? "border-t border-black/10" : ""}`}>{m.text}</div>}
                     {mine && (
@@ -150,11 +195,61 @@ export function MessageThread() {
                         <span>{fmtTime(m.created_at)}</span>
                       </div>
                     )}
+                    {Object.keys(grouped).length > 0 && (
+                      <div data-testid={`reactions-${m.id}`} className="flex gap-1 px-2 pb-2 flex-wrap">
+                        {Object.entries(grouped).map(([emoji, info]) => (
+                          <button
+                            key={emoji}
+                            onClick={() => react(m.id, emoji)}
+                            data-testid={`reaction-chip-${m.id}-${emoji}`}
+                            className={`text-[11px] px-1.5 py-0.5 rounded-full border ${info.mine ? "border-[#CCFF00] bg-[#CCFF00]/20 text-white" : "border-white/20 bg-black/30 text-white/80"}`}>
+                            {emojiChar(emoji)} {info.count}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                  {!mine && (
+                    <button
+                      data-testid={`react-btn-${m.id}`}
+                      onClick={() => setReactingTo(showPicker ? null : m.id)}
+                      className="opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 text-zinc-500 hover:text-[#CCFF00] transition-opacity p-1"
+                      aria-label="React">
+                      <Smile size={14} />
+                    </button>
+                  )}
                 </div>
+                {showPicker && (
+                  <div data-testid={`reaction-picker-${m.id}`} className={`flex ${mine ? "justify-end" : "justify-start"} mt-1`}>
+                    <div className="inline-flex items-center gap-1 bg-[#121214] border border-white/10 rounded-full px-2 py-1 shadow-lg">
+                      {REACTION_EMOJIS.map((e) => (
+                        <button
+                          key={e.key}
+                          data-testid={`pick-${m.id}-${e.key}`}
+                          onClick={() => react(m.id, e.key)}
+                          className="text-lg hover:scale-125 transition-transform px-1">
+                          {e.char}
+                        </button>
+                      ))}
+                      <button onClick={() => setReactingTo(null)} className="text-zinc-500 hover:text-white px-1"><X size={12} /></button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
+          {data.other_typing && (
+            <div data-testid="typing-indicator" className="flex justify-start">
+              <div className="bg-[#1A1A1E] text-white rounded-sm px-3 py-2 flex items-center gap-1">
+                <span className="text-xs text-zinc-400">{data.other?.name?.split(" ")[0] || "typing"}</span>
+                <span className="typing-dots inline-flex gap-0.5 items-end">
+                  <span className="w-1 h-1 rounded-full bg-[#CCFF00] animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1 h-1 rounded-full bg-[#CCFF00] animate-bounce" style={{ animationDelay: "120ms" }} />
+                  <span className="w-1 h-1 rounded-full bg-[#CCFF00] animate-bounce" style={{ animationDelay: "240ms" }} />
+                </span>
+              </div>
+            </div>
+          )}
           <div ref={endRef} />
         </div>
         {attachment && (
@@ -175,7 +270,7 @@ export function MessageThread() {
           <button type="button" onClick={attachStudio} data-testid="attach-studio" className="btn-ghost !py-2 !px-3 flex-shrink-0" title="Share this studio">
             <Palette size={14} />
           </button>
-          <input data-testid="message-input" value={text} onChange={(e) => setText(e.target.value)}
+          <input data-testid="message-input" value={text} onChange={(e) => onTextChange(e.target.value)}
             placeholder={uploading ? "Uploading..." : "Type a message..."} disabled={uploading || sending}
             className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm" />
           <button data-testid="message-send" disabled={sending || uploading || (!text.trim() && !attachment)} className="btn-lime !py-2 !px-3"><Send size={14} /></button>

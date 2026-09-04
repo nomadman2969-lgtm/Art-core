@@ -1,0 +1,46 @@
+{
+  "short_name": "Art Core",
+  "name": "Art Core — Social Marketplace for Artists",
+  "description": "The social marketplace for visual artists. Studios, auctions, commissions, and originals — from artists to collectors.",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0A0A0C",
+  "background_color": "#0A0A0C",
+  "categories": ["shopping", "art", "social"],
+  "shortcuts": [
+    {
+      "name": "Home Feed",
+      "short_name": "Feed",
+      "description": "See the latest from artists you follow",
+      "url": "/feed"
+    },
+    {
+      "name": "Messages",
+      "short_name": "DMs",
+      "description": "Chat with artists and collectors",
+      "url": "/messages"
+    },
+    {
+      "name": "My Studio",
+      "short_name": "Studio",
+      "description": "Edit your studio",
+      "url": "/studio"
+    }
+  ]
+}

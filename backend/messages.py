@@ -174,6 +174,7 @@ async def get_thread(user_id: str, me: dict = Depends(get_current_user)):
     return {
         "other": {"id": other["id"], "name": other["name"], "role": other["role"], "bio": other.get("bio")} if other else None,
         "messages": msgs,
+        "other_typing": await _other_typing(me["id"], user_id),
     }
 
 
@@ -189,6 +190,56 @@ async def mark_thread_read(user_id: str, me: dict = Depends(get_current_user)):
 async def unread_count(me: dict = Depends(get_current_user)):
     n = await db.messages.count_documents({"to_id": me["id"], "read": False})
     return {"count": n}
+
+
+# ---------- Typing indicators ----------
+@router.post("/thread/{user_id}/typing")
+async def signal_typing(user_id: str, me: dict = Depends(get_current_user)):
+    """Mark that `me` is typing to user_id — expires ~5s later."""
+    from datetime import datetime, timezone, timedelta
+    expires = (datetime.now(timezone.utc) + timedelta(seconds=6)).isoformat()
+    await db.typing.update_one(
+        {"from_id": me["id"], "to_id": user_id},
+        {"$set": {"from_id": me["id"], "to_id": user_id, "expires_at": expires}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+async def _other_typing(me_id: str, other_id: str) -> bool:
+    doc = await db.typing.find_one({"from_id": other_id, "to_id": me_id})
+    if not doc:
+        return False
+    return doc["expires_at"] > now_iso()
+
+
+# ---------- Reactions ----------
+ALLOWED_REACTIONS = {"heart", "fire", "mind_blown", "wow", "clap", "eye"}
+
+
+class ReactReq(BaseModel):
+    emoji: str
+
+
+@router.post("/{message_id}/react")
+async def react(message_id: str, req: ReactReq, me: dict = Depends(get_current_user)):
+    if req.emoji not in ALLOWED_REACTIONS:
+        raise HTTPException(400, f"Emoji not allowed")
+    m = await db.messages.find_one({"id": message_id})
+    if not m:
+        raise HTTPException(404, "Not found")
+    if me["id"] not in (m["from_id"], m["to_id"]):
+        raise HTTPException(403, "Not your thread")
+    reactions = m.get("reactions") or []
+    existing = next((r for r in reactions if r["user_id"] == me["id"] and r["emoji"] == req.emoji), None)
+    if existing:
+        reactions = [r for r in reactions if not (r["user_id"] == me["id"] and r["emoji"] == req.emoji)]
+    else:
+        # remove any prior emoji from this user first (one reaction per user per message)
+        reactions = [r for r in reactions if r["user_id"] != me["id"]]
+        reactions.append({"user_id": me["id"], "user_name": me["name"], "emoji": req.emoji, "at": now_iso()})
+    await db.messages.update_one({"id": message_id}, {"$set": {"reactions": reactions}})
+    return {"reactions": reactions}
 
 
 @router.get("/search")
