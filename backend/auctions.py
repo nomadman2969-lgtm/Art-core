@@ -150,6 +150,17 @@ async def _process_proxies(auction_id: str):
                 "auction_id": auction_id, "artwork_id": a["artwork_id"],
                 "amount": target, "read": False, "created_at": now_iso(),
             })
+            try:
+                from push import send_push
+                import asyncio as _a
+                _a.create_task(send_push(
+                    prev_bidder,
+                    title="You've been outbid",
+                    body=f"New top bid: ${int(target):,}",
+                    url=f"/auctions/{auction_id}",
+                ))
+            except Exception:
+                pass
         # Loop only if another proxy could still push us higher — usually no.
 
 
@@ -195,6 +206,17 @@ async def _check_ending_soon(auction_id: str):
             "current_bid": a.get("current_bid"), "end_at": a["end_at"],
             "read": False, "created_at": now_iso(),
         })
+        try:
+            from push import send_push
+            import asyncio as _a
+            _a.create_task(send_push(
+                uid,
+                title="Auction ending soon",
+                body=f"Ends in under 1h · Current bid ${int(a.get('current_bid') or 0):,}",
+                url=f"/auctions/{auction_id}",
+            ))
+        except Exception:
+            pass
 
 
 async def _check_deadline_warning(auction_id: str):
@@ -463,6 +485,17 @@ async def place_bid(auction_id: str, req: BidReq, user: dict = Depends(get_curre
             "auction_id": auction_id, "artwork_id": a["artwork_id"],
             "amount": req.amount, "read": False, "created_at": now_iso(),
         })
+        try:
+            from push import send_push
+            import asyncio as _a
+            _a.create_task(send_push(
+                prev_bidder,
+                title="You've been outbid",
+                body=f"New top bid: ${int(req.amount):,}",
+                url=f"/auctions/{auction_id}",
+            ))
+        except Exception:
+            pass
     # Trigger any proxy bids
     await _process_proxies(auction_id)
     # Notify watchers of leader change (throttle: only if leader != previous)

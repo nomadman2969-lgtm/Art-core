@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
-import { Bell, Gavel, Trophy, Palette, UserPlus, Check, Trash2, MessageSquare, Heart } from "lucide-react";
+import { Bell, Gavel, Trophy, Palette, UserPlus, Check, Trash2, MessageSquare, Heart, BellRing, BellOff, Loader2 } from "lucide-react";
+import usePushSubscription from "../hooks/usePushSubscription";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -52,6 +53,7 @@ const KIND_META = {
 export default function Notifications() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const push = usePushSubscription();
 
   const load = () => api.get("/notifications?limit=100").then((r) => setItems(r.data)).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
@@ -79,6 +81,40 @@ export default function Notifications() {
           <button data-testid="mark-all-read" onClick={markAll} className="btn-ghost !py-2 !text-xs">Mark all read</button>
         )}
       </div>
+
+      {/* Push notification toggle */}
+      {push.supported && (
+        <div data-testid="push-card" className="border border-white/8 rounded-sm p-4 mb-6 flex items-center gap-4 bg-[#121214]">
+          <div className={`p-2 rounded-sm flex-shrink-0 ${push.subscribed ? "bg-[#CCFF00]/20 text-[#CCFF00]" : "bg-white/[0.05] text-zinc-400"}`}>
+            {push.subscribed ? <BellRing size={18} /> : <BellOff size={18} />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-unbounded font-semibold text-sm">
+              {push.subscribed ? "Push notifications on" : "Turn on push notifications"}
+            </div>
+            <div className="text-xs text-zinc-500 mt-0.5">
+              {push.subscribed
+                ? "You'll get instant alerts for messages, bids, and offers — even when the app is closed."
+                : "Instant alerts for new messages, outbid warnings, and offer updates."}
+            </div>
+          </div>
+          {push.subscribed ? (
+            <div className="flex gap-2 flex-shrink-0">
+              <button data-testid="push-test-btn" onClick={push.test} disabled={push.loading}
+                className="btn-ghost !py-2 !px-3 text-xs">Send test</button>
+              <button data-testid="push-disable-btn" onClick={push.disable} disabled={push.loading}
+                className="btn-ghost !py-2 !px-3 text-xs">
+                {push.loading ? <Loader2 size={12} className="animate-spin" /> : "Turn off"}
+              </button>
+            </div>
+          ) : (
+            <button data-testid="push-enable-btn" onClick={push.enable} disabled={push.loading}
+              className="btn-lime !py-2 !px-4 text-xs flex-shrink-0">
+              {push.loading ? <Loader2 size={12} className="animate-spin" /> : "Enable"}
+            </button>
+          )}
+        </div>
+      )}
 
       {loading ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
         items.length === 0 ? (

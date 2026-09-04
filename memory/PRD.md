@@ -218,3 +218,39 @@ Full commerce system audit + upgrade:
 - 13/13 pytest suite `tests/test_commerce_full.py` passing
 - Covers race conditions, idempotency, offer lifecycle, proxy pricing, fulfillment, commissions
 
+
+
+## Realtime Messaging Polish + PWA + Push (Feb 26, 2026)
+
+### Direct Messaging v3
+- **Typing indicators**: `POST /api/messages/thread/{user_id}/typing` upserts a `typing` doc with 6s TTL. `GET /messages/thread/{user_id}` returns `other_typing: bool`. Frontend throttles the signal to every 2.5s.
+- **Message reactions**: `POST /api/messages/{message_id}/react` with `{emoji}` in allowlist (heart, fire, mind_blown, wow, clap, eye). Same emoji toggles off; different emoji replaces (one active reaction per user per message). 403 for non-thread members, 400 for invalid emoji.
+- **Frontend UI**: Hover a bubble → smile-icon reveals (always-40%-visible on mobile). Tap → floating picker with all 6 emojis. Applied reactions render as colored chips under the bubble (chip lit green if it's yours). Typing bubble shows the other user's first name + 3 bouncing lime dots.
+
+### PWA (installable app)
+- `manifest.json` with name, icons (192/512 maskable), theme #0A0A0C, standalone display, 3 shortcuts (Feed, DMs, Studio).
+- `service-worker.js`: navigation network-first with offline shell fallback; stale-while-revalidate for static assets; skips `/api/`.
+- 3 icons generated (192, 512, apple-touch-180) with lime badge + "A".
+- `index.html` updated with manifest link, apple-touch-icon, PWA meta tags, and app title.
+- SW auto-registers in `index.js` (https only).
+
+### Feed Composer (`/feed`)
+- New `FeedComposer.js` modal — 9 kind chips, textarea with @mention support + live counter, image OR video upload (mutually exclusive), Post button.
+- Three entry points on `/feed`: top-right green "New Post" button, quick-post prompt card (avatar + placeholder), mobile floating action button.
+- Only visible for `role in ("artist", "admin")`.
+
+### Push Notifications (Web Push / VAPID)
+- New `push.py` module with:
+  - Auto-generated VAPID keypair on first run, persisted in `push_config` MongoDB collection.
+  - `GET /api/push/vapid-public-key` — returns url-safe b64 for `applicationServerKey`.
+  - `POST /api/push/subscribe` / `POST /api/push/unsubscribe` — idempotent per (user, endpoint).
+  - `GET /api/push/subscriptions/mine`, `POST /api/push/test` — utilities.
+  - `send_push(user_id, title, body, url)` helper — fans out to all subscriptions, prunes dead endpoints (404/410).
+- **Triggers wired** in: `messages.py` (new DM), `auctions.py` (outbid × 2 paths + auction ending soon), `offers.py` (offer received + accept/decline/counter).
+- Frontend: `usePushSubscription()` hook + toggle card at top of `/notifications` with Enable / Send Test / Turn Off. Service worker's `push` + `notificationclick` handlers focus the correct URL.
+
+### Testing status
+- Backend: All new endpoints curl-tested (typing, react toggle/replace/invalid, subscribe/unsubscribe/vapid).
+- Frontend: Smoke screenshots of Feed Composer modal, Messages reactions/typing UI, Notifications push card — all rendering correctly.
+- testing_agent iteration 12 dispatched but not returned before this write; iteration_13 will re-run with push included.
+

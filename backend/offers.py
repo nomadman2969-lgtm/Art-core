@@ -82,6 +82,17 @@ async def create_offer(req: OfferCreate, me: dict = Depends(get_current_user)):
         "offer_id": o["id"], "artwork_id": req.artwork_id, "amount": req.amount,
         "read": False, "created_at": now_iso(),
     })
+    try:
+        from push import send_push
+        import asyncio as _a
+        _a.create_task(send_push(
+            art["artist_id"],
+            title="New offer",
+            body=f"{me['name']} offered ${int(req.amount):,}",
+            url="/offers",
+        ))
+    except Exception:
+        pass
     return await _enrich(o)
 
 
@@ -165,6 +176,18 @@ async def seller_respond(oid: str, req: SellerResponse, me: dict = Depends(get_c
         "amount": counter if counter else o["amount"],
         "read": False, "created_at": now_iso(),
     })
+    try:
+        from push import send_push
+        import asyncio as _a
+        titles = {"accept": "Offer accepted", "decline": "Offer declined", "counter": "Counter received"}
+        _a.create_task(send_push(
+            o["buyer_id"],
+            title=titles.get(req.action, "Offer update"),
+            body=f"${int(counter or o['amount']):,}",
+            url="/offers",
+        ))
+    except Exception:
+        pass
     return await _enrich(await db.offers.find_one({"id": oid}))
 
 

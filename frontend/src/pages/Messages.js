@@ -181,7 +181,7 @@ export function MessageThread() {
                     <button
                       data-testid={`react-btn-${m.id}`}
                       onClick={() => setReactingTo(showPicker ? null : m.id)}
-                      className="opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 text-zinc-500 hover:text-[#CCFF00] transition-opacity p-1"
+                      className="opacity-40 md:opacity-0 md:group-hover:opacity-100 text-zinc-500 hover:text-[#CCFF00] transition-opacity p-1"
                       aria-label="React">
                       <Smile size={14} />
                     </button>
@@ -213,7 +213,7 @@ export function MessageThread() {
                     <button
                       data-testid={`react-btn-${m.id}`}
                       onClick={() => setReactingTo(showPicker ? null : m.id)}
-                      className="opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 text-zinc-500 hover:text-[#CCFF00] transition-opacity p-1"
+                      className="opacity-40 md:opacity-0 md:group-hover:opacity-100 text-zinc-500 hover:text-[#CCFF00] transition-opacity p-1"
                       aria-label="React">
                       <Smile size={14} />
                     </button>

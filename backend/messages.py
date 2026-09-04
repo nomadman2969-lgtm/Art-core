@@ -113,6 +113,18 @@ async def send_message(req: SendReq, me: dict = Depends(get_current_user)):
             "message_id": msg["id"], "preview": (text or f"Shared {attachment['kind']}")[:120],
             "read": False, "created_at": now_iso(),
         })
+        # Fire web push (fire-and-forget so send() is fast)
+        try:
+            from push import send_push
+            import asyncio as _a
+            _a.create_task(send_push(
+                req.to_user_id,
+                title=f"New message from {me['name']}",
+                body=(text or f"Shared a {attachment['kind']}")[:140],
+                url=f"/messages/{me['id']}",
+            ))
+        except Exception:
+            pass
     out = strip_mongo(msg)
     out["attachment"] = await _enrich_attachment(out.get("attachment"))
     return out
