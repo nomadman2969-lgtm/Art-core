@@ -112,6 +112,43 @@ async def startup():
         }
         await db.users.insert_one(admin)
         logger.info("Seeded admin user")
+
+    # Seed demo artist + demo collector (one-click login on /login)
+    demo_accounts = [
+        {
+            "email": "demo.artist@artcorestudio.net",
+            "password": "DemoArtist2026!",
+            "name": "Demo Artist",
+            "role": "artist",
+            "bio": "This is a demo artist account. Explore posting artworks, running auctions, and hosting events.",
+        },
+        {
+            "email": "demo.collector@artcorestudio.net",
+            "password": "DemoCollector2026!",
+            "name": "Demo Collector",
+            "role": "buyer",
+            "bio": "This is a demo buyer account. Explore browsing, offers, purchases, and RSVPing to events.",
+        },
+    ]
+    for d in demo_accounts:
+        if await db.users.find_one({"email": d["email"]}):
+            continue
+        await db.users.insert_one({
+            "id": new_id(),
+            "email": d["email"],
+            "password_hash": hash_password(d["password"]),
+            "name": d["name"],
+            "name_lc": d["name"].lower(),
+            "role": d["role"],
+            "bio": d["bio"],
+            "cover_image": None,
+            "avatar": None,
+            "approved": True,
+            "is_demo": True,
+            "stripe_connect_status": "not_started",
+            "created_at": now_iso(),
+        })
+        logger.info(f"Seeded demo account: {d['email']}")
     # Seed settings
     if not await db.settings.find_one({"id": "global"}):
         await db.settings.insert_one({

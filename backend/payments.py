@@ -598,6 +598,12 @@ async def _apply_paid(session_id: str):
                 await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"payment_intent": pi}})
         except Exception:
             pass
+        # Mark waitlist hold as claimed (if this session came from a hold)
+        if tx.get("waitlist_hold"):
+            await db.waitlist_holds.update_one(
+                {"session_id": session_id},
+                {"$set": {"claimed": True, "claimed_at": now_iso()}},
+            )
         # Idempotency: only create RSVP once per session
         existing_rsvp = await db.event_rsvps.find_one({"event_id": tx["event_id"], "user_id": tx["user_id"]})
         if not existing_rsvp:

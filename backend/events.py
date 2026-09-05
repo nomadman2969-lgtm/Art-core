@@ -1,4 +1,5 @@
 """Art events — physical + virtual events with geolocation and RSVP."""
+import logging
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -7,6 +8,7 @@ from db import db, new_id, now_iso, strip_mongo
 from auth import get_current_user, get_optional_user, require_role
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+log = logging.getLogger(__name__)
 
 EVENT_CATEGORIES = [
     "gallery_opening", "pop_up", "festival", "meetup",
@@ -150,6 +152,11 @@ async def list_events(
         await check_event_reminders()
     except Exception:
         pass
+    # Opportunistic waitlist-hold sweep — expire holds > 15min and promote next
+    try:
+        await _sweep_expired_holds()
+    except Exception:
+        pass
     q: dict = {"cancelled": {"$ne": True}}
     if category:
         if category not in EVENT_CATEGORIES:
@@ -214,7 +221,6 @@ async def cancel_event(event_id: str, cancel_series: bool = False, user: dict = 
 async def _cancel_single_event(e: dict, user: dict) -> dict:
     event_id = e["id"]
     await db.events.update_one({"id": event_id}, {"$set": {"cancelled": True, "cancelled_at": now_iso()}})
-
     # Auto-refund every paid ticket
     refund_summary = {"refunded": 0, "failed": 0, "amount": 0.0}
     if not e.get("is_free"):
@@ -436,6 +442,68 @@ async def event_analytics(event_id: str, user: dict = Depends(get_current_user))
     }
 
 
+# ---------- Analytics CSV Export ----------
+@router.get("/{event_id}/analytics.csv")
+async def event_analytics_csv(event_id: str, kind: str = "attendees", user: dict = Depends(get_current_user)):
+    """Downloadable CSV. kind ∈ {'attendees', 'revenue'}."""
+    from fastapi.responses import PlainTextResponse
+    import csv
+    import io as _io
+
+    e = await db.events.find_one({"id": event_id})
+    if not e:
+        raise HTTPException(404, "Not found")
+    if e["host_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not yours")
+    if kind not in ("attendees", "revenue"):
+        raise HTTPException(400, "kind must be 'attendees' or 'revenue'")
+
+    buf = _io.StringIO()
+    writer = csv.writer(buf)
+    safe_title = "".join(c for c in e["title"] if c.isalnum() or c in " -_")[:40].strip().replace(" ", "_")
+
+    if kind == "attendees":
+        writer.writerow(["Name", "Email", "RSVP Date", "Paid", "Amount", "Refunded", "Checked In", "Checked In At"])
+        rsvps = await db.event_rsvps.find({"event_id": event_id}).sort("created_at", 1).to_list(5000)
+        for r in rsvps:
+            user_doc = await db.users.find_one({"id": r["user_id"]}) or {}
+            writer.writerow([
+                r.get("user_name") or user_doc.get("name") or "",
+                user_doc.get("email") or "",
+                r.get("created_at", ""),
+                "Yes" if r.get("paid") else "No",
+                r.get("amount") or "",
+                "Yes" if r.get("refunded") else "No",
+                "Yes" if r.get("checked_in") else "No",
+                r.get("checked_in_at") or "",
+            ])
+        filename = f"artcore_attendees_{safe_title}.csv"
+    else:
+        writer.writerow(["Transaction ID", "Buyer Email", "Amount", "Currency", "Status", "Payment Intent", "Refunded", "Date"])
+        txs = await db.payment_transactions.find({
+            "kind": "event_ticket", "event_id": event_id,
+        }).sort("created_at", 1).to_list(5000)
+        for t in txs:
+            buyer = await db.users.find_one({"id": t.get("user_id")}) or {}
+            writer.writerow([
+                t.get("id", ""),
+                buyer.get("email") or "",
+                t.get("amount") or 0,
+                t.get("currency", "usd"),
+                t.get("payment_status", "unknown"),
+                t.get("payment_intent") or "",
+                "Yes" if t.get("refunded") else "No",
+                t.get("created_at", ""),
+            ])
+        filename = f"artcore_revenue_{safe_title}.csv"
+
+    return PlainTextResponse(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+    )
+
+
 # ---------- Waitlist ----------
 @router.post("/{event_id}/waitlist")
 async def join_waitlist(event_id: str, user: dict = Depends(get_current_user)):
@@ -475,33 +543,121 @@ async def list_waitlist(event_id: str, user: dict = Depends(get_current_user)):
     return [strip_mongo(r) for r in await cursor.to_list(200)]
 
 
+async def _sweep_expired_holds():
+    """Expire waitlist holds that passed their 15-min TTL without payment, and promote next."""
+    from datetime import datetime as _dt, timezone as _tz
+    now_iso_str = _dt.now(_tz.utc).isoformat()
+    stale = await db.waitlist_holds.find({
+        "claimed": False, "expired": False, "expires_at_iso": {"$lt": now_iso_str},
+    }).to_list(50)
+    for h in stale:
+        await db.waitlist_holds.update_one({"_id": h["_id"]}, {"$set": {"expired": True}})
+        # Also expire the pending transaction
+        await db.payment_transactions.update_one(
+            {"session_id": h["session_id"], "payment_status": "pending"},
+            {"$set": {"payment_status": "expired", "updated_at": now_iso()}},
+        )
+        # Promote the next person on the waitlist
+        ev = await db.events.find_one({"id": h["event_id"]})
+        if ev and not ev.get("cancelled"):
+            await _promote_from_waitlist(ev)
+
+
+
 async def _promote_from_waitlist(e: dict) -> Optional[dict]:
-    """Notify the next un-notified user on the waitlist that a seat opened up."""
+    """Notify the next un-notified user on the waitlist that a seat opened up.
+    For PAID events: creates a 15-min Stripe hold checkout link (auto-charge experience).
+    For FREE events: sends a plain invite to RSVP.
+    """
     if not e.get("max_capacity"):
         return None
     filled = await db.event_rsvps.count_documents({"event_id": e["id"]})
     if filled >= e["max_capacity"]:
         return None
+    # Check for a still-valid unclaimed hold — if so, don't promote yet
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc)
+    hold = await db.waitlist_holds.find_one({
+        "event_id": e["id"], "claimed": False, "expired": False,
+        "expires_at_iso": {"$gt": now.isoformat()},
+    })
+    if hold:
+        return None
     nxt = await db.event_waitlist.find_one({"event_id": e["id"], "notified": False}, sort=[("created_at", 1)])
     if not nxt:
         return None
     await db.event_waitlist.update_one({"_id": nxt["_id"]}, {"$set": {"notified": True, "notified_at": now_iso()}})
+
+    checkout_url = None
+    hold_expires_at = None
+    if not e.get("is_free"):
+        # Create a 15-minute-expiring Stripe checkout session for this reserved seat
+        try:
+            import os as _os, stripe as _stripe
+            from datetime import timedelta as _td
+            _stripe.api_key = _os.environ["STRIPE_SECRET_KEY"]
+            settings_row = await db.settings.find_one({"id": "platform"}) or {}
+            currency = settings_row.get("currency", "usd")
+            from connect import build_transfer_options
+            transfer_kwargs = await build_transfer_options(e["host_id"], float(e["ticket_price"]))
+            expires_ts = int((now + _td(minutes=15)).timestamp())
+            origin = _os.environ.get("PUBLIC_APP_URL", "https://artcorestudio.net")
+            session = _stripe.checkout.Session.create(
+                mode="payment",
+                line_items=[{
+                    "price_data": {
+                        "currency": currency,
+                        "product_data": {"name": f"Reserved Ticket: {e['title']}"},
+                        "unit_amount": int(round(float(e["ticket_price"]) * 100)),
+                    },
+                    "quantity": 1,
+                }],
+                success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{origin}/events/{e['id']}",
+                customer_email=nxt.get("user_email") or None,
+                expires_at=expires_ts,
+                metadata={"kind": "event_ticket", "event_id": e["id"], "user_id": nxt["user_id"], "waitlist_hold": "1"},
+                **transfer_kwargs,
+            )
+            hold_expires_at = (now + _td(minutes=15)).isoformat()
+            await db.waitlist_holds.insert_one({
+                "id": new_id(), "event_id": e["id"], "user_id": nxt["user_id"],
+                "session_id": session.id, "created_at": now_iso(),
+                "expires_at_iso": hold_expires_at, "claimed": False, "expired": False,
+            })
+            await db.payment_transactions.insert_one({
+                "id": new_id(), "session_id": session.id,
+                "kind": "event_ticket", "user_id": nxt["user_id"],
+                "event_id": e["id"], "host_id": e["host_id"],
+                "amount": float(e["ticket_price"]), "currency": currency,
+                "status": "initiated", "payment_status": "pending", "waitlist_hold": True,
+                "created_at": now_iso(), "updated_at": now_iso(),
+            })
+            checkout_url = session.url
+        except Exception as _e:
+            log.warning("Waitlist hold creation failed: %s", _e)
+            checkout_url = None
+
     await db.notifications.insert_one({
         "id": new_id(), "user_id": nxt["user_id"], "kind": "event_waitlist_open",
         "event_id": e["id"], "event_title": e["title"], "is_free": bool(e.get("is_free")),
         "ticket_price": e.get("ticket_price"),
+        "checkout_url": checkout_url, "hold_expires_at": hold_expires_at,
         "read": False, "created_at": now_iso(),
     })
     # Push
     try:
         from push import send_push
         import asyncio as _a
-        body = "A seat opened up — RSVP now" if e.get("is_free") else f"A seat opened up — grab it for ${int(e['ticket_price'] or 0):,}"
+        if e.get("is_free"):
+            body = "A seat opened up — RSVP now"
+        else:
+            body = f"Seat reserved 15min: ${int(e['ticket_price'] or 0):,} · Tap to pay"
         _a.create_task(send_push(
             nxt["user_id"],
             title=f"You're off the waitlist: {e['title']}",
             body=body,
-            url=f"/events/{e['id']}",
+            url=checkout_url or f"/events/{e['id']}",
             kind="event_waitlist_open",
         ))
     except Exception:
@@ -509,7 +665,7 @@ async def _promote_from_waitlist(e: dict) -> Optional[dict]:
     # Email invite
     try:
         from emails import send_email
-        html = _waitlist_invite_html(nxt.get("user_name") or "there", e)
+        html = _waitlist_invite_html(nxt.get("user_name") or "there", e, checkout_url=checkout_url, hold_expires_at=hold_expires_at)
         import asyncio as _a2
         if nxt.get("user_email"):
             _a2.create_task(send_email(nxt["user_email"], f"A seat opened up: {e['title']}", html))
@@ -518,18 +674,22 @@ async def _promote_from_waitlist(e: dict) -> Optional[dict]:
     return nxt
 
 
-def _waitlist_invite_html(user_name: str, e: dict) -> str:
+def _waitlist_invite_html(user_name: str, e: dict, checkout_url: Optional[str] = None, hold_expires_at: Optional[str] = None) -> str:
     from emails import _wrap
     price = f"${e['ticket_price']:,.2f}" if not e.get("is_free") else "Free"
+    cta_href = checkout_url or f"https://artcorestudio.net/events/{e['id']}"
+    cta_label = "Complete payment (15 min)" if checkout_url else "Claim your seat"
+    countdown_note = ""
+    if hold_expires_at and checkout_url:
+        countdown_note = f"<div style=\"font-size:12px;color:#F5A623;margin-bottom:16px\">⏱ Your seat is held for 15 minutes.</div>"
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
   A seat opened up
 </div>
 <div style="color:#a1a1aa;font-size:13px;margin-bottom:24px">
   Hey {user_name}, a spot just opened for <strong style="color:#fff">{e['title']}</strong>.
-  Grab it before someone else does.
 </div>
-
+{countdown_note}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
   style="background:rgba(204,255,0,0.08);border:1px solid rgba(204,255,0,0.3);border-radius:4px;margin-bottom:24px">
   <tr><td style="padding:20px">
@@ -540,10 +700,10 @@ def _waitlist_invite_html(user_name: str, e: dict) -> str:
 </table>
 
 <div style="margin-top:28px">
-  <a href="https://artcorestudio.net/events/{e['id']}" style="display:inline-block;background:#CCFF00;color:#000;
+  <a href="{cta_href}" style="display:inline-block;background:#CCFF00;color:#000;
      padding:12px 22px;text-decoration:none;font-family:Impact,Arial Black,sans-serif;
      letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:2px">
-    Claim your seat →
+    {cta_label} →
   </a>
 </div>
 """
@@ -577,7 +737,78 @@ async def my_tickets(upcoming_only: bool = True, user: dict = Depends(get_curren
     return tickets
 
 
-# ---------- Trending (by RSVP velocity) ----------
+# ---------- Series editing ----------
+class EventUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=3, max_length=140)
+    description: Optional[str] = Field(default=None, min_length=3, max_length=4000)
+    category: Optional[str] = None
+    location: Optional[Location] = None
+    start_at: Optional[str] = None
+    end_at: Optional[str] = None
+    cover_image: Optional[str] = None
+    max_capacity: Optional[int] = Field(default=None, ge=1, le=100000)
+    is_free: Optional[bool] = None
+    ticket_price: Optional[float] = Field(default=None, ge=0)
+    apply_to: str = "this"  # "this" | "series"
+
+    @field_validator("category")
+    @classmethod
+    def _check_cat(cls, v):
+        if v is not None and v not in EVENT_CATEGORIES:
+            raise ValueError(f"Category must be one of {EVENT_CATEGORIES}")
+        return v
+
+    @field_validator("apply_to")
+    @classmethod
+    def _check_scope(cls, v):
+        if v not in ("this", "series"):
+            raise ValueError("apply_to must be 'this' or 'series'")
+        return v
+
+
+@router.patch("/{event_id}")
+async def edit_event(event_id: str, req: EventUpdate, user: dict = Depends(get_current_user)):
+    e = await db.events.find_one({"id": event_id})
+    if not e:
+        raise HTTPException(404, "Not found")
+    if e["host_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not yours")
+
+    # Build the patch dict from non-None fields
+    patch: dict = {}
+    if req.title is not None: patch["title"] = req.title
+    if req.description is not None: patch["description"] = req.description
+    if req.category is not None: patch["category"] = req.category
+    if req.location is not None: patch["location"] = req.location.model_dump()
+    if req.cover_image is not None: patch["cover_image"] = req.cover_image
+    if req.max_capacity is not None: patch["max_capacity"] = req.max_capacity
+    if req.is_free is not None: patch["is_free"] = req.is_free
+    if req.ticket_price is not None: patch["ticket_price"] = req.ticket_price
+    # is_free/ticket_price consistency
+    if patch.get("is_free") is True:
+        patch["ticket_price"] = None
+    elif patch.get("is_free") is False and (patch.get("ticket_price") or 0) <= 0:
+        raise HTTPException(400, "Paid events need a ticket_price > 0")
+
+    updated = 0
+    if req.apply_to == "series" and e.get("series_id"):
+        # Update every future sibling, but keep each occurrence's own start/end
+        siblings = await db.events.find({
+            "series_id": e["series_id"], "cancelled": {"$ne": True},
+        }).to_list(200)
+        for s in siblings:
+            r = await db.events.update_one({"id": s["id"]}, {"$set": patch})
+            updated += r.modified_count
+    else:
+        # Single event — allow start/end changes
+        if req.start_at is not None: patch["start_at"] = req.start_at
+        if req.end_at is not None: patch["end_at"] = req.end_at
+        r = await db.events.update_one({"id": event_id}, {"$set": patch})
+        updated = r.modified_count
+
+    return {"updated": updated, "apply_to": req.apply_to}
+
+
 @router.get("/lists/trending")
 async def trending_events(
     limit: int = 12,

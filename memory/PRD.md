@@ -431,3 +431,41 @@ Full commerce system audit + upgrade:
 - Once verified, refund + ticket emails will send from `refunds@artcorestudio.net` instead of falling back to sandbox `onboarding@resend.dev`.
 
 
+
+## Series Edit + Auto-Charge + CSV + Demo Logins (Mar 4, 2026)
+
+### Series Editing
+- `PATCH /events/{id}` accepts `apply_to: "this" | "series"` alongside any editable fields (title, description, category, location, start/end, capacity, is_free, ticket_price).
+- When `apply_to=series`, every future non-cancelled sibling is updated in one call. Individual `start_at/end_at` never change for series edits (each occurrence keeps its own date).
+- Frontend: `EditEventModal` opened from a new **Edit event** button in the host sidebar. Shows a radio pair — "This occurrence only" / "Entire series" — when the event is part of a series.
+- 403 for non-host verified.
+
+### Waitlist Auto-Charge (paid events)
+- When a paid RSVP is refunded or a hold expires, `_promote_from_waitlist()` now:
+  - For **paid** events: creates a Stripe Checkout Session with `expires_at = now + 15min`, stores a `waitlist_holds` record + a `payment_transactions` row (kind=event_ticket, waitlist_hold=true), and sends the buyer a push + email with the direct checkout link.
+  - For **free** events: sends the plain invite (unchanged).
+- New `_sweep_expired_holds()` runs opportunistically on `GET /events` — expires stale holds, marks tx as `expired`, and re-promotes the next waitlist user.
+- `_apply_paid()` marks the hold as `claimed` when the buyer completes checkout.
+- Email template updated with amber countdown warning "⏱ Your seat is held for 15 minutes."
+
+### Analytics CSV Export
+- New `GET /events/{id}/analytics.csv?kind=attendees|revenue` — host/admin only, returns `text/csv` with attachment disposition.
+- **Attendees CSV**: Name, Email, RSVP Date, Paid, Amount, Refunded, Checked In, Checked In At.
+- **Revenue CSV**: Transaction ID, Buyer Email, Amount, Currency, Status, Payment Intent, Refunded, Date.
+- Analytics modal has two new pill buttons **CSV · Attendees** and **CSV · Revenue** in the header — one click downloads.
+
+### Demo Accounts + One-Tap Login
+- Seeded at backend startup:
+  - Demo Artist: `demo.artist@artcorestudio.net` / `DemoArtist2026!`
+  - Demo Collector: `demo.collector@artcorestudio.net` / `DemoCollector2026!`
+- `/login` page redesigned with a **ONE-TAP DEMO** section at the top:
+  - Lime "Enter as Artist" button → auto-login → routes to `/studio`
+  - Violet "Enter as Collector" button → auto-login → routes to `/dashboard`
+- Divider **OR SIGN IN NORMALLY** below → regular email/password form preserved.
+- `test_credentials.md` updated with all three seed accounts.
+
+### Testing
+- Backend curl: demo logins return valid tokens with correct roles; series PATCH updates 1 vs all siblings; CSV endpoints return proper text/csv with headers; non-host PATCH returns 403.
+- Frontend screenshots: login page with green Artist + violet Collector one-tap buttons; auto-navigated Studio Editor showing "HEY, DEMO ARTIST."
+
+

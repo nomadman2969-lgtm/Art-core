@@ -23,6 +23,7 @@ export default function EventDetail() {
   const [waitlistPos, setWaitlistPos] = useState(null); // {on_waitlist, position}
   const [analytics, setAnalytics] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -206,6 +207,10 @@ export default function EventDetail() {
 
           {isHost && !ev.cancelled && (
             <>
+              <button data-testid="edit-event-btn" onClick={() => setShowEdit(true)}
+                className="btn-ghost w-full flex items-center justify-center gap-2 text-xs">
+                Edit event
+              </button>
               <button data-testid="show-analytics-btn" onClick={loadAnalytics}
                 className="btn-ghost !text-[#CCFF00] !border-[#CCFF00]/40 w-full flex items-center justify-center gap-2 text-xs">
                 <TrendingUp size={12} /> View analytics
@@ -265,6 +270,9 @@ export default function EventDetail() {
       </div>
       {showAnalytics && analytics && (
         <AnalyticsModal analytics={analytics} onClose={() => setShowAnalytics(false)} />
+      )}
+      {showEdit && (
+        <EditEventModal ev={ev} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); load(); }} />
       )}
     </div>
   );
@@ -387,6 +395,22 @@ function HostCheckIn({ eventId, onCheckedIn }) {
 function AnalyticsModal({ analytics, onClose }) {
   const curve = analytics.rsvp_curve || [];
   const max = Math.max(1, ...curve.map((c) => c.count));
+
+  const downloadCsv = async (kind) => {
+    try {
+      const r = await api.get(`/events/${analytics.event_id}/analytics.csv?kind=${kind}`, {
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([r.data], { type: "text/csv" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `artcore_${kind}_${analytics.event_id.slice(0, 6)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`${kind === "attendees" ? "Attendee list" : "Revenue report"} downloaded`);
+    } catch { toast.error("Download failed"); }
+  };
+
   return (
     <div onClick={onClose} data-testid="analytics-modal"
       className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
@@ -396,7 +420,17 @@ function AnalyticsModal({ analytics, onClose }) {
             <TrendingUp size={14} className="text-[#CCFF00]" />
             <div className="label-caps">Event Analytics</div>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+          <div className="flex items-center gap-2">
+            <button data-testid="csv-attendees" onClick={() => downloadCsv("attendees")}
+              className="label-caps text-[10px] px-2 py-1 border border-white/12 rounded-sm hover:border-[#CCFF00] hover:text-[#CCFF00]">
+              CSV · Attendees
+            </button>
+            <button data-testid="csv-revenue" onClick={() => downloadCsv("revenue")}
+              className="label-caps text-[10px] px-2 py-1 border border-white/12 rounded-sm hover:border-[#CCFF00] hover:text-[#CCFF00]">
+              CSV · Revenue
+            </button>
+            <button onClick={onClose} className="text-zinc-500 hover:text-white ml-1"><X size={18} /></button>
+          </div>
         </div>
         <div className="p-6 space-y-6">
           <div>
@@ -480,6 +514,119 @@ function StatBox({ label, value, accent, sub }) {
       <div className="text-[10px] uppercase text-zinc-500 tracking-wider">{label}</div>
       <div className="font-anton text-2xl mt-1" style={{ color: accent }}>{value}</div>
       {sub && <div className="text-[10px] text-zinc-500 mt-0.5">{sub}</div>}
+    </div>
+  );
+}
+
+
+function EditEventModal({ ev, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    title: ev.title, description: ev.description, category: ev.category,
+    address: ev.location?.address || "", city: ev.location?.city || "",
+    lat: String(ev.location?.lat ?? ""), lng: String(ev.location?.lng ?? ""),
+    start_at: ev.start_at ? ev.start_at.slice(0, 16) : "",
+    end_at: ev.end_at ? ev.end_at.slice(0, 16) : "",
+    max_capacity: ev.max_capacity || "",
+    is_free: !!ev.is_free, ticket_price: ev.ticket_price || "",
+    apply_to: "this",
+  });
+  const [busy, setBusy] = useState(false);
+  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const inSeries = !!ev.series_id;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const payload = {
+        title: form.title, description: form.description, category: form.category,
+        location: { lat: parseFloat(form.lat), lng: parseFloat(form.lng), address: form.address || null, city: form.city || null },
+        is_free: form.is_free,
+        ticket_price: form.is_free ? null : parseFloat(form.ticket_price) || 0,
+        max_capacity: form.max_capacity ? parseInt(form.max_capacity, 10) : null,
+        apply_to: form.apply_to,
+      };
+      // start/end only when editing single occurrence (backend ignores on series)
+      if (form.apply_to === "this") {
+        payload.start_at = new Date(form.start_at).toISOString();
+        payload.end_at = form.end_at ? new Date(form.end_at).toISOString() : null;
+      }
+      await api.patch(`/events/${ev.id}`, payload);
+      toast.success(form.apply_to === "series" ? "Whole series updated" : "Event updated");
+      onSaved?.();
+    } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
+    setBusy(false);
+  };
+
+  const inputCls = "w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2.5 text-sm outline-none focus:border-[#CCFF00]";
+
+  return (
+    <div onClick={onClose} data-testid="edit-event-modal"
+      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+      <div onClick={(e) => e.stopPropagation()} className="bg-[#121214] border border-white/10 rounded-sm w-full max-w-xl my-auto">
+        <div className="flex items-center justify-between p-4 border-b border-white/8">
+          <div className="font-unbounded font-semibold">Edit event</div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
+        </div>
+        <form onSubmit={submit} className="p-4 space-y-3">
+          {inSeries && (
+            <div className="border border-[#F5A623]/40 bg-[#F5A623]/10 rounded-sm p-3 space-y-2">
+              <div className="label-caps text-[#F5A623] text-xs">This event is part of a series</div>
+              <div className="flex gap-2">
+                <label className="flex items-center gap-2 text-xs">
+                  <input data-testid="apply-this" type="radio" name="apply_to" checked={form.apply_to === "this"}
+                    onChange={() => setF("apply_to", "this")} />
+                  This occurrence only
+                </label>
+                <label className="flex items-center gap-2 text-xs">
+                  <input data-testid="apply-series" type="radio" name="apply_to" checked={form.apply_to === "series"}
+                    onChange={() => setF("apply_to", "series")} />
+                  Entire series
+                </label>
+              </div>
+            </div>
+          )}
+          <input data-testid="edit-title" value={form.title} onChange={(e) => setF("title", e.target.value)} placeholder="Title" className={inputCls} />
+          <textarea data-testid="edit-description" value={form.description} onChange={(e) => setF("description", e.target.value)} rows={3}
+            className={inputCls} />
+          <div className="grid grid-cols-2 gap-3">
+            <input data-testid="edit-city" value={form.city} onChange={(e) => setF("city", e.target.value)} placeholder="City" className={inputCls} />
+            <input data-testid="edit-address" value={form.address} onChange={(e) => setF("address", e.target.value)} placeholder="Address" className={inputCls} />
+            <input data-testid="edit-lat" value={form.lat} onChange={(e) => setF("lat", e.target.value)} placeholder="Lat" className={inputCls} />
+            <input data-testid="edit-lng" value={form.lng} onChange={(e) => setF("lng", e.target.value)} placeholder="Lng" className={inputCls} />
+          </div>
+          {form.apply_to === "this" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-zinc-500 mb-1">Start</div>
+                <input data-testid="edit-start" type="datetime-local" value={form.start_at}
+                  onChange={(e) => setF("start_at", e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <div className="text-xs text-zinc-500 mb-1">End</div>
+                <input data-testid="edit-end" type="datetime-local" value={form.end_at}
+                  onChange={(e) => setF("end_at", e.target.value)} className={inputCls} />
+              </div>
+            </div>
+          )}
+          <input data-testid="edit-capacity" type="number" min="1" value={form.max_capacity}
+            onChange={(e) => setF("max_capacity", e.target.value)} placeholder="Max capacity" className={inputCls} />
+          <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <input data-testid="edit-free" type="checkbox" checked={form.is_free}
+              onChange={(e) => setF("is_free", e.target.checked)} />
+            Free event
+          </label>
+          {!form.is_free && (
+            <input data-testid="edit-price" type="number" step="0.01" placeholder="Ticket price"
+              value={form.ticket_price} onChange={(e) => setF("ticket_price", e.target.value)} className={inputCls} />
+          )}
+          <button data-testid="edit-submit" type="submit" disabled={busy}
+            className="btn-lime w-full !py-3 mt-2 flex items-center justify-center gap-2">
+            {busy ? <Loader2 size={14} className="animate-spin" /> : null}
+            {form.apply_to === "series" ? "Save to whole series" : "Save changes"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

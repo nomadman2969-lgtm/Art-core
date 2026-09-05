@@ -7,24 +7,77 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [demoBusy, setDemoBusy] = useState(null);
   const { login } = useAuth();
   const nav = useNavigate();
+
+  const routeByRole = (u) => {
+    if (u.role === "admin") nav("/admin");
+    else if (u.role === "artist") nav("/studio");
+    else nav("/dashboard");
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
       const u = await login(email, password);
       toast.success("Welcome back");
-      if (u.role === "admin") nav("/admin");
-      else if (u.role === "artist") nav("/studio");
-      else nav("/dashboard");
+      routeByRole(u);
     } catch { toast.error("Invalid credentials"); }
     finally { setBusy(false); }
   };
+
+  const demoLogin = async (key) => {
+    const creds = key === "artist"
+      ? { email: "demo.artist@artcorestudio.net", password: "DemoArtist2026!" }
+      : { email: "demo.collector@artcorestudio.net", password: "DemoCollector2026!" };
+    setDemoBusy(key);
+    try {
+      const u = await login(creds.email, creds.password);
+      toast.success(`Signed in as demo ${key}`);
+      routeByRole(u);
+    } catch { toast.error("Demo login failed — try again in a sec"); }
+    finally { setDemoBusy(null); }
+  };
+
   return (
     <div data-testid="login-page" className="max-w-md mx-auto px-6 pt-24 pb-32">
       <div className="label-caps text-[#CCFF00]">Sign In</div>
-      <h1 className="font-anton text-6xl uppercase mt-4 mb-12 leading-none">Welcome<br />back.</h1>
+      <h1 className="font-anton text-6xl uppercase mt-4 mb-8 leading-none">Welcome<br />back.</h1>
+
+      {/* One-click demo sign-in */}
+      <div className="mb-8">
+        <div className="label-caps text-zinc-500 mb-3">One-tap demo</div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            data-testid="demo-artist-btn"
+            onClick={() => demoLogin("artist")}
+            disabled={!!demoBusy}
+            className="border border-[#CCFF00]/40 bg-[#CCFF00]/10 text-[#CCFF00] hover:bg-[#CCFF00]/20 label-caps py-3 rounded-sm text-xs transition-colors">
+            {demoBusy === "artist" ? "Signing in..." : "Enter as Artist"}
+          </button>
+          <button
+            type="button"
+            data-testid="demo-collector-btn"
+            onClick={() => demoLogin("collector")}
+            disabled={!!demoBusy}
+            className="border border-[#7C3AED]/40 bg-[#7C3AED]/10 text-[#7C3AED] hover:bg-[#7C3AED]/20 label-caps py-3 rounded-sm text-xs transition-colors">
+            {demoBusy === "collector" ? "Signing in..." : "Enter as Collector"}
+          </button>
+        </div>
+        <div className="text-[10px] text-zinc-500 mt-2">
+          Shared demo accounts — everything is real, but data may be reset periodically.
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex-1 h-px bg-white/8" />
+        <div className="text-[10px] text-zinc-500 label-caps">Or sign in normally</div>
+        <div className="flex-1 h-px bg-white/8" />
+      </div>
+
       <form onSubmit={submit} className="space-y-5">
         <input data-testid="login-email" required type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none focus:border-[#CCFF00]" />
