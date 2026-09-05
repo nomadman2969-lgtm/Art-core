@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { Calendar, Users, MapPin, ArrowLeft, Trash2, Loader2, QrCode, CheckCircle2 } from "lucide-react";
+import { Calendar, Users, MapPin, ArrowLeft, Trash2, Loader2, QrCode, CheckCircle2, Clock, TrendingUp, DollarSign, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
@@ -20,6 +20,9 @@ export default function EventDetail() {
   const [busy, setBusy] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [showTicket, setShowTicket] = useState(false);
+  const [waitlistPos, setWaitlistPos] = useState(null); // {on_waitlist, position}
+  const [analytics, setAnalytics] = useState(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -59,14 +62,34 @@ export default function EventDetail() {
   };
 
   const cancelEvent = async () => {
-    if (!confirm("Cancel this event? All attendees will be notified.")) return;
+    const wholeSeries = ev.series_id ? confirm("This event is part of a series. Cancel the ENTIRE remaining series?") : false;
+    const oneOnly = !ev.series_id ? confirm("Cancel this event? All attendees will be notified and paid tickets refunded.") : true;
+    if (!oneOnly && !wholeSeries) return;
     setBusy(true);
     try {
-      await api.delete(`/events/${id}`);
-      toast.success("Cancelled");
+      await api.delete(`/events/${id}${wholeSeries ? "?cancel_series=true" : ""}`);
+      toast.success(wholeSeries ? "Whole series cancelled" : "Cancelled");
       nav("/events");
     } catch { toast.error("Failed"); }
     setBusy(false);
+  };
+
+  const toggleWaitlist = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post(`/events/${id}/waitlist`, {});
+      setWaitlistPos(r.data);
+      toast.success(r.data.on_waitlist ? `You're #${r.data.position} on the waitlist` : "Removed from waitlist");
+    } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
+    setBusy(false);
+  };
+
+  const loadAnalytics = async () => {
+    try {
+      const r = await api.get(`/events/${id}/analytics`);
+      setAnalytics(r.data);
+      setShowAnalytics(true);
+    } catch { toast.error("Couldn't load analytics"); }
   };
 
   if (loading) return <div className="py-32 text-center label-caps text-zinc-500">Loading...</div>;
@@ -133,18 +156,34 @@ export default function EventDetail() {
           <div className="border border-white/8 rounded-sm p-4 bg-[#121214]">
             <div className="label-caps text-zinc-500 mb-2">Price</div>
             <div className="font-anton text-3xl">{ev.is_free ? "FREE" : `$${ev.ticket_price}`}</div>
-            {!ev.cancelled && (
-              <button data-testid="rsvp-btn" onClick={toggleRsvp} disabled={busy}
-                className={`w-full mt-4 !py-3 ${ev.rsvped ? "btn-ghost" : "btn-lime"}`}>
-                {busy ? <Loader2 size={14} className="animate-spin inline" /> :
-                  ev.rsvped ? "Cancel RSVP" :
-                  ev.is_free ? "RSVP" : `Get Ticket · $${ev.ticket_price}`}
-              </button>
+            {ev.series_id && (
+              <div className="text-xs text-[#F5A623] mt-1 flex items-center gap-1">
+                <Clock size={11} /> Session {ev.series_seq}/{ev.series_total} in this series
+              </div>
             )}
             {ev.max_capacity && (
-              <div className="text-xs text-zinc-500 mt-2 text-center">
-                {ev.rsvp_count}/{ev.max_capacity} spots
+              <div className="text-xs text-zinc-500 mt-1">
+                {ev.rsvp_count}/{ev.max_capacity} spots · {Math.max(0, ev.max_capacity - ev.rsvp_count)} left
               </div>
+            )}
+
+            {!ev.cancelled && (
+              <>
+                {(ev.max_capacity && ev.rsvp_count >= ev.max_capacity && !ev.rsvped) ? (
+                  <button data-testid="waitlist-btn" onClick={toggleWaitlist} disabled={busy}
+                    className={`w-full mt-4 !py-3 ${waitlistPos?.on_waitlist ? "btn-ghost" : "btn-violet"}`}>
+                    {busy ? <Loader2 size={14} className="animate-spin inline" /> :
+                      waitlistPos?.on_waitlist ? `On waitlist · #${waitlistPos.position} · Leave` : "Join Waitlist"}
+                  </button>
+                ) : (
+                  <button data-testid="rsvp-btn" onClick={toggleRsvp} disabled={busy}
+                    className={`w-full mt-4 !py-3 ${ev.rsvped ? "btn-ghost" : "btn-lime"}`}>
+                    {busy ? <Loader2 size={14} className="animate-spin inline" /> :
+                      ev.rsvped ? "Cancel RSVP" :
+                      ev.is_free ? "RSVP" : `Get Ticket · $${ev.ticket_price}`}
+                  </button>
+                )}
+              </>
             )}
           </div>
 
@@ -166,10 +205,16 @@ export default function EventDetail() {
           </div>
 
           {isHost && !ev.cancelled && (
-            <button data-testid="cancel-event-btn" onClick={cancelEvent} disabled={busy}
-              className="btn-ghost !text-[#FF4D4D] !border-[#FF4D4D]/40 w-full flex items-center justify-center gap-2 text-xs">
-              <Trash2 size={12} /> Cancel event
-            </button>
+            <>
+              <button data-testid="show-analytics-btn" onClick={loadAnalytics}
+                className="btn-ghost !text-[#CCFF00] !border-[#CCFF00]/40 w-full flex items-center justify-center gap-2 text-xs">
+                <TrendingUp size={12} /> View analytics
+              </button>
+              <button data-testid="cancel-event-btn" onClick={cancelEvent} disabled={busy}
+                className="btn-ghost !text-[#FF4D4D] !border-[#FF4D4D]/40 w-full flex items-center justify-center gap-2 text-xs">
+                <Trash2 size={12} /> {ev.series_id ? "Cancel event / series" : "Cancel event"}
+              </button>
+            </>
           )}
 
           {/* Attendee's ticket QR */}
@@ -218,6 +263,9 @@ export default function EventDetail() {
           )}
         </aside>
       </div>
+      {showAnalytics && analytics && (
+        <AnalyticsModal analytics={analytics} onClose={() => setShowAnalytics(false)} />
+      )}
     </div>
   );
 }
@@ -331,6 +379,107 @@ function HostCheckIn({ eventId, onCheckedIn }) {
           {last.error ? "✕" : last.already ? "⚠ Already in" : "✓ Checked in"} · {last.name}
         </div>
       )}
+    </div>
+  );
+}
+
+
+function AnalyticsModal({ analytics, onClose }) {
+  const curve = analytics.rsvp_curve || [];
+  const max = Math.max(1, ...curve.map((c) => c.count));
+  return (
+    <div onClick={onClose} data-testid="analytics-modal"
+      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+      <div onClick={(e) => e.stopPropagation()} className="bg-[#121214] border border-white/10 rounded-sm w-full max-w-2xl my-auto">
+        <div className="flex items-center justify-between p-4 border-b border-white/8">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={14} className="text-[#CCFF00]" />
+            <div className="label-caps">Event Analytics</div>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div>
+            <div className="font-anton text-2xl uppercase leading-tight">{analytics.title}</div>
+            <div className="text-xs text-zinc-500 mt-1">Metrics update every page load.</div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatBox label="Total RSVPs" value={analytics.total_rsvps} accent="#CCFF00" />
+            <StatBox label="Check-in rate" value={`${analytics.check_in_rate}%`} accent="#7C3AED" sub={`${analytics.checked_in} in`} />
+            <StatBox label="Paid tickets" value={analytics.paid_rsvps} accent="#F5A623" sub={`${analytics.refunded_rsvps} refunded`} />
+            <StatBox label="Waitlist" value={analytics.waitlist} accent="#FF4D4D" />
+          </div>
+
+          {analytics.paid_rsvps > 0 && (
+            <div className="border border-white/8 rounded-sm p-4">
+              <div className="label-caps text-zinc-500 mb-3"><DollarSign size={11} className="inline mr-1" /> Revenue</div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <div className="text-[10px] uppercase text-zinc-500 tracking-wider">Gross</div>
+                  <div className="font-anton text-xl text-white">${analytics.revenue_gross.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase text-zinc-500 tracking-wider">Platform fee</div>
+                  <div className="font-anton text-xl text-[#F5A623]">${analytics.platform_fee.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase text-zinc-500 tracking-wider">Net to you</div>
+                  <div className="font-anton text-xl text-[#CCFF00]">${analytics.net_to_host.toFixed(2)}</div>
+                </div>
+              </div>
+              {analytics.revenue_refunded > 0 && (
+                <div className="text-xs text-[#FF4D4D] mt-2">${analytics.revenue_refunded.toFixed(2)} refunded</div>
+              )}
+            </div>
+          )}
+
+          {analytics.capacity && (
+            <div className="border border-white/8 rounded-sm p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="label-caps text-zinc-500">Fill rate</div>
+                <div className="font-anton text-lg">{analytics.fill_rate}%</div>
+              </div>
+              <div className="w-full h-2 bg-white/[0.06] rounded-sm overflow-hidden">
+                <div className="h-full bg-[#CCFF00]" style={{ width: `${Math.min(100, analytics.fill_rate || 0)}%` }} />
+              </div>
+              <div className="text-xs text-zinc-500 mt-1">{analytics.total_rsvps} / {analytics.capacity} seats</div>
+            </div>
+          )}
+
+          {curve.length > 1 && (
+            <div className="border border-white/8 rounded-sm p-4">
+              <div className="label-caps text-zinc-500 mb-3">RSVP Curve</div>
+              <div className="flex items-end gap-1 h-24" data-testid="rsvp-curve">
+                {curve.map((c) => (
+                  <div key={c.date} className="flex-1 flex flex-col justify-end" title={`${c.date}: ${c.count}`}>
+                    <div className="w-full rounded-t-sm transition-all"
+                      style={{
+                        height: `${(c.count / max) * 100}%`,
+                        background: c.count === 0 ? "rgba(255,255,255,0.05)" : "#CCFF00",
+                        minHeight: "3px",
+                      }} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
+                <span>{curve[0]?.date.slice(5)}</span>
+                <span>{curve[curve.length - 1]?.date.slice(5)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatBox({ label, value, accent, sub }) {
+  return (
+    <div className="border border-white/8 rounded-sm p-3">
+      <div className="text-[10px] uppercase text-zinc-500 tracking-wider">{label}</div>
+      <div className="font-anton text-2xl mt-1" style={{ color: accent }}>{value}</div>
+      {sub && <div className="text-[10px] text-zinc-500 mt-0.5">{sub}</div>}
     </div>
   );
 }

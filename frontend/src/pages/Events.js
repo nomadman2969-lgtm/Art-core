@@ -321,6 +321,8 @@ function CreateEventModal({ onClose, onCreated }) {
     start_at: "", end_at: "",
     is_free: true, ticket_price: "",
     cover_image: null,
+    // recurrence
+    recurring: false, freq: "weekly", count: 4,
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -379,6 +381,7 @@ function CreateEventModal({ onClose, onCreated }) {
         cover_image: form.cover_image,
         is_free: form.is_free,
         ticket_price: form.is_free ? null : parseFloat(form.ticket_price) || 0,
+        recurrence: form.recurring ? { frequency: form.freq, count: Math.max(2, Math.min(26, Number(form.count) || 2)) } : null,
       };
       await api.post("/events", payload);
       toast.success("Event created");
@@ -452,6 +455,29 @@ function CreateEventModal({ onClose, onCreated }) {
               value={form.ticket_price} onChange={(e) => setF("ticket_price", e.target.value)}
               className="w-full bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm" />
           )}
+          <div className="border-t border-white/8 pt-3 space-y-3">
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input data-testid="event-recurring" type="checkbox" checked={form.recurring}
+                onChange={(e) => setF("recurring", e.target.checked)} />
+              Make it a recurring series
+            </label>
+            {form.recurring && (
+              <div className="grid grid-cols-2 gap-3">
+                <select data-testid="event-freq" value={form.freq} onChange={(e) => setF("freq", e.target.value)}
+                  className="bg-white/[0.03] border border-white/12 px-3 py-2.5 rounded-sm text-sm outline-none focus:border-[#CCFF00]">
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Biweekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+                <input data-testid="event-count" type="number" min="2" max="26" placeholder="How many total?"
+                  value={form.count} onChange={(e) => setF("count", e.target.value)}
+                  className="bg-white/[0.03] border border-white/12 px-3 py-2.5 rounded-sm text-sm outline-none focus:border-[#CCFF00]" />
+                <div className="col-span-2 text-xs text-zinc-500">
+                  Creates {Math.max(2, Math.min(26, Number(form.count) || 2))} events, each {form.freq === "weekly" ? "7" : form.freq === "biweekly" ? "14" : "30"} days apart.
+                </div>
+              </div>
+            )}
+          </div>
           <button data-testid="event-submit" type="submit" disabled={saving}
             className="btn-lime w-full !py-3 flex items-center justify-center gap-2">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}

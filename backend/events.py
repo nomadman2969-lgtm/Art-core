@@ -13,12 +13,27 @@ EVENT_CATEGORIES = [
     "workshop", "live_painting", "virtual", "market",
 ]
 
+RECURRENCE_FREQ = ["weekly", "biweekly", "monthly"]
+RECURRENCE_MAX = 26  # cap: 6 months weekly, 12 months biweekly, 2 years monthly
+
 
 class Location(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lng: float = Field(ge=-180, le=180)
     address: Optional[str] = Field(default=None, max_length=300)
     city: Optional[str] = Field(default=None, max_length=100)
+
+
+class Recurrence(BaseModel):
+    frequency: str  # weekly | biweekly | monthly
+    count: int = Field(ge=2, le=RECURRENCE_MAX)
+
+    @field_validator("frequency")
+    @classmethod
+    def _check_freq(cls, v):
+        if v not in RECURRENCE_FREQ:
+            raise ValueError(f"Frequency must be one of {RECURRENCE_FREQ}")
+        return v
 
 
 class EventCreate(BaseModel):
@@ -32,6 +47,7 @@ class EventCreate(BaseModel):
     max_capacity: Optional[int] = Field(default=None, ge=1, le=100000)
     is_free: bool = True
     ticket_price: Optional[float] = Field(default=None, ge=0)
+    recurrence: Optional[Recurrence] = None
 
     @field_validator("category")
     @classmethod
@@ -69,25 +85,52 @@ async def _enrich(e: dict, me: Optional[dict] = None) -> dict:
 async def create_event(req: EventCreate, user: dict = Depends(require_role("artist", "admin"))):
     if not req.is_free and (req.ticket_price is None or req.ticket_price <= 0):
         raise HTTPException(400, "Paid events need a ticket_price > 0")
-    e = {
-        "id": new_id(),
-        "host_id": user["id"],
-        "host_name": user["name"],
-        "title": req.title,
-        "description": req.description,
-        "category": req.category,
-        "location": req.location.model_dump(),
-        "start_at": req.start_at,
-        "end_at": req.end_at,
-        "cover_image": req.cover_image,
-        "max_capacity": req.max_capacity,
-        "is_free": req.is_free,
-        "ticket_price": req.ticket_price if not req.is_free else None,
-        "cancelled": False,
-        "created_at": now_iso(),
-    }
-    await db.events.insert_one(e)
-    return await _enrich(e, user)
+    from datetime import datetime as _dt, timedelta as _td
+
+    def make_event(start_iso: str, end_iso: Optional[str], series_id: Optional[str], seq: int, total: int) -> dict:
+        return {
+            "id": new_id(),
+            "host_id": user["id"],
+            "host_name": user["name"],
+            "title": req.title,
+            "description": req.description,
+            "category": req.category,
+            "location": req.location.model_dump(),
+            "start_at": start_iso,
+            "end_at": end_iso,
+            "cover_image": req.cover_image,
+            "max_capacity": req.max_capacity,
+            "is_free": req.is_free,
+            "ticket_price": req.ticket_price if not req.is_free else None,
+            "cancelled": False,
+            "series_id": series_id,
+            "series_seq": seq if series_id else None,
+            "series_total": total if series_id else None,
+            "created_at": now_iso(),
+        }
+
+    if not req.recurrence:
+        e = make_event(req.start_at, req.end_at, None, 0, 1)
+        await db.events.insert_one(e)
+        return await _enrich(e, user)
+
+    # Build the series
+    freq_days = {"weekly": 7, "biweekly": 14, "monthly": 30}[req.recurrence.frequency]
+    start_dt = _dt.fromisoformat(req.start_at.replace("Z", "+00:00"))
+    end_dt = _dt.fromisoformat(req.end_at.replace("Z", "+00:00")) if req.end_at else None
+    duration = (end_dt - start_dt) if end_dt else None
+    series_id = new_id()
+    docs = []
+    for i in range(req.recurrence.count):
+        st = start_dt + _td(days=freq_days * i)
+        et = (st + duration) if duration else None
+        docs.append(make_event(
+            st.isoformat(),
+            et.isoformat() if et else None,
+            series_id, i + 1, req.recurrence.count,
+        ))
+    await db.events.insert_many(docs)
+    return await _enrich(docs[0], user)
 
 
 @router.get("")
@@ -144,12 +187,32 @@ async def get_event(event_id: str, me: Optional[dict] = Depends(get_optional_use
 
 
 @router.delete("/{event_id}")
-async def cancel_event(event_id: str, user: dict = Depends(get_current_user)):
+async def cancel_event(event_id: str, cancel_series: bool = False, user: dict = Depends(get_current_user)):
     e = await db.events.find_one({"id": event_id})
     if not e:
         raise HTTPException(404, "Not found")
     if e["host_id"] != user["id"] and user.get("role") != "admin":
         raise HTTPException(403, "Not yours")
+    targets = [e]
+    if cancel_series and e.get("series_id"):
+        # Cancel every future sibling event in the series
+        siblings = await db.events.find({
+            "series_id": e["series_id"],
+            "cancelled": {"$ne": True},
+        }).to_list(200)
+        targets = siblings
+    total_summary = {"cancelled": 0, "refunded": 0, "failed": 0, "amount": 0.0}
+    for target in targets:
+        result = await _cancel_single_event(target, user)
+        total_summary["cancelled"] += 1
+        total_summary["refunded"] += result.get("refunded", 0)
+        total_summary["failed"] += result.get("failed", 0)
+        total_summary["amount"] += result.get("amount", 0.0)
+    return total_summary
+
+
+async def _cancel_single_event(e: dict, user: dict) -> dict:
+    event_id = e["id"]
     await db.events.update_one({"id": event_id}, {"$set": {"cancelled": True, "cancelled_at": now_iso()}})
 
     # Auto-refund every paid ticket
@@ -241,6 +304,14 @@ async def cancel_event(event_id: str, user: dict = Depends(get_current_user)):
     return {"cancelled": True, **refund_summary}
 
 
+# ---------- Promote from waitlist when a paid RSVP gets refunded via Stripe webhook or admin ----------
+async def promote_waitlist_after_refund(event_id: str):
+    e = await db.events.find_one({"id": event_id})
+    if not e or e.get("cancelled"):
+        return
+    await _promote_from_waitlist(e)
+
+
 @router.post("/{event_id}/rsvp")
 async def rsvp(event_id: str, user: dict = Depends(get_current_user)):
     e = await db.events.find_one({"id": event_id})
@@ -251,12 +322,16 @@ async def rsvp(event_id: str, user: dict = Depends(get_current_user)):
     existing = await db.event_rsvps.find_one({"event_id": event_id, "user_id": user["id"]})
     if existing:
         await db.event_rsvps.delete_one({"_id": existing["_id"]})
+        # If RSVP was paid, don't auto-refund on user cancel here (only host cancel triggers refunds).
+        # Promote next in waitlist if capacity is now available (only for free events; paid seats require ticket purchase from waitlist).
+        if e.get("is_free"):
+            await _promote_from_waitlist(e)
         return {"rsvped": False, "count": await db.event_rsvps.count_documents({"event_id": event_id})}
     # Capacity check
     if e.get("max_capacity"):
         count = await db.event_rsvps.count_documents({"event_id": event_id})
         if count >= e["max_capacity"]:
-            raise HTTPException(400, "Event is full")
+            raise HTTPException(400, "Event is full — join the waitlist")
     await db.event_rsvps.insert_one({
         "id": new_id(), "event_id": event_id, "user_id": user["id"],
         "user_name": user["name"], "created_at": now_iso(),
@@ -288,6 +363,191 @@ async def rsvp(event_id: str, user: dict = Depends(get_current_user)):
 async def attendees(event_id: str, limit: int = 100):
     cursor = db.event_rsvps.find({"event_id": event_id}).sort("created_at", 1).limit(limit)
     return [strip_mongo(r) for r in await cursor.to_list(limit)]
+
+
+# ---------- Analytics (host-only) ----------
+@router.get("/{event_id}/analytics")
+async def event_analytics(event_id: str, user: dict = Depends(get_current_user)):
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    e = await db.events.find_one({"id": event_id})
+    if not e:
+        raise HTTPException(404, "Not found")
+    if e["host_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not yours")
+
+    rsvps = await db.event_rsvps.find({"event_id": event_id}).to_list(2000)
+    total = len(rsvps)
+    paid = sum(1 for r in rsvps if r.get("paid"))
+    refunded = sum(1 for r in rsvps if r.get("refunded"))
+    checked_in = sum(1 for r in rsvps if r.get("checked_in"))
+    revenue_gross = sum(float(r.get("amount") or 0) for r in rsvps if r.get("paid") and not r.get("refunded"))
+    revenue_refunded = sum(float(r.get("amount") or 0) for r in rsvps if r.get("refunded"))
+
+    # Fee estimate: use platform settings if available
+    try:
+        settings = await db.settings.find_one({"id": "platform"}) or {}
+        commission_pct = float(settings.get("commission_pct", 10)) / 100.0
+    except Exception:
+        commission_pct = 0.10
+    est_platform_fee = revenue_gross * commission_pct
+    net_to_host = max(0.0, revenue_gross - est_platform_fee)
+
+    # RSVP curve — count per day since creation
+    try:
+        created = _dt.fromisoformat(e["created_at"].replace("Z", "+00:00"))
+    except Exception:
+        created = _dt.now(_tz.utc) - _td(days=30)
+    today = _dt.now(_tz.utc).date()
+    days = max(1, (today - created.date()).days + 1)
+    days = min(days, 60)  # cap chart to 60 days
+    buckets = {}
+    for i in range(days):
+        d = today - _td(days=days - 1 - i)
+        buckets[d.isoformat()] = 0
+    for r in rsvps:
+        try:
+            d = _dt.fromisoformat(r["created_at"].replace("Z", "+00:00")).date().isoformat()
+            if d in buckets:
+                buckets[d] += 1
+        except Exception:
+            continue
+    curve = [{"date": k, "count": v} for k, v in buckets.items()]
+
+    waitlist_count = await db.event_waitlist.count_documents({"event_id": event_id, "notified": False})
+
+    return {
+        "event_id": event_id,
+        "title": e["title"],
+        "start_at": e.get("start_at"),
+        "total_rsvps": total,
+        "paid_rsvps": paid,
+        "free_rsvps": total - paid,
+        "refunded_rsvps": refunded,
+        "checked_in": checked_in,
+        "check_in_rate": round((checked_in / total) * 100.0, 1) if total else 0.0,
+        "capacity": e.get("max_capacity"),
+        "fill_rate": round((total / e["max_capacity"]) * 100.0, 1) if e.get("max_capacity") else None,
+        "waitlist": waitlist_count,
+        "revenue_gross": round(revenue_gross, 2),
+        "revenue_refunded": round(revenue_refunded, 2),
+        "platform_fee": round(est_platform_fee, 2),
+        "net_to_host": round(net_to_host, 2),
+        "rsvp_curve": curve,
+    }
+
+
+# ---------- Waitlist ----------
+@router.post("/{event_id}/waitlist")
+async def join_waitlist(event_id: str, user: dict = Depends(get_current_user)):
+    e = await db.events.find_one({"id": event_id})
+    if not e:
+        raise HTTPException(404, "Not found")
+    if e.get("cancelled"):
+        raise HTTPException(400, "Event was cancelled")
+    if not e.get("max_capacity"):
+        raise HTTPException(400, "This event has no capacity limit")
+    # Already RSVP'd?
+    if await db.event_rsvps.find_one({"event_id": event_id, "user_id": user["id"]}):
+        raise HTTPException(400, "You already have a ticket")
+    # Already on the list?
+    existing = await db.event_waitlist.find_one({"event_id": event_id, "user_id": user["id"]})
+    if existing:
+        await db.event_waitlist.delete_one({"_id": existing["_id"]})
+        return {"on_waitlist": False, "position": None}
+    await db.event_waitlist.insert_one({
+        "id": new_id(), "event_id": event_id, "user_id": user["id"],
+        "user_name": user["name"], "user_email": user.get("email"),
+        "notified": False, "created_at": now_iso(),
+    })
+    position = await db.event_waitlist.count_documents({"event_id": event_id, "notified": False})
+    return {"on_waitlist": True, "position": position}
+
+
+@router.get("/{event_id}/waitlist")
+async def list_waitlist(event_id: str, user: dict = Depends(get_current_user)):
+    """Host-only summary of who's on the waitlist."""
+    e = await db.events.find_one({"id": event_id})
+    if not e:
+        raise HTTPException(404, "Not found")
+    if e["host_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not yours")
+    cursor = db.event_waitlist.find({"event_id": event_id}).sort("created_at", 1).limit(200)
+    return [strip_mongo(r) for r in await cursor.to_list(200)]
+
+
+async def _promote_from_waitlist(e: dict) -> Optional[dict]:
+    """Notify the next un-notified user on the waitlist that a seat opened up."""
+    if not e.get("max_capacity"):
+        return None
+    filled = await db.event_rsvps.count_documents({"event_id": e["id"]})
+    if filled >= e["max_capacity"]:
+        return None
+    nxt = await db.event_waitlist.find_one({"event_id": e["id"], "notified": False}, sort=[("created_at", 1)])
+    if not nxt:
+        return None
+    await db.event_waitlist.update_one({"_id": nxt["_id"]}, {"$set": {"notified": True, "notified_at": now_iso()}})
+    await db.notifications.insert_one({
+        "id": new_id(), "user_id": nxt["user_id"], "kind": "event_waitlist_open",
+        "event_id": e["id"], "event_title": e["title"], "is_free": bool(e.get("is_free")),
+        "ticket_price": e.get("ticket_price"),
+        "read": False, "created_at": now_iso(),
+    })
+    # Push
+    try:
+        from push import send_push
+        import asyncio as _a
+        body = "A seat opened up — RSVP now" if e.get("is_free") else f"A seat opened up — grab it for ${int(e['ticket_price'] or 0):,}"
+        _a.create_task(send_push(
+            nxt["user_id"],
+            title=f"You're off the waitlist: {e['title']}",
+            body=body,
+            url=f"/events/{e['id']}",
+            kind="event_waitlist_open",
+        ))
+    except Exception:
+        pass
+    # Email invite
+    try:
+        from emails import send_email
+        html = _waitlist_invite_html(nxt.get("user_name") or "there", e)
+        import asyncio as _a2
+        if nxt.get("user_email"):
+            _a2.create_task(send_email(nxt["user_email"], f"A seat opened up: {e['title']}", html))
+    except Exception:
+        pass
+    return nxt
+
+
+def _waitlist_invite_html(user_name: str, e: dict) -> str:
+    from emails import _wrap
+    price = f"${e['ticket_price']:,.2f}" if not e.get("is_free") else "Free"
+    body = f"""
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  A seat opened up
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:24px">
+  Hey {user_name}, a spot just opened for <strong style="color:#fff">{e['title']}</strong>.
+  Grab it before someone else does.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+  style="background:rgba(204,255,0,0.08);border:1px solid rgba(204,255,0,0.3);border-radius:4px;margin-bottom:24px">
+  <tr><td style="padding:20px">
+    <div style="font-size:11px;color:#CCFF00;letter-spacing:2px;text-transform:uppercase">Your invite</div>
+    <div style="font-family:Impact,Arial Black,sans-serif;font-size:24px;color:#fff;margin-top:6px">{e['title']}</div>
+    <div style="font-size:12px;color:#a1a1aa;margin-top:10px">Price: {price}</div>
+  </td></tr>
+</table>
+
+<div style="margin-top:28px">
+  <a href="https://artcorestudio.net/events/{e['id']}" style="display:inline-block;background:#CCFF00;color:#000;
+     padding:12px 22px;text-decoration:none;font-family:Impact,Arial Black,sans-serif;
+     letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:2px">
+    Claim your seat →
+  </a>
+</div>
+"""
+    return _wrap(body, "Waitlist Invite")
 
 
 @router.get("/mine/tickets")

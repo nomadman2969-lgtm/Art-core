@@ -390,3 +390,44 @@ Full commerce system audit + upgrade:
 - `App.js` referenced undefined `ProtectedRoute` → replaced with the existing `RequireAuth`.
 
 
+
+## Recurring + Waitlist + Analytics (Mar 3, 2026)
+
+### Recurring Events
+- New `Recurrence` pydantic model: `{frequency: weekly|biweekly|monthly, count: 2-26}`.
+- `POST /events` with `recurrence` generates all sibling events in one call, sharing `series_id` and `series_seq/total` fields.
+- `DELETE /events/{id}?cancel_series=true` cancels every future sibling at once. Frontend prompts user to cancel whole series if event is part of one.
+- Frontend Create modal: **"Make it a recurring series"** checkbox → reveals Frequency select + Count input with live "Creates N events, each X days apart" hint.
+- Event detail page shows **"Session N/M in this series"** indicator.
+
+### Waitlist
+- `event_waitlist` collection with `{event_id, user_id, user_name, user_email, notified, created_at}`.
+- `POST /events/{id}/waitlist` — idempotent toggle; returns `{on_waitlist, position}`.
+- `GET /events/{id}/waitlist` — host-only summary.
+- `_promote_from_waitlist()` — when a free RSVP is cancelled OR a paid RSVP is refunded, notifies + emails + pushes the first un-notified user.
+- Frontend event detail: when event is full, RSVP button auto-swaps to a purple **"Join Waitlist"** button; once on the list, it shows position and lets them leave.
+- Email template `_waitlist_invite_html` matches the Art Core aesthetic — sent via Resend when a spot opens.
+
+### Event Analytics (host mini-dashboard)
+- `GET /events/{id}/analytics` — host/admin only. Returns:
+  - `total_rsvps`, `paid_rsvps`, `free_rsvps`, `refunded_rsvps`, `checked_in`, `check_in_rate` (%)
+  - `capacity`, `fill_rate` (%)
+  - `waitlist` count
+  - `revenue_gross`, `revenue_refunded`, `platform_fee` (uses live settings.commission_pct fallback 10%), `net_to_host`
+  - `rsvp_curve` — daily counts since event creation, capped at 60 days
+- Frontend: **"View analytics"** button in host sidebar opens a full modal with 4 stat boxes, revenue breakdown card (gross/fee/net), fill-rate progress bar, and a CSS-only bar chart of the RSVP curve.
+
+### Testing
+- Backend curl: recurring create → 3 sibling events; capacity full returns 400 "join the waitlist"; waitlist join returns position 1; analytics returns full payload for host, 403 for non-host.
+- Frontend screenshots: sold-out event with purple Join Waitlist + series indicator; analytics modal with 3 RSVPs / 100% fill rate; Create Event with recurrence checkbox active + live hint.
+
+## DNS Setup (user action) — pending
+- Go to Resend → Domains → Add `artcorestudio.net`.
+- Add 3 DNS records at your registrar:
+  - **TXT** at root: `v=spf1 include:_spf.resend.com ~all`
+  - **CNAME** at `resend._domainkey`: value provided in Resend
+  - **MX** at `send`: value provided in Resend (priority 10)
+- Wait ~5 min for propagation, click Verify in Resend.
+- Once verified, refund + ticket emails will send from `refunds@artcorestudio.net` instead of falling back to sandbox `onboarding@resend.dev`.
+
+
