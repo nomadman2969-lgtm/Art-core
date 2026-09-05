@@ -71,26 +71,16 @@ async def _enrich_attachment(att: Optional[dict]) -> Optional[dict]:
     return att
 
 
-@router.post("")
-async def send_message(req: SendReq, me: dict = Depends(get_current_user)):
-    if req.to_user_id == me["id"]:
-        raise HTTPException(400, "Cannot message yourself")
-    target = await db.users.find_one({"id": req.to_user_id})
+async def deliver_dm(sender: dict, to_user_id: str, text: str, attachment: Optional[dict] = None, notify: bool = True) -> dict:
+    """Insert a DM from `sender` to `to_user_id` with throttled notification + push. Reused by broadcasts."""
+    target = await db.users.find_one({"id": to_user_id})
     if not target:
         raise HTTPException(404, "User not found")
-    text = (req.text or "").strip()
-    if not text and not req.attachment:
-        raise HTTPException(400, "Message empty")
-    attachment = None
-    if req.attachment:
-        if req.attachment.kind not in ATTACHMENT_KINDS:
-            raise HTTPException(400, f"Unknown attachment kind: {req.attachment.kind}")
-        attachment = req.attachment.model_dump()
     msg = {
         "id": new_id(),
-        "thread_key": _thread_key(me["id"], req.to_user_id),
-        "from_id": me["id"], "from_name": me["name"],
-        "to_id": req.to_user_id, "to_name": target["name"],
+        "thread_key": _thread_key(sender["id"], to_user_id),
+        "from_id": sender["id"], "from_name": sender["name"],
+        "to_id": to_user_id, "to_name": target["name"],
         "text": text,
         "attachment": attachment,
         "read": False,
@@ -99,33 +89,49 @@ async def send_message(req: SendReq, me: dict = Depends(get_current_user)):
         "created_at": now_iso(),
     }
     await db.messages.insert_one(msg)
-    # Fire notification (throttled: at most one per hour per sender to avoid spam)
+    if not notify:
+        return msg
     from datetime import datetime, timezone, timedelta
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
     existing = await db.notifications.find_one({
-        "user_id": req.to_user_id, "kind": "new_message",
-        "from_user_id": me["id"], "created_at": {"$gte": cutoff},
+        "user_id": to_user_id, "kind": "new_message",
+        "from_user_id": sender["id"], "created_at": {"$gte": cutoff},
     })
     if not existing:
         await db.notifications.insert_one({
-            "id": new_id(), "user_id": req.to_user_id, "kind": "new_message",
-            "from_user_id": me["id"], "from_user_name": me["name"],
+            "id": new_id(), "user_id": to_user_id, "kind": "new_message",
+            "from_user_id": sender["id"], "from_user_name": sender["name"],
             "message_id": msg["id"], "preview": (text or f"Shared {attachment['kind']}")[:120],
             "read": False, "created_at": now_iso(),
         })
-        # Fire web push (fire-and-forget so send() is fast)
         try:
             from push import send_push
             import asyncio as _a
             _a.create_task(send_push(
-                req.to_user_id,
-                title=f"New message from {me['name']}",
+                to_user_id,
+                title=f"New message from {sender['name']}",
                 body=(text or f"Shared a {attachment['kind']}")[:140],
-                url=f"/messages/{me['id']}",
+                url=f"/messages/{sender['id']}",
                 kind="new_message",
             ))
         except Exception:
             pass
+    return msg
+
+
+@router.post("")
+async def send_message(req: SendReq, me: dict = Depends(get_current_user)):
+    if req.to_user_id == me["id"]:
+        raise HTTPException(400, "Cannot message yourself")
+    text = (req.text or "").strip()
+    if not text and not req.attachment:
+        raise HTTPException(400, "Message empty")
+    attachment = None
+    if req.attachment:
+        if req.attachment.kind not in ATTACHMENT_KINDS:
+            raise HTTPException(400, f"Unknown attachment kind: {req.attachment.kind}")
+        attachment = req.attachment.model_dump()
+    msg = await deliver_dm(me, req.to_user_id, text, attachment)
     out = strip_mongo(msg)
     out["attachment"] = await _enrich_attachment(out.get("attachment"))
     return out

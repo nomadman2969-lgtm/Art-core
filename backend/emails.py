@@ -169,3 +169,76 @@ def ticket_receipt_html(user_name: str, event_title: str, amount: float, event_w
 </div>
 """
     return _wrap(body, "Ticket Confirmation")
+
+
+def _fmt_when(iso_str: str) -> str:
+    from datetime import datetime as _dt
+    try:
+        return _dt.fromisoformat((iso_str or "").replace("Z", "+00:00")).strftime("%b %d, %Y · %-I:%M %p")
+    except Exception:
+        return iso_str or "TBA"
+
+
+def waitlist_position_html(user_name: str, event: dict, position: int) -> str:
+    where = ", ".join(x for x in [(event.get("location") or {}).get("address"), (event.get("location") or {}).get("city")] if x) or "TBA"
+    ordinal = f"#{position}"
+    body = f"""
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  You're on the list
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:24px">
+  Hey {user_name}, <strong style="color:#fff">{event['title']}</strong> is full right now — but you're queued.
+  We'll email you the moment a seat opens.
+</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+  style="background:rgba(124,58,237,0.10);border:1px solid rgba(124,58,237,0.35);border-radius:4px;margin-bottom:24px">
+  <tr><td style="padding:20px">
+    <div style="font-size:11px;color:#a78bfa;letter-spacing:2px;text-transform:uppercase">Your waitlist position</div>
+    <div style="font-family:Impact,Arial Black,sans-serif;font-size:56px;color:#fff;margin-top:6px;line-height:1">{ordinal}</div>
+    <div style="font-size:12px;color:#a1a1aa;margin-top:10px">📅 {_fmt_when(event.get('start_at'))}</div>
+    <div style="font-size:12px;color:#a1a1aa">📍 {where}</div>
+  </td></tr>
+</table>
+<div style="font-size:12px;color:#71717a">
+  Seats are offered in order. If the event is paid, you'll get a 15-minute checkout hold when it's your turn.
+</div>
+<div style="margin-top:28px">
+  <a href="https://artcorestudio.net/events/{event['id']}" style="display:inline-block;background:#CCFF00;color:#000;
+     padding:12px 22px;text-decoration:none;font-family:Impact,Arial Black,sans-serif;
+     letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:2px">
+    View event →
+  </a>
+</div>
+"""
+    return _wrap(body, "Waitlist Confirmation")
+
+
+def event_broadcast_html(user_name: str, host_name: str, event: dict, subject: str, message: str) -> str:
+    import html as _h
+    where = ", ".join(x for x in [(event.get("location") or {}).get("address"), (event.get("location") or {}).get("city")] if x) or "TBA"
+    safe_msg = _h.escape(message).replace("\n", "<br>")
+    body = f"""
+<div style="font-size:11px;color:#CCFF00;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">
+  Update from {_h.escape(host_name)}
+</div>
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:32px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  {_h.escape(subject)}
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:20px">
+  Hey {_h.escape(user_name)} — a message about <strong style="color:#fff">{_h.escape(event['title'])}</strong>:
+</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+  style="background:rgba(255,255,255,0.04);border-left:3px solid #CCFF00;border-radius:2px;margin-bottom:24px">
+  <tr><td style="padding:18px 20px;font-size:14px;color:#e5e7eb;line-height:1.7">{safe_msg}</td></tr>
+</table>
+<div style="font-size:12px;color:#a1a1aa">📅 {_fmt_when(event.get('start_at'))}</div>
+<div style="font-size:12px;color:#a1a1aa">📍 {_h.escape(where)}</div>
+<div style="margin-top:28px">
+  <a href="https://artcorestudio.net/events/{event['id']}" style="display:inline-block;background:#CCFF00;color:#000;
+     padding:12px 22px;text-decoration:none;font-family:Impact,Arial Black,sans-serif;
+     letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:2px">
+    Open event →
+  </a>
+</div>
+"""
+    return _wrap(body, "Event Update")
