@@ -52,6 +52,9 @@ const KIND_META = {
   event_cancelled: { label: "An event was cancelled", icon: <MapPin size={14} />, color: "#FF4D4D" },
   event_ticket_paid: { label: "Ticket purchased", icon: <Check size={14} />, color: "#CCFF00" },
   event_reminder: { label: "Event happening soon", icon: <MapPin size={14} />, color: "#F5A623" },
+  event_waitlist_joined: { label: "You're on the waitlist", icon: <MapPin size={14} />, color: "#7C3AED" },
+  event_waitlist_open: { label: "A seat opened up", icon: <MapPin size={14} />, color: "#CCFF00" },
+  event_broadcast: { label: "Message from event host", icon: <MapPin size={14} />, color: "#7C3AED" },
 };
 
 export default function Notifications() {
@@ -211,6 +214,8 @@ export default function Notifications() {
                       {n.other?.name && (n.artwork?.title || n.commission?.subject) && <span className="text-zinc-500"> · </span>}
                       {n.artwork?.title && <span>{n.artwork.title}</span>}
                       {n.commission?.subject && <span>{n.commission.subject}</span>}
+                      {n.event_title && !n.artwork?.title && <span>{n.other?.name ? " · " : ""}{n.event_title}{n.position ? ` · #${n.position}` : ""}</span>}
+                      {n.preview && n.kind === "event_broadcast" && <span className="text-zinc-500"> — {n.preview}</span>}
                       {n.amount != null && <span className="ml-2 text-[#CCFF00] font-anton">${Number(n.amount).toLocaleString()}</span>}
                     </div>
                   </div>

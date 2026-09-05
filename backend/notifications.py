@@ -57,7 +57,8 @@ async def _enrich(n: dict) -> dict:
     # New social kinds (comment reply, new comment, artwork share, post like/comment, mentions, DM)
     if kind in ("new_comment", "comment_reply", "artwork_shared",
                 "mentioned_in_comment", "mentioned_in_post_comment", "mentioned_in_post",
-                "post_liked", "post_comment", "new_message"):
+                "post_liked", "post_comment", "new_message",
+                "event_broadcast", "event_rsvp", "event_ticket_paid"):
         if n.get("from_user_id"):
             u = await db.users.find_one({"id": n["from_user_id"]})
             if u:
@@ -156,6 +157,7 @@ KIND_TO_CATEGORY = {
     "new_review": "post",
     "event_rsvp": "event", "event_cancelled": "event",
     "event_reminder": "event", "event_ticket_paid": "event",
+    "event_waitlist_open": "event", "event_waitlist_joined": "event", "event_broadcast": "event",
 }
 
 

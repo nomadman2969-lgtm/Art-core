@@ -421,7 +421,40 @@ Full commerce system audit + upgrade:
 - Backend curl: recurring create → 3 sibling events; capacity full returns 400 "join the waitlist"; waitlist join returns position 1; analytics returns full payload for host, 403 for non-host.
 - Frontend screenshots: sold-out event with purple Join Waitlist + series indicator; analytics modal with 3 RSVPs / 100% fill rate; Create Event with recurrence checkbox active + live hint.
 
-## DNS Setup (user action) — pending
+## Demo World + Attendee Broadcast + Waitlist Emails + Series Reminders (Mar 5, 2026)
+
+### Demo World (`backend/seed_demo.py`)
+- Run: `cd /app/backend && python seed_demo.py [--wipe-tests] [--no-images]`. Idempotent — every doc carries `seed: "demo_v1"` and is replaced on re-run. Generated images cached in `demo_assets` (47 images via Gemini `gemini-3.1-flash-image-preview`, stored in Emergent object storage under `house-of-monster/demo/*.jpg`, registered in `files` so `/api/files/...` serves them).
+- 8 fictional artists (Kai Rivera, Yuki Tanaka, Marisol Vega, Theo Lindqvist, Amara Okafor, Dex Morrow, Inês Duarte + Demo Artist) w/ avatars, studio configs, bios; 3 collectors (Jordan, Priya, Luca). Passwords: artists `DemoArtist2026!`, collectors `DemoCollector2026!`.
+- 27 artworks (live/sold/prints), 16 feed posts (WIP/sold/exhibition/auction/…), 8 auctions (3 live incl. one ending <1h, 2 scheduled, 3 ended), 5 offers, 5 commissions across all stages, 4 orders (+2 reviews), 10 events (paid rooftop show w/ 8 tickets, full battle w/ waitlist, 4-part weekly series, past checked-in open studio…), DMs, follows, likes, comments, saves, notifications for both demo protagonists.
+- `--wipe-tests` deleted ~210 junk accounts from earlier automated runs (domains @test.com/@t.com/@t.io/@x.com/@test.io/@example.com) + orphans. Real user accounts untouched.
+
+### Attendee Broadcast
+- `POST /api/events/{id}/broadcast` (host/admin) `{subject, message, via_dm, via_email, include_waitlist}` → DMs (via new `messages.deliver_dm()` helper), Resend email (`event_broadcast_html`), push + in-app notification (`event_broadcast`) to every non-refunded RSVP (+ waitlist optional), delivered concurrently via `asyncio.gather`. History stored in `event_broadcasts`, `GET /api/events/{id}/broadcasts`.
+- Frontend: `components/events/BroadcastModal.js` — opened from **Message attendees** button in host sidebar; channel toggles, sent history.
+
+### Waitlist Position Email
+- `join_waitlist` now emails `waitlist_position_html` ("You're #N") + inserts `event_waitlist_joined` notification with `position`.
+
+### Series-level Reminders Toggle
+- `reminders_enabled` (default true) on events; settable at create (`event-reminders` checkbox), in Edit modal (`edit-reminders`, respects apply_to=series), and via one-tap **Reminders on/off · series** sidebar button (`reminders-toggle-btn`). `check_event_reminders()` skips events with `reminders_enabled == False`.
+
+### Misc
+- Event modals bumped to `z-[1200]` (Leaflet panes were bleeding through the backdrop).
+- Refund code in `_cancel_single_event` de-tangled; CSV media type now `text/csv; charset=utf-8`.
+- New notification kinds in `Notifications.js`: event_waitlist_joined, event_waitlist_open, event_broadcast.
+
+### Testing — iteration_13: 33/33 backend + 100% frontend (first automated pass over the whole Events/Ticketing system). `/app/backend/tests/test_iter13_events_broadcast_waitlist.py`.
+
+### ⚠️ DNS still pending (BLOCKING all customer emails)
+Resend domain `artcorestudio.net` status = `not_started`. Sandbox only delivers to the account owner's inbox, so receipts/refunds/waitlist/broadcast emails currently fail for everyone else. Records to add at the registrar (from Resend):
+- TXT `resend._domainkey` → `p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrbwb3RNufXiQzWnJJXaEHWq0Atvdz…` (copy full value from Resend)
+- CNAME `send` → `send.forge.rmta.net`
+- CNAME `rsend` → `rsend.forge.rmta.net`
+Then click Verify in Resend → Domains.
+
+### Competition punch list → `/app/memory/COMPETITION_PUNCHLIST.md`
+
 - Go to Resend → Domains → Add `artcorestudio.net`.
 - Add 3 DNS records at your registrar:
   - **TXT** at root: `v=spf1 include:_spf.resend.com ~all`

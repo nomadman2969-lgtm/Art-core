@@ -2,10 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { Calendar, Users, MapPin, ArrowLeft, Trash2, Loader2, QrCode, CheckCircle2, Clock, TrendingUp, DollarSign, X } from "lucide-react";
+import { Calendar, Users, MapPin, ArrowLeft, Trash2, Loader2, QrCode, CheckCircle2, Clock, TrendingUp, DollarSign, X, Megaphone, Bell, BellOff } from "lucide-react";
 import { toast } from "sonner";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { BroadcastModal } from "../components/events/BroadcastModal";
 
 const catColor = { gallery_opening: "#D4AF37", pop_up: "#FF4D4D", festival: "#FF6EC7", meetup: "#7C3AED", workshop: "#00E5FF", live_painting: "#F5A623", virtual: "#CCFF00", market: "#00E5FF" };
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
@@ -24,6 +25,18 @@ export default function EventDetail() {
   const [analytics, setAnalytics] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
+
+  const toggleReminders = async () => {
+    const next = ev.reminders_enabled === false;
+    setBusy(true);
+    try {
+      await api.patch(`/events/${id}`, { reminders_enabled: next, apply_to: ev.series_id ? "series" : "this" });
+      setEv((e) => ({ ...e, reminders_enabled: next }));
+      toast.success(next ? `Reminders on${ev.series_id ? " for the whole series" : ""}` : `Reminders off${ev.series_id ? " for the whole series" : ""}`);
+    } catch { toast.error("Failed"); }
+    setBusy(false);
+  };
 
   const load = () => {
     setLoading(true);
@@ -211,6 +224,15 @@ export default function EventDetail() {
                 className="btn-ghost w-full flex items-center justify-center gap-2 text-xs">
                 Edit event
               </button>
+              <button data-testid="broadcast-btn" onClick={() => setShowBroadcast(true)}
+                className="btn-ghost !text-[#7C3AED] !border-[#7C3AED]/40 w-full flex items-center justify-center gap-2 text-xs">
+                <Megaphone size={12} /> Message attendees
+              </button>
+              <button data-testid="reminders-toggle-btn" onClick={toggleReminders} disabled={busy}
+                className={`btn-ghost w-full flex items-center justify-center gap-2 text-xs ${ev.reminders_enabled === false ? "!text-zinc-500" : "!text-[#F5A623] !border-[#F5A623]/40"}`}>
+                {ev.reminders_enabled === false ? <BellOff size={12} /> : <Bell size={12} />}
+                {ev.reminders_enabled === false ? "Reminders off" : "Reminders on"}{ev.series_id ? " · series" : ""}
+              </button>
               <button data-testid="show-analytics-btn" onClick={loadAnalytics}
                 className="btn-ghost !text-[#CCFF00] !border-[#CCFF00]/40 w-full flex items-center justify-center gap-2 text-xs">
                 <TrendingUp size={12} /> View analytics
@@ -273,6 +295,9 @@ export default function EventDetail() {
       )}
       {showEdit && (
         <EditEventModal ev={ev} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); load(); }} />
+      )}
+      {showBroadcast && (
+        <BroadcastModal ev={ev} attendeeCount={attendees.length} onClose={() => setShowBroadcast(false)} />
       )}
     </div>
   );
@@ -413,7 +438,7 @@ function AnalyticsModal({ analytics, onClose }) {
 
   return (
     <div onClick={onClose} data-testid="analytics-modal"
-      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+      className="fixed inset-0 z-[1200] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
       <div onClick={(e) => e.stopPropagation()} className="bg-[#121214] border border-white/10 rounded-sm w-full max-w-2xl my-auto">
         <div className="flex items-center justify-between p-4 border-b border-white/8">
           <div className="flex items-center gap-2">
@@ -528,6 +553,7 @@ function EditEventModal({ ev, onClose, onSaved }) {
     end_at: ev.end_at ? ev.end_at.slice(0, 16) : "",
     max_capacity: ev.max_capacity || "",
     is_free: !!ev.is_free, ticket_price: ev.ticket_price || "",
+    reminders_enabled: ev.reminders_enabled !== false,
     apply_to: "this",
   });
   const [busy, setBusy] = useState(false);
@@ -544,6 +570,7 @@ function EditEventModal({ ev, onClose, onSaved }) {
         is_free: form.is_free,
         ticket_price: form.is_free ? null : parseFloat(form.ticket_price) || 0,
         max_capacity: form.max_capacity ? parseInt(form.max_capacity, 10) : null,
+        reminders_enabled: form.reminders_enabled,
         apply_to: form.apply_to,
       };
       // start/end only when editing single occurrence (backend ignores on series)
@@ -562,7 +589,7 @@ function EditEventModal({ ev, onClose, onSaved }) {
 
   return (
     <div onClick={onClose} data-testid="edit-event-modal"
-      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+      className="fixed inset-0 z-[1200] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
       <div onClick={(e) => e.stopPropagation()} className="bg-[#121214] border border-white/10 rounded-sm w-full max-w-xl my-auto">
         <div className="flex items-center justify-between p-4 border-b border-white/8">
           <div className="font-unbounded font-semibold">Edit event</div>
@@ -620,6 +647,11 @@ function EditEventModal({ ev, onClose, onSaved }) {
             <input data-testid="edit-price" type="number" step="0.01" placeholder="Ticket price"
               value={form.ticket_price} onChange={(e) => setF("ticket_price", e.target.value)} className={inputCls} />
           )}
+          <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <input data-testid="edit-reminders" type="checkbox" checked={form.reminders_enabled}
+              onChange={(e) => setF("reminders_enabled", e.target.checked)} />
+            Send 24h + 1h reminders to attendees{inSeries && form.apply_to === "series" ? " (every occurrence)" : ""}
+          </label>
           <button data-testid="edit-submit" type="submit" disabled={busy}
             className="btn-lime w-full !py-3 mt-2 flex items-center justify-center gap-2">
             {busy ? <Loader2 size={14} className="animate-spin" /> : null}

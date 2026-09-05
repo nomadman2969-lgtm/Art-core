@@ -323,6 +323,7 @@ function CreateEventModal({ onClose, onCreated }) {
     cover_image: null,
     // recurrence
     recurring: false, freq: "weekly", count: 4,
+    reminders_enabled: true,
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -382,6 +383,7 @@ function CreateEventModal({ onClose, onCreated }) {
         is_free: form.is_free,
         ticket_price: form.is_free ? null : parseFloat(form.ticket_price) || 0,
         recurrence: form.recurring ? { frequency: form.freq, count: Math.max(2, Math.min(26, Number(form.count) || 2)) } : null,
+        reminders_enabled: form.reminders_enabled,
       };
       await api.post("/events", payload);
       toast.success("Event created");
@@ -394,7 +396,7 @@ function CreateEventModal({ onClose, onCreated }) {
 
   return (
     <div data-testid="create-event-modal" onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+      className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
       <div onClick={(e) => e.stopPropagation()} className="bg-[#121214] border border-white/10 rounded-sm w-full max-w-2xl my-auto">
         <div className="flex items-center justify-between p-4 border-b border-white/8">
           <div className="font-unbounded font-semibold">Host an event</div>
@@ -477,6 +479,11 @@ function CreateEventModal({ onClose, onCreated }) {
                 </div>
               </div>
             )}
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              <input data-testid="event-reminders" type="checkbox" checked={form.reminders_enabled}
+                onChange={(e) => setF("reminders_enabled", e.target.checked)} />
+              Send 24h + 1h reminders to attendees{form.recurring ? " (every occurrence)" : ""}
+            </label>
           </div>
           <button data-testid="event-submit" type="submit" disabled={saving}
             className="btn-lime w-full !py-3 flex items-center justify-center gap-2">

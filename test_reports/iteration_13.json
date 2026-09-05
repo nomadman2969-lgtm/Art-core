@@ -1,0 +1,34 @@
+{
+  "summary": "Iter 13 full backend + frontend testing of the Events & Ticketing system, host Broadcast (DM+email+push), Waitlist position confirmation, series-level reminders toggle, and demo world sanity. 34 backend tests (33 passed, 1 skipped because demo collector already has a paid ticket — expected). All frontend flows verified on real preview URL with demo-artist and demo-collector one-tap sign-ins.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter13_events_broadcast_waitlist.py",
+    "/app/test_reports/pytest/iter13_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "events.py is now 1091 lines and mixes 8+ concerns (CRUD, waitlist promotion + Stripe holds, analytics, CSV, QR, check-in, broadcast, reminder scheduler, HTML email helper). Recommend splitting into events_core.py / events_waitlist.py / events_broadcast.py / events_analytics.py for maintainability — well past the 700-line guideline.",
+    "events.py list_events() opportunistically triggers check_event_reminders() and _sweep_expired_holds() on every GET /api/events call. Fine for low traffic but this creates a self-DoS risk at scale (each anonymous /events request does N event lookups + potential Stripe API calls). Should move to a proper APScheduler background job.",
+    "events.py:243 _cancel_single_event has a bizarre inline conditional expression `_stripe.Refund.create(...) if tx.get('payment_intent') else _stripe.checkout.Session.retrieve(...)` — the else branch's return value is discarded, and the actual refund logic runs a second time in the `if not tx.get('payment_intent')` block below. The first ternary is essentially dead code / confusingly written. Refactor to clean if/else.",
+    "events.py broadcast() sends push AND writes notification AND emails inside the request loop, awaiting deliver_dm per attendee sequentially. For an event with 500 attendees this endpoint will time out. Should batch via asyncio.gather or push all to a background task.",
+    "broadcast() records `recipients: len(recipients)` in the persisted broadcast doc but the actual DM/email counters can be lower on partial failure — history 'sent to N people' UI copy can mislead. Consider distinguishing 'targeted' vs 'delivered'.",
+    "check_event_reminders() checks `e.get('reminders_enabled') is False` — this correctly treats missing field (legacy events pre-flag) as enabled. Good.",
+    "The events analytics.csv endpoint uses `PlainTextResponse` with media_type='text/csv'. This works but response.status_code default 200 and no explicit encoding declared. Add charset=utf-8 to media_type for non-ASCII names.",
+    "waitlist_position_html email is fire-and-forget via asyncio.create_task — swallows all exceptions silently. Sensible given Resend sandbox, but log the exception at debug level for future observability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter13_events_broadcast_waitlist.py"
+  ],
+  "success_rate": {"backend": "100% (33/33 passed, 1 skipped by design)", "frontend": "100%"},
+  "test_credentials": "Used seeded /app/memory/test_credentials.md accounts: demo.artist@artcorestudio.net, demo.collector@artcorestudio.net, monster@houseofmonster.com, kai@demo.artcorestudio.net — all confirmed working.",
+  "seed_data_creation": "Tests create/delete only TEST13-prefixed events (throwaway free-events, one weekly-recurring series of 3, one to-be-deleted). All seeded demo events untouched except reversible toggles: (a) reminders_enabled on Sunday Sketch Club flipped OFF then back ON, (b) reminders_enabled on a demo-artist single event flipped and restored, (c) demo collector's Live Painting Battle waitlist entry — LEFT ON WAITLIST as instructed (verified UI shows 'ON WAITLIST · #2 · LEAVE').",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend token key is 'token' (from /api/auth/login response), stored client-side under localStorage['hom_token']. All events routes under /api/events. Broadcast endpoint: POST /api/events/{id}/broadcast, history GET /api/events/{id}/broadcasts. Waitlist toggle: POST /api/events/{id}/waitlist. Payments buy ticket requires body {origin_url: '...'}. Trending endpoint /api/events/lists/trending — Neon Rooftop currently top-3 (was #1 at test time). Note: /api/auctions live count fluctuates as auctions end in real time — assert >= 3 total, not exactly '3 live'. TEST13 free rsvp event may leak into demo collector's Past tab as CANCELLED+CHECKED IN — expected artifact from RSVP+check-in+delete integration test.",
+  "rca of the issue": "N/A — no regressions or bugs found. Three initial test failures were self-inflicted (subject min_length=2 violation, missing origin_url in payments payload, event description min_length=3 violation) and were fixed in the test file."
+}

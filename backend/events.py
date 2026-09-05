@@ -50,6 +50,7 @@ class EventCreate(BaseModel):
     is_free: bool = True
     ticket_price: Optional[float] = Field(default=None, ge=0)
     recurrence: Optional[Recurrence] = None
+    reminders_enabled: bool = True
 
     @field_validator("category")
     @classmethod
@@ -108,6 +109,7 @@ async def create_event(req: EventCreate, user: dict = Depends(require_role("arti
             "series_id": series_id,
             "series_seq": seq if series_id else None,
             "series_total": total if series_id else None,
+            "reminders_enabled": req.reminders_enabled,
             "created_at": now_iso(),
         }
 
@@ -233,17 +235,10 @@ async def _cancel_single_event(e: dict, user: dict) -> dict:
             }).to_list(2000)
             for tx in paid_txs:
                 try:
-                    _stripe.Refund.create(
-                        payment_intent=tx.get("payment_intent"),
-                        checkout_session=tx.get("session_id") if not tx.get("payment_intent") else None,
-                        reverse_transfer=True,
-                        refund_application_fee=True,
-                    ) if tx.get("payment_intent") else _stripe.checkout.Session.retrieve(tx["session_id"], expand=["payment_intent"])
-                    # If we don't have payment_intent stored, retrieve+refund
-                    if not tx.get("payment_intent"):
-                        s = _stripe.checkout.Session.retrieve(tx["session_id"])
-                        pi = s.payment_intent
-                        _stripe.Refund.create(payment_intent=pi, reverse_transfer=True, refund_application_fee=True)
+                    pi = tx.get("payment_intent")
+                    if not pi:
+                        pi = _stripe.checkout.Session.retrieve(tx["session_id"]).payment_intent
+                    _stripe.Refund.create(payment_intent=pi, reverse_transfer=True, refund_application_fee=True)
                     await db.payment_transactions.update_one(
                         {"id": tx["id"]},
                         {"$set": {"refunded": True, "refunded_at": now_iso(), "payment_status": "refunded"}},
@@ -499,7 +494,7 @@ async def event_analytics_csv(event_id: str, kind: str = "attendees", user: dict
 
     return PlainTextResponse(
         content=buf.getvalue(),
-        media_type="text/csv",
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
     )
 
@@ -528,6 +523,20 @@ async def join_waitlist(event_id: str, user: dict = Depends(get_current_user)):
         "notified": False, "created_at": now_iso(),
     })
     position = await db.event_waitlist.count_documents({"event_id": event_id, "notified": False})
+    # Confirmation email: "you're #N on the waitlist"
+    if user.get("email"):
+        try:
+            from emails import send_email, waitlist_position_html
+            import asyncio as _a
+            _a.create_task(send_email(user["email"], f"You're #{position} on the waitlist: {e['title']}",
+                                      waitlist_position_html(user["name"], strip_mongo(e), position)))
+        except Exception:
+            pass
+    await db.notifications.insert_one({
+        "id": new_id(), "user_id": user["id"], "kind": "event_waitlist_joined",
+        "event_id": event_id, "event_title": e["title"], "position": position,
+        "read": False, "created_at": now_iso(),
+    })
     return {"on_waitlist": True, "position": position}
 
 
@@ -749,6 +758,7 @@ class EventUpdate(BaseModel):
     max_capacity: Optional[int] = Field(default=None, ge=1, le=100000)
     is_free: Optional[bool] = None
     ticket_price: Optional[float] = Field(default=None, ge=0)
+    reminders_enabled: Optional[bool] = None
     apply_to: str = "this"  # "this" | "series"
 
     @field_validator("category")
@@ -784,6 +794,7 @@ async def edit_event(event_id: str, req: EventUpdate, user: dict = Depends(get_c
     if req.max_capacity is not None: patch["max_capacity"] = req.max_capacity
     if req.is_free is not None: patch["is_free"] = req.is_free
     if req.ticket_price is not None: patch["ticket_price"] = req.ticket_price
+    if req.reminders_enabled is not None: patch["reminders_enabled"] = req.reminders_enabled
     # is_free/ticket_price consistency
     if patch.get("is_free") is True:
         patch["ticket_price"] = None
@@ -941,6 +952,87 @@ async def check_in(event_id: str, req: CheckInReq, user: dict = Depends(get_curr
     return {"ok": True, "user_name": rsvp.get("user_name"), "checked_in_at": now_iso()}
 
 
+# ---------- Host broadcast to attendees (DM + email + push) ----------
+class BroadcastReq(BaseModel):
+    subject: str = Field(min_length=2, max_length=120)
+    message: str = Field(min_length=2, max_length=2000)
+    via_dm: bool = True
+    via_email: bool = True
+    include_waitlist: bool = False
+
+
+@router.post("/{event_id}/broadcast")
+async def broadcast(event_id: str, req: BroadcastReq, user: dict = Depends(get_current_user)):
+    ev = await db.events.find_one({"id": event_id})
+    if not ev:
+        raise HTTPException(404, "Not found")
+    if ev["host_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Only the host can message attendees")
+    if not req.via_dm and not req.via_email:
+        raise HTTPException(400, "Pick at least one channel")
+
+    recipients: dict = {}
+    for r in await db.event_rsvps.find({"event_id": event_id, "refunded": {"$ne": True}}).to_list(5000):
+        recipients[r["user_id"]] = "attendee"
+    if req.include_waitlist:
+        for w in await db.event_waitlist.find({"event_id": event_id}).to_list(2000):
+            recipients.setdefault(w["user_id"], "waitlist")
+    recipients.pop(user["id"], None)
+
+    from messages import deliver_dm
+    from emails import send_email, event_broadcast_html
+    from push import send_push
+    import asyncio as _a
+    ev_clean = strip_mongo(ev)
+    dm_text = f"📣 {req.subject}\n\n{req.message}\n\nEvent: {ev['title']}"
+    sent = {"recipients": len(recipients), "dm": 0, "email": 0}
+
+    async def _deliver(uid: str):
+        u = await db.users.find_one({"id": uid})
+        if not u:
+            return
+        if req.via_dm:
+            try:
+                await deliver_dm(user, uid, dm_text, notify=False)
+                sent["dm"] += 1
+            except Exception:
+                pass
+        if req.via_email and u.get("email"):
+            _a.create_task(send_email(u["email"], f"{ev['title']}: {req.subject}",
+                                      event_broadcast_html(u["name"], user["name"], ev_clean, req.subject, req.message)))
+            sent["email"] += 1
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": uid, "kind": "event_broadcast",
+            "event_id": event_id, "event_title": ev["title"],
+            "from_user_id": user["id"], "from_user_name": user["name"],
+            "preview": f"{req.subject} — {req.message}"[:140],
+            "read": False, "created_at": now_iso(),
+        })
+        _a.create_task(send_push(uid, title=f"{ev['title']}: {req.subject}", body=req.message[:140],
+                                 url=f"/events/{event_id}", kind="event_broadcast"))
+
+    await _a.gather(*(_deliver(uid) for uid in recipients))
+
+    record = {
+        "id": new_id(), "event_id": event_id, "host_id": user["id"], "host_name": user["name"],
+        "subject": req.subject, "message": req.message, "via_dm": req.via_dm, "via_email": req.via_email,
+        "include_waitlist": req.include_waitlist, **sent, "created_at": now_iso(),
+    }
+    await db.event_broadcasts.insert_one(record)
+    return strip_mongo(record)
+
+
+@router.get("/{event_id}/broadcasts")
+async def list_broadcasts(event_id: str, user: dict = Depends(get_current_user)):
+    ev = await db.events.find_one({"id": event_id})
+    if not ev:
+        raise HTTPException(404, "Not found")
+    if ev["host_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Not yours")
+    cursor = db.event_broadcasts.find({"event_id": event_id}).sort("created_at", -1).limit(50)
+    return [strip_mongo(b) for b in await cursor.to_list(50)]
+
+
 # ---------- Reminder scheduler ----------
 async def check_event_reminders():
     """Fire push at 24h and 1h before start_at. Idempotent via marker fields on the event."""
@@ -953,6 +1045,8 @@ async def check_event_reminders():
     })
     events = await cursor.to_list(200)
     for e in events:
+        if e.get("reminders_enabled") is False:
+            continue
         try:
             start = _dt.fromisoformat(e["start_at"].replace("Z", "+00:00"))
         except Exception:
