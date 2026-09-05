@@ -95,6 +95,7 @@ export default function Layout({ children }) {
                 {(user.role === "artist" || user.role === "admin") && <Link to="/selling" data-testid="nav-selling" className="label-caps hover:text-[#CCFF00]">Selling</Link>}
                 {user.role === "buyer" && <Link to="/dashboard" data-testid="nav-dashboard" className="label-caps hover:text-[#CCFF00]">Dashboard</Link>}
                 <Link to="/orders" data-testid="nav-orders" className="label-caps hover:text-[#CCFF00]">Orders</Link>
+                <Link to="/tickets" data-testid="nav-tickets" className="label-caps hover:text-[#CCFF00]">Tickets</Link>
                 <Link to="/feed" data-testid="nav-feed" className="label-caps hover:text-[#CCFF00]">Feed</Link>
                 <Link to="/saved" data-testid="nav-saved" className="label-caps hover:text-[#CCFF00]">Saved</Link>
                 <Link to="/offers" data-testid="nav-offers" className="label-caps hover:text-[#CCFF00]">Offers</Link>

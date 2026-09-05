@@ -352,3 +352,41 @@ Full commerce system audit + upgrade:
 - Frontend screenshots: QR + check-in panel rendering on event detail; upcoming events rail rendering on home feed with mixed free/paid cards.
 
 
+
+## QR Scanner + Wallet + Refund Emails + Trending (Mar 2, 2026)
+
+### QR Camera Scanner
+- Installed `html5-qrcode`. Host check-in panel on `/events/:id` now has **Scan / Paste** mode toggle.
+- Scan mode: uses rear-facing camera via `Html5Qrcode`, decodes 10fps, auto-submits check-in. Debounced to prevent duplicate submits within 1.5s.
+- Graceful fallback: camera denied / unavailable auto-switches to Paste mode with toast.
+- Last-check-in banner shows checked-in / already / error states with color.
+
+### Ticket Wallet (`/tickets`)
+- New backend `GET /api/events/mine/tickets?upcoming_only=<bool>` — every RSVP for the current user with event + payment + check-in state.
+- New `/tickets` page + **TICKETS** nav link (top nav, next to Orders).
+- Upcoming / Past & Cancelled tabs; ticket cards show cover, category chip, price/refunded/checked-in badges, date, city, and a **Show QR** button.
+- QR modal is a white-background presentation-mode ticket (attendee name + short ID) — pull-QR on demand.
+
+### Refund Emails (Resend)
+- Installed `resend`. New `/app/backend/emails.py` with `send_email(to, subject, html)` (non-blocking via `asyncio.to_thread`, graceful fallback from `refunds@artcorestudio.net` → sandbox `onboarding@resend.dev` if the custom domain isn't yet DNS-verified).
+- Templates: `refund_email_html()` (event cancellation), `ticket_receipt_html()` (successful purchase). Both use table-based inline-CSS HTML styled to match the Art Core dark aesthetic with the lime accent.
+- Triggered from `events.cancel_event()` for every paid RSVP + from `payments._apply_paid()` for `event_ticket` kind (buyer receipt).
+- All sends fire-and-forget so payment/cancel latency is unaffected.
+- `.env` keys: `RESEND_API_KEY`, `SENDER_EMAIL=refunds@artcorestudio.net`, `SENDER_FALLBACK=onboarding@resend.dev`.
+- Delivery verified against Resend's `delivered@resend.dev` test inbox → returned message id.
+
+### Event Trending
+- New `GET /api/events/lists/trending` — scores upcoming events by:
+  `(recent_rsvps_48h × 3 + total_rsvps) × soon_boost` where `soon_boost = 1.0 → 2.0` as event date approaches (7d window). Optional `near_lat`, `near_lng`, `radius_km` filter.
+- HomeFeed rail now uses this endpoint (still location-aware).
+- Rail card gets a red **🔥 Trending** badge when `recent_rsvps_48h >= 3`.
+- Rail title changed to **Trending Events**.
+
+### Testing
+- Backend curl: trending endpoint returns ordered list (Neon Rooftop Party ranked 1st with score 4.0 vs 0.0 for others); my/tickets returns admin's RSVP; Resend send returned `True` via test inbox.
+- Frontend screenshots: Tickets wallet with upcoming card, white QR modal, home feed with Trending header + top-scoring event ranked first.
+
+### Bug fix
+- `App.js` referenced undefined `ProtectedRoute` → replaced with the existing `RequireAuth`.
+
+

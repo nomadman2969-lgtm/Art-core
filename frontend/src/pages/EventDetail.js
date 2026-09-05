@@ -226,39 +226,109 @@ function HostCheckIn({ eventId, onCheckedIn }) {
   const [payload, setPayload] = useState("");
   const [busy, setBusy] = useState(false);
   const [last, setLast] = useState(null);
+  const [mode, setMode] = useState("scan"); // scan | manual
+  const [scannerReady, setScannerReady] = useState(false);
+  const scannerRef = React.useRef(null);
+  const html5QrRef = React.useRef(null);
+  const inFlightRef = React.useRef(false);
 
-  const submit = async (e) => {
-    e?.preventDefault?.();
-    if (!payload.trim()) return;
+  const doCheckIn = async (rawPayload) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setBusy(true);
     try {
-      const r = await api.post(`/events/${eventId}/check-in`, { qr_payload: payload.trim() });
+      const r = await api.post(`/events/${eventId}/check-in`, { qr_payload: rawPayload.trim() });
       setLast({ name: r.data.user_name, already: !!r.data.already });
       toast.success(r.data.already ? `${r.data.user_name} was already checked in` : `Checked in ${r.data.user_name}`);
-      setPayload("");
       onCheckedIn?.();
     } catch (er) {
-      toast.error(er?.response?.data?.detail || "Invalid ticket");
+      const msg = er?.response?.data?.detail || "Invalid ticket";
+      setLast({ name: msg, already: false, error: true });
+      toast.error(msg);
     }
+    setTimeout(() => { inFlightRef.current = false; }, 1500);
     setBusy(false);
+  };
+
+  // Attach camera scanner
+  useEffect(() => {
+    if (mode !== "scan") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        if (cancelled) return;
+        if (!scannerRef.current) return;
+        const inst = new Html5Qrcode(scannerRef.current.id);
+        html5QrRef.current = inst;
+        await inst.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 220, height: 220 } },
+          (decodedText) => { doCheckIn(decodedText); },
+          () => { /* ignore per-frame decode errors */ },
+        );
+        setScannerReady(true);
+      } catch (e) {
+        setScannerReady(false);
+        // Camera denied / unavailable — offer manual fallback
+        setMode("manual");
+        toast("Camera unavailable — paste ticket code instead");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      const inst = html5QrRef.current;
+      if (inst) {
+        inst.stop().then(() => inst.clear()).catch(() => null);
+        html5QrRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  const submitManual = async (e) => {
+    e?.preventDefault?.();
+    if (!payload.trim()) return;
+    await doCheckIn(payload);
+    setPayload("");
   };
 
   return (
     <div className="border border-white/8 rounded-sm p-4 bg-[#121214]" data-testid="host-checkin">
-      <div className="label-caps text-[#7C3AED] flex items-center gap-1 mb-2"><QrCode size={12} /> Door Check-in</div>
-      <div className="text-xs text-zinc-500 mb-3">Paste or scan a ticket QR code below. Any phone QR scanner app pointed at the attendee's phone will decode it — paste the result here.</div>
-      <form onSubmit={submit} className="flex gap-2">
-        <input data-testid="checkin-input" value={payload} onChange={(e) => setPayload(e.target.value)}
-          placeholder="artcore:ticket:..."
-          className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 text-xs outline-none focus:border-[#CCFF00]" />
-        <button data-testid="checkin-submit" type="submit" disabled={busy || !payload.trim()}
-          className="btn-lime !py-2 !px-3 flex items-center gap-1 text-xs">
-          {busy ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-        </button>
-      </form>
+      <div className="flex items-center justify-between mb-2">
+        <div className="label-caps text-[#7C3AED] flex items-center gap-1"><QrCode size={12} /> Door Check-in</div>
+        <div className="flex gap-1">
+          <button data-testid="checkin-mode-scan" onClick={() => setMode("scan")}
+            className={`label-caps text-[10px] px-2 py-0.5 rounded-sm ${mode === "scan" ? "bg-[#CCFF00] text-black" : "border border-white/10 text-zinc-400"}`}>Scan</button>
+          <button data-testid="checkin-mode-manual" onClick={() => setMode("manual")}
+            className={`label-caps text-[10px] px-2 py-0.5 rounded-sm ${mode === "manual" ? "bg-[#CCFF00] text-black" : "border border-white/10 text-zinc-400"}`}>Paste</button>
+        </div>
+      </div>
+
+      {mode === "scan" ? (
+        <>
+          <div className="text-xs text-zinc-500 mb-2">Point the camera at the attendee's ticket QR.</div>
+          <div ref={scannerRef} id="host-qr-scanner" data-testid="qr-scanner" className="w-full aspect-square bg-black rounded-sm overflow-hidden" />
+          {!scannerReady && <div className="text-[11px] text-zinc-500 mt-2">Requesting camera...</div>}
+        </>
+      ) : (
+        <>
+          <div className="text-xs text-zinc-500 mb-2">Paste a ticket QR payload below.</div>
+          <form onSubmit={submitManual} className="flex gap-2">
+            <input data-testid="checkin-input" value={payload} onChange={(e) => setPayload(e.target.value)}
+              placeholder="artcore:ticket:..."
+              className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 text-xs outline-none focus:border-[#CCFF00]" />
+            <button data-testid="checkin-submit" type="submit" disabled={busy || !payload.trim()}
+              className="btn-lime !py-2 !px-3 flex items-center gap-1 text-xs">
+              {busy ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+            </button>
+          </form>
+        </>
+      )}
+
       {last && (
-        <div data-testid="checkin-last" className="text-xs mt-2" style={{ color: last.already ? "#F5A623" : "#CCFF00" }}>
-          {last.already ? "⚠ Already in" : "✓ Checked in"} · {last.name}
+        <div data-testid="checkin-last" className="text-xs mt-3" style={{ color: last.error ? "#FF4D4D" : last.already ? "#F5A623" : "#CCFF00" }}>
+          {last.error ? "✕" : last.already ? "⚠ Already in" : "✓ Checked in"} · {last.name}
         </div>
       )}
     </div>

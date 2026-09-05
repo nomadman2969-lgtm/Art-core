@@ -53,22 +53,22 @@ export default function HomeFeed() {
 
   const canPost = user?.role === "artist" || user?.role === "admin";
 
-  // Fetch upcoming events near the user (best-effort, geolocation optional)
+  // Fetch trending upcoming events (RSVP-velocity-ranked, location-aware if permitted)
   useEffect(() => {
-    const fetchEvents = (params) => {
-      const qs = new URLSearchParams({ upcoming_only: "true", ...params }).toString();
-      api.get(`/events?${qs}`)
+    const fetchTrending = (params) => {
+      const qs = new URLSearchParams(params).toString();
+      api.get(`/events/lists/trending${qs ? `?${qs}` : ""}`)
         .then((r) => setNearbyEvents(r.data.slice(0, 8)))
         .catch(() => setNearbyEvents([]));
     };
     if (typeof navigator !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => fetchEvents({ near_lat: String(pos.coords.latitude), near_lng: String(pos.coords.longitude), radius_km: "100" }),
-        () => fetchEvents({}),
+        (pos) => fetchTrending({ near_lat: String(pos.coords.latitude), near_lng: String(pos.coords.longitude), radius_km: "100" }),
+        () => fetchTrending({}),
         { timeout: 4000, maximumAge: 10 * 60 * 1000 }
       );
     } else {
-      fetchEvents({});
+      fetchTrending({});
     }
   }, []);
 
@@ -128,11 +128,11 @@ export default function HomeFeed() {
         </button>
       )}
 
-      {/* Nearby / upcoming events rail */}
+      {/* Trending upcoming events rail */}
       {nearbyEvents.length > 0 && (
         <div className="mb-6" data-testid="events-rail">
           <div className="flex items-center justify-between mb-3">
-            <div className="label-caps text-[#FF4D4D] flex items-center gap-2"><MapPin size={12} /> Upcoming Events</div>
+            <div className="label-caps text-[#FF4D4D] flex items-center gap-2"><MapPin size={12} /> Trending Events</div>
             <Link to="/events" className="label-caps text-xs text-zinc-500 hover:text-[#CCFF00]">See all →</Link>
           </div>
           <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-2">
@@ -154,6 +154,11 @@ export default function HomeFeed() {
                   <div className="absolute top-2 left-2 label-caps text-[10px] px-1.5 py-0.5 rounded-sm bg-black/70 text-white">
                     {(e.category || "").replace(/_/g, " ")}
                   </div>
+                  {e.recent_rsvps_48h >= 3 && (
+                    <div className="absolute bottom-2 left-2 label-caps text-[10px] px-1.5 py-0.5 rounded-sm bg-[#FF4D4D]/90 text-white flex items-center gap-1">
+                      🔥 Trending
+                    </div>
+                  )}
                   {!e.is_free && (
                     <div className="absolute top-2 right-2 label-caps text-[10px] px-1.5 py-0.5 rounded-sm bg-[#F5A623] text-black">
                       ${e.ticket_price}

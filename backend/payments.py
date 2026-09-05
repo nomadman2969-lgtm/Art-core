@@ -616,6 +616,29 @@ async def _apply_paid(session_id: str):
             "amount": float(tx["amount"]),
             "read": False, "created_at": now_iso(),
         })
+        # Ticket confirmation email
+        try:
+            from emails import send_email, ticket_receipt_html
+            from datetime import datetime as _dt
+            buyer = await db.users.find_one({"id": tx["user_id"]}) or {}
+            if buyer.get("email"):
+                when = ev.get("start_at", "")
+                try:
+                    when = _dt.fromisoformat(when.replace("Z", "+00:00")).strftime("%b %d, %Y · %-I:%M %p")
+                except Exception:
+                    pass
+                where = (ev.get("location") or {}).get("city") or (ev.get("location") or {}).get("address") or "TBA"
+                html = ticket_receipt_html(
+                    user_name=buyer.get("name") or "there",
+                    event_title=ev.get("title") or "your event",
+                    amount=float(tx["amount"]),
+                    event_when=when,
+                    event_where=where,
+                )
+                import asyncio as _a3
+                _a3.create_task(send_email(buyer["email"], f"You're going: {ev.get('title')}", html))
+        except Exception:
+            pass
         # Notify host
         if tx.get("host_id") and tx["host_id"] != tx["user_id"]:
             await db.notifications.insert_one({

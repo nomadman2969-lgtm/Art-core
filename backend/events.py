@@ -216,6 +216,28 @@ async def cancel_event(event_id: str, user: dict = Depends(get_current_user)):
             ))
         except Exception:
             pass
+        # Send refund email (paid tickets only)
+        if was_paid:
+            try:
+                from emails import send_email, refund_email_html
+                from datetime import datetime as _dt
+                user_doc = await db.users.find_one({"id": r["user_id"]}) or {}
+                if user_doc.get("email"):
+                    when = e.get("start_at", "")
+                    try:
+                        when = _dt.fromisoformat(when.replace("Z", "+00:00")).strftime("%b %d, %Y · %-I:%M %p")
+                    except Exception:
+                        pass
+                    html = refund_email_html(
+                        user_name=user_doc.get("name") or "there",
+                        event_title=e["title"],
+                        amount=float(r.get("amount") or 0),
+                        event_when=when,
+                    )
+                    import asyncio as _a2
+                    _a2.create_task(send_email(user_doc["email"], f"Refund: {e['title']}", html))
+            except Exception:
+                pass
     return {"cancelled": True, **refund_summary}
 
 
@@ -266,6 +288,96 @@ async def rsvp(event_id: str, user: dict = Depends(get_current_user)):
 async def attendees(event_id: str, limit: int = 100):
     cursor = db.event_rsvps.find({"event_id": event_id}).sort("created_at", 1).limit(limit)
     return [strip_mongo(r) for r in await cursor.to_list(limit)]
+
+
+@router.get("/mine/tickets")
+async def my_tickets(upcoming_only: bool = True, user: dict = Depends(get_current_user)):
+    """Return every RSVP the current user has (upcoming by default), enriched with event data."""
+    rsvps = await db.event_rsvps.find({"user_id": user["id"]}).sort("created_at", -1).to_list(500)
+    tickets = []
+    for r in rsvps:
+        e = await db.events.find_one({"id": r["event_id"]})
+        if not e:
+            continue
+        if upcoming_only and e.get("start_at", "") < now_iso() and not e.get("cancelled"):
+            continue
+        tickets.append({
+            "rsvp_id": r["id"],
+            "event": strip_mongo(e),
+            "paid": bool(r.get("paid")),
+            "amount": r.get("amount"),
+            "refunded": bool(r.get("refunded")),
+            "checked_in": bool(r.get("checked_in")),
+            "checked_in_at": r.get("checked_in_at"),
+            "qr_payload": f"artcore:ticket:{r['id']}:{r['event_id']}",
+            "created_at": r["created_at"],
+        })
+    # Sort by upcoming date first
+    tickets.sort(key=lambda t: t["event"].get("start_at", ""))
+    return tickets
+
+
+# ---------- Trending (by RSVP velocity) ----------
+@router.get("/lists/trending")
+async def trending_events(
+    limit: int = 12,
+    near_lat: Optional[float] = None,
+    near_lng: Optional[float] = None,
+    radius_km: float = 100,
+    me: Optional[dict] = Depends(get_optional_user),
+):
+    """Rank upcoming events by hotness = recent RSVPs (48h) weighted by proximity to event date."""
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    now = _dt.now(_tz.utc)
+    horizon = (now - _td(hours=48)).isoformat()
+    upcoming_iso = now.isoformat()
+
+    cursor = db.events.find({
+        "cancelled": {"$ne": True},
+        "start_at": {"$gte": upcoming_iso},
+    }).limit(300)
+    events = await cursor.to_list(300)
+
+    scored = []
+    for e in events:
+        recent = await db.event_rsvps.count_documents({
+            "event_id": e["id"], "created_at": {"$gte": horizon},
+        })
+        total = await db.event_rsvps.count_documents({"event_id": e["id"]})
+        # Boost events that are soon (within a week gets extra weight)
+        try:
+            start = _dt.fromisoformat(e["start_at"].replace("Z", "+00:00"))
+            days_out = max(0.5, (start - now).total_seconds() / 86400.0)
+            soon_boost = 1.0 + max(0.0, 1.0 - min(days_out, 7) / 7.0)  # 2.0 for tomorrow → 1.0 for 7+ days
+        except Exception:
+            soon_boost = 1.0
+        score = (recent * 3.0 + total * 1.0) * soon_boost
+        scored.append((score, recent, e))
+
+    # Optional distance filter
+    if near_lat is not None and near_lng is not None:
+        import math
+
+        def dist_km(a, b):
+            R = 6371.0
+            dlat = math.radians(b[0] - a[0])
+            dlng = math.radians(b[1] - a[1])
+            aa = (math.sin(dlat / 2) ** 2
+                  + math.cos(math.radians(a[0])) * math.cos(math.radians(b[0]))
+                  * math.sin(dlng / 2) ** 2)
+            return 2 * R * math.asin(math.sqrt(aa))
+        origin = (near_lat, near_lng)
+        scored = [t for t in scored if dist_km(origin, (t[2]["location"]["lat"], t[2]["location"]["lng"])) <= radius_km]
+
+    scored.sort(key=lambda t: t[0], reverse=True)
+    top = scored[: max(1, min(limit, 40))]
+    out = []
+    for score, recent, e in top:
+        enriched = await _enrich(e, me)
+        enriched["trend_score"] = round(score, 2)
+        enriched["recent_rsvps_48h"] = recent
+        out.append(enriched)
+    return out
 
 
 # ---------- Ticket QR ----------

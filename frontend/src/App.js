@@ -31,6 +31,7 @@ import { Orders, OrderDetail, SellingOrders } from "@/pages/Orders";
 import Notifications from "@/pages/Notifications";
 import Events from "@/pages/Events";
 import EventDetail from "@/pages/EventDetail";
+import Tickets from "@/pages/Tickets";
 import NotFound from "@/pages/NotFound";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -95,6 +96,7 @@ function App() {
                 <Route path="/selling" element={<RequireRole roles={["artist", "admin"]}><SellingOrders /></RequireRole>} />
                 <Route path="/events" element={<Events />} />
                 <Route path="/events/:id" element={<EventDetail />} />
+                <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
                 <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
                 <Route path="/studio-custom" element={<ComingSoon title="Studio Themes" accent="#CCFF00"
                   tagline="Make your profile yours."
