@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Calendar, Users, Plus, List as ListIcon, Map as MapIcon, X, Loader2, Search } from "lucide-react";
+import { MapPin, Calendar, Users, Plus, List as ListIcon, Map as MapIcon, X, Loader2, Search, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { api, fileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
@@ -43,13 +43,41 @@ export default function Events() {
   const [view, setView] = useState("map"); // map | list
   const [category, setCategory] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [myLocation, setMyLocation] = useState(null); // {lat, lng} or null
+  const [radiusKm, setRadiusKm] = useState(50);
+  const [locBusy, setLocBusy] = useState(false);
 
   const load = () => {
     setLoading(true);
-    const q = category ? `?category=${category}` : "";
-    api.get(`/events${q}`).then((r) => setEvents(r.data)).catch(() => setEvents([])).finally(() => setLoading(false));
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    if (myLocation) {
+      params.set("near_lat", String(myLocation.lat));
+      params.set("near_lng", String(myLocation.lng));
+      params.set("radius_km", String(radiusKm));
+    }
+    const q = params.toString();
+    api.get(`/events${q ? `?${q}` : ""}`).then((r) => setEvents(r.data)).catch(() => setEvents([])).finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, [category]);
+  useEffect(() => { load(); }, [category, myLocation, radiusKm]);
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
+    setLocBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        toast.success(`Showing events within ${radiusKm}km`);
+        setLocBusy(false);
+      },
+      (err) => {
+        toast.error(err.code === 1 ? "Location permission denied" : "Couldn't get your location");
+        setLocBusy(false);
+      },
+      { timeout: 8000, maximumAge: 5 * 60 * 1000 }
+    );
+  };
+  const clearLocation = () => { setMyLocation(null); toast("Showing events worldwide"); };
 
   const canHost = user?.role === "artist" || user?.role === "admin";
 
@@ -79,7 +107,7 @@ export default function Events() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap mb-6">
+      <div className="flex gap-2 flex-wrap mb-4 items-center">
         <button data-testid="filter-cat-all" onClick={() => setCategory("")}
           className="label-caps text-xs px-3 py-1.5 rounded-full border transition-colors"
           style={{ borderColor: !category ? "#CCFF00" : "rgba(255,255,255,0.1)", background: !category ? "#CCFF0020" : "transparent", color: !category ? "#CCFF00" : "#A1A1AA" }}>All</button>
@@ -92,11 +120,38 @@ export default function Events() {
         ))}
       </div>
 
+      {/* Near me controls */}
+      <div className="flex gap-2 items-center flex-wrap mb-6 pb-4 border-b border-white/8">
+        {myLocation ? (
+          <>
+            <button data-testid="near-me-clear" onClick={clearLocation}
+              className="label-caps text-xs px-3 py-1.5 rounded-full border border-[#CCFF00] bg-[#CCFF00]/15 text-[#CCFF00] flex items-center gap-1.5">
+              <Navigation size={12} /> Near me · {radiusKm}km <X size={11} className="ml-1" />
+            </button>
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <span>Radius</span>
+              <input data-testid="radius-slider" type="range" min="5" max="500" step="5" value={radiusKm}
+                onChange={(e) => setRadiusKm(Number(e.target.value))} className="accent-[#CCFF00]" />
+              <span className="text-white font-anton min-w-[3ch] text-right">{radiusKm}</span>
+              <span>km</span>
+            </div>
+          </>
+        ) : (
+          <button data-testid="near-me-btn" onClick={detectLocation} disabled={locBusy}
+            className="label-caps text-xs px-3 py-1.5 rounded-full border border-white/12 text-zinc-300 hover:border-[#CCFF00] hover:text-[#CCFF00] flex items-center gap-1.5">
+            {locBusy ? <Loader2 size={12} className="animate-spin" /> : <Navigation size={12} />} Near me
+          </button>
+        )}
+        <div className="text-xs text-zinc-500 ml-auto">
+          {events.length} {events.length === 1 ? "event" : "events"} {myLocation ? `within ${radiusKm}km` : "worldwide"}
+        </div>
+      </div>
+
       {loading && !events.length ? (
         <div className="text-center py-16 label-caps text-zinc-500">Loading...</div>
       ) : (
         <>
-          {view === "map" && <EventsMap events={events} onChange={load} />}
+          {view === "map" && <EventsMap events={events} myLocation={myLocation} radiusKm={radiusKm} onChange={load} />}
           {view === "list" && <EventsList events={events} onChange={load} />}
         </>
       )}
@@ -108,26 +163,43 @@ export default function Events() {
   );
 }
 
-function EventsMap({ events, onChange }) {
+function EventsMap({ events, myLocation, radiusKm, onChange }) {
   const [selected, setSelected] = useState(null);
-  // Default center — NYC-ish; will auto-fit if events exist
+  // Default center — user location if available, else auto-fit events, else NYC-ish
   const center = useMemo(() => {
+    if (myLocation) return [myLocation.lat, myLocation.lng];
     if (events.length === 0) return [40.7128, -74.006];
     const avgLat = events.reduce((s, e) => s + e.location.lat, 0) / events.length;
     const avgLng = events.reduce((s, e) => s + e.location.lng, 0) / events.length;
     return [avgLat, avgLng];
-  }, [events]);
+  }, [events, myLocation]);
+
+  // Custom icon for the "you are here" marker (lime dot)
+  const meIcon = useMemo(() => L.divIcon({
+    className: "",
+    html: '<div style="width:16px;height:16px;background:#CCFF00;border:2px solid #0A0A0C;border-radius:50%;box-shadow:0 0 0 6px rgba(204,255,0,0.25)"></div>',
+    iconSize: [16, 16], iconAnchor: [8, 8],
+  }), []);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 h-[70vh]" data-testid="events-map-view">
       <div className="border border-white/8 rounded-sm overflow-hidden h-full">
-        <MapContainer center={center} zoom={events.length ? 4 : 3} scrollWheelZoom style={{ height: "100%", width: "100%", background: "#0A0A0C" }}>
+        <MapContainer center={center} zoom={events.length || myLocation ? 4 : 3} scrollWheelZoom style={{ height: "100%", width: "100%", background: "#0A0A0C" }}>
           <TileLayer
             attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
             className="grayscale contrast-125"
           />
-          <FitToBounds events={events} />
+          <FitToBounds events={events} myLocation={myLocation} radiusKm={radiusKm} />
+          {myLocation && (
+            <>
+              <Marker position={[myLocation.lat, myLocation.lng]} icon={meIcon}>
+                <Popup>You are here</Popup>
+              </Marker>
+              <Circle center={[myLocation.lat, myLocation.lng]} radius={radiusKm * 1000}
+                pathOptions={{ color: "#CCFF00", fillColor: "#CCFF00", fillOpacity: 0.05, weight: 1, dashArray: "6 6" }} />
+            </>
+          )}
           {events.map((e) => (
             <Marker key={e.id} position={[e.location.lat, e.location.lng]} eventHandlers={{ click: () => setSelected(e) }}>
               <Popup>
@@ -144,7 +216,7 @@ function EventsMap({ events, onChange }) {
       </div>
       <div className="border border-white/8 rounded-sm overflow-y-auto max-h-[70vh]" data-testid="events-side-list">
         {events.length === 0 ? (
-          <div className="text-center py-16 label-caps text-zinc-500 px-4">No events yet.</div>
+          <div className="text-center py-16 label-caps text-zinc-500 px-4">No events {myLocation ? "in range" : "yet"}.</div>
         ) : (
           <div className="divide-y divide-white/8">
             {events.map((e) => (
@@ -157,13 +229,19 @@ function EventsMap({ events, onChange }) {
   );
 }
 
-function FitToBounds({ events }) {
+function FitToBounds({ events, myLocation, radiusKm }) {
   const map = useMap();
   useEffect(() => {
-    if (events.length === 0) return;
-    const bounds = L.latLngBounds(events.map((e) => [e.location.lat, e.location.lng]));
+    const points = events.map((e) => [e.location.lat, e.location.lng]);
+    if (myLocation) points.push([myLocation.lat, myLocation.lng]);
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      map.setView(points[0], myLocation ? 10 : 12);
+      return;
+    }
+    const bounds = L.latLngBounds(points);
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
-  }, [events, map]);
+  }, [events, myLocation, radiusKm, map]);
   return null;
 }
 

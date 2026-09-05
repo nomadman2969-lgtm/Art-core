@@ -156,6 +156,18 @@ async def cancel_event(event_id: str, user: dict = Depends(get_current_user)):
             "event_id": event_id, "event_title": e["title"],
             "read": False, "created_at": now_iso(),
         })
+        try:
+            from push import send_push
+            import asyncio as _a
+            _a.create_task(send_push(
+                r["user_id"],
+                title="Event cancelled",
+                body=e["title"],
+                url="/events",
+                kind="event_cancelled",
+            ))
+        except Exception:
+            pass
     return {"cancelled": True}
 
 
@@ -187,6 +199,18 @@ async def rsvp(event_id: str, user: dict = Depends(get_current_user)):
             "from_user_id": user["id"], "from_user_name": user["name"],
             "read": False, "created_at": now_iso(),
         })
+        try:
+            from push import send_push
+            import asyncio as _a
+            _a.create_task(send_push(
+                e["host_id"],
+                title="New RSVP",
+                body=f"{user['name']} is going to {e['title']}",
+                url=f"/events/{event_id}",
+                kind="event_rsvp",
+            ))
+        except Exception:
+            pass
     return {"rsvped": True, "count": await db.event_rsvps.count_documents({"event_id": event_id})}
 
 

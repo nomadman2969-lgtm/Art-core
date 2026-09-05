@@ -286,3 +286,38 @@ Full commerce system audit + upgrade:
 - Frontend: smoke-tested — Events map renders 3 pins auto-fit-bounded, side list, filter chips; Notification prefs card toggles render; Studio Editor tabs still load after refactor.
 
 
+
+## Event Push Alerts + Nearby + Ticket Payments (Feb 28, 2026)
+
+### Event Push Alerts
+- `send_push()` called in `events.py` on RSVP (host gets alert with attendee name + event) and cancellation (each attendee gets alert).
+- New `event` category added to `notification_prefs` (default true).
+- New notification kinds mapped: `event_rsvp`, `event_cancelled`, `event_reminder`, `event_ticket_paid`.
+- `Notifications.js` KIND_META extended with event kinds + colored icons.
+- Route resolver: notifications with `event_id` link directly to `/events/:id`.
+
+### Nearby Events (Geolocation)
+- Frontend `/events`: **Near me** button uses `navigator.geolocation` (5min cache); once granted, shows a lime-dashed radius circle on the map + a "you are here" lime pulsing dot marker.
+- Radius slider (5–500km, default 50).
+- Map auto-fits to include both user location and any events in range.
+- Backend haversine filter already supported the `near_lat`, `near_lng`, `radius_km` params — now used from the UI.
+- Empty state adapts: "No events in range" when filtering vs "No events yet" globally.
+- Counter shows `X events within Ykm` or `X events worldwide`.
+
+### Event Tickets (Real Stripe)
+- New `POST /api/payments/events/{event_id}/ticket` endpoint:
+  - Rejects free events (400), sold-out events (capacity check), duplicate purchases.
+  - Uses `build_transfer_options()` for Stripe Connect destination charges — host with `payouts_enabled` gets funds routed directly (minus platform commission).
+  - Cancel URL routes back to the event page.
+  - Creates `payment_transactions` row with `kind: "event_ticket"`, `event_id`, `host_id`, `amount`.
+- `_apply_paid()` handles `event_ticket` — creates the RSVP row (idempotent), fires host push + buyer confirmation notification, marks RSVP as `paid: true` with amount + session_id for future refunds.
+- Frontend event detail:
+  - Paid event RSVP button becomes **"Get Ticket · $X"** (lime CTA) that redirects to Stripe.
+  - Free events still use the simple RSVP toggle.
+  - Payment success page (`Cart.js`) has an `event_ticket` variant → "You're going" headline + "See Events" CTA.
+
+### Testing
+- Backend curl: paid ticket returns valid Stripe URL; free-event ticket returns 400; near-me radius filter narrows results correctly; prefs default includes `event: true`.
+- Frontend screenshots: near-me active with radius slider + lime location dot + circle + narrowed list; paid event detail shows "Get Ticket · $25" button + mini-map + cancel action.
+
+

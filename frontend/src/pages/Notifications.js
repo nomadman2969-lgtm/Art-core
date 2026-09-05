@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
-import { Bell, Gavel, Trophy, Palette, UserPlus, Check, Trash2, MessageSquare, Heart, BellRing, BellOff, Loader2, Settings2, AtSign } from "lucide-react";
+import { Bell, Gavel, Trophy, Palette, UserPlus, Check, Trash2, MessageSquare, Heart, BellRing, BellOff, Loader2, Settings2, AtSign, MapPin } from "lucide-react";
 import usePushSubscription from "../hooks/usePushSubscription";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
@@ -48,6 +48,10 @@ const KIND_META = {
   post_comment: { label: "Commented on your post", icon: <MessageSquare size={14} />, color: "#CCFF00" },
   new_message: { label: "New message", icon: <MessageSquare size={14} />, color: "#7C3AED" },
   auction_ending: { label: "Auction ending soon", icon: <Gavel size={14} />, color: "#F5A623" },
+  event_rsvp: { label: "New RSVP to your event", icon: <MapPin size={14} />, color: "#CCFF00" },
+  event_cancelled: { label: "An event was cancelled", icon: <MapPin size={14} />, color: "#FF4D4D" },
+  event_ticket_paid: { label: "Ticket purchased", icon: <Check size={14} />, color: "#CCFF00" },
+  event_reminder: { label: "Event happening soon", icon: <MapPin size={14} />, color: "#F5A623" },
 };
 
 export default function Notifications() {
@@ -115,6 +119,7 @@ export default function Notifications() {
               { key: "follow", label: "New Followers", icon: <UserPlus size={12} />, color: "#00E5FF" },
               { key: "mention", label: "Mentions", icon: <AtSign size={12} />, color: "#CCFF00" },
               { key: "post", label: "Post Activity", icon: <Heart size={12} />, color: "#FF6EC7" },
+              { key: "event", label: "Events", icon: <MapPin size={12} />, color: "#FF4D4D" },
             ].map((c) => {
               const on = prefs[c.key] !== false;
               return (
@@ -188,6 +193,7 @@ export default function Notifications() {
                          n.auction?.id ? `/auctions/${n.auction.id}` :
                          n.offer?.id ? "/offers" :
                          n.order?.id ? `/orders/${n.order.id}` :
+                         n.event_id ? `/events/${n.event_id}` :
                          n.kind === "new_message" && n.other?.id ? `/messages/${n.other.id}` :
                          n.artwork?.id ? `/artwork/${n.artwork.id}` :
                          n.post?.id && n.other?.id ? `/artist/${n.other.id}` :

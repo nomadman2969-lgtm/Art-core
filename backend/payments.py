@@ -316,6 +316,61 @@ class OfferPayReq(BaseModel):
     origin_url: str
 
 
+# ---------- Event ticket payment ----------
+class EventTicketReq(BaseModel):
+    origin_url: str
+
+
+@router.post("/payments/events/{event_id}/ticket")
+async def buy_event_ticket(event_id: str, req: EventTicketReq, user: dict = Depends(get_current_user)):
+    ev = await db.events.find_one({"id": event_id})
+    if not ev:
+        raise HTTPException(404, "Event not found")
+    if ev.get("cancelled"):
+        raise HTTPException(400, "Event was cancelled")
+    if ev.get("is_free"):
+        raise HTTPException(400, "This is a free event — just RSVP")
+    price = float(ev.get("ticket_price") or 0)
+    if price <= 0:
+        raise HTTPException(400, "Invalid ticket price")
+    # No double buys
+    existing = await db.event_rsvps.find_one({"event_id": event_id, "user_id": user["id"]})
+    if existing:
+        raise HTTPException(400, "You already have a ticket")
+    if ev.get("max_capacity"):
+        count = await db.event_rsvps.count_documents({"event_id": event_id})
+        if count >= ev["max_capacity"]:
+            raise HTTPException(400, "Event is sold out")
+    settings = await get_settings()
+    from connect import build_transfer_options
+    transfer_kwargs = await build_transfer_options(ev["host_id"], price)
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": settings["currency"],
+                "product_data": {"name": f"Ticket: {ev['title']}", "description": (ev.get("description") or "")[:400]},
+                "unit_amount": int(round(price * 100)),
+            },
+            "quantity": 1,
+        }],
+        success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{req.origin_url}/events/{event_id}",
+        customer_email=user["email"],
+        metadata={"kind": "event_ticket", "event_id": event_id, "user_id": user["id"]},
+        **transfer_kwargs,
+    )
+    await db.payment_transactions.insert_one({
+        "id": new_id(), "session_id": session.id,
+        "kind": "event_ticket", "user_id": user["id"],
+        "event_id": event_id, "host_id": ev["host_id"],
+        "amount": price, "currency": settings["currency"],
+        "status": "initiated", "payment_status": "pending",
+        "created_at": now_iso(), "updated_at": now_iso(),
+    })
+    return {"checkout_url": session.url, "session_id": session.id, "amount": price}
+
+
 @router.post("/payments/offers/{offer_id}/pay")
 async def pay_offer(offer_id: str, req: OfferPayReq, user: dict = Depends(get_current_user)):
     o = await db.offers.find_one({"id": offer_id})
@@ -534,6 +589,45 @@ async def _apply_paid(session_id: str):
             "commission_id": tx["commission_id"], "amount": gross,
             "read": False, "created_at": now_iso(),
         })
+    elif tx["kind"] == "event_ticket":
+        # Idempotency: only create RSVP once per session
+        existing_rsvp = await db.event_rsvps.find_one({"event_id": tx["event_id"], "user_id": tx["user_id"]})
+        if not existing_rsvp:
+            user_doc = await db.users.find_one({"id": tx["user_id"]}) or {}
+            await db.event_rsvps.insert_one({
+                "id": new_id(), "event_id": tx["event_id"], "user_id": tx["user_id"],
+                "user_name": user_doc.get("name", "Guest"),
+                "paid": True, "amount": float(tx["amount"]),
+                "session_id": tx["session_id"], "created_at": now_iso(),
+            })
+        ev = await db.events.find_one({"id": tx["event_id"]}) or {}
+        # Notify buyer
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": tx["user_id"], "kind": "event_ticket_paid",
+            "event_id": tx["event_id"], "event_title": ev.get("title"),
+            "amount": float(tx["amount"]),
+            "read": False, "created_at": now_iso(),
+        })
+        # Notify host
+        if tx.get("host_id") and tx["host_id"] != tx["user_id"]:
+            await db.notifications.insert_one({
+                "id": new_id(), "user_id": tx["host_id"], "kind": "event_rsvp",
+                "event_id": tx["event_id"], "event_title": ev.get("title"),
+                "from_user_id": tx["user_id"], "from_user_name": (user_doc.get("name") if not existing_rsvp else ""),
+                "amount": float(tx["amount"]), "read": False, "created_at": now_iso(),
+            })
+            try:
+                from push import send_push
+                import asyncio as _a
+                _a.create_task(send_push(
+                    tx["host_id"],
+                    title="New paid ticket",
+                    body=f"${int(tx['amount']):,} · {ev.get('title', 'your event')}",
+                    url=f"/events/{tx['event_id']}",
+                    kind="event_rsvp",
+                ))
+            except Exception:
+                pass
     await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"_paid_applied": True}})
 
 

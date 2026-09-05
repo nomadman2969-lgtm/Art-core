@@ -96,23 +96,27 @@ export function PaymentSuccess() {
           {kind === "upload_fee" ? "Live now" :
            kind === "auction_win" ? "Piece is yours" :
            kind === "commission_payment" ? "Payment sent" :
+           kind === "event_ticket" ? "You're going" :
            "Thank you."}
         </h1>
         <p className="text-zinc-400 mt-8">
           {kind === "upload_fee" ? "Your artwork is live in the marketplace." :
            kind === "auction_win" ? "Your auction win is settled. Art Core will coordinate delivery with the seller." :
            kind === "commission_payment" ? "Funds released to the artist. Enjoy your custom piece." :
+           kind === "event_ticket" ? "Ticket confirmed. See you at the event." :
            "A confirmation email is on its way. Art Core will coordinate shipping."}
         </p>
         <Link to={
           kind === "upload_fee" ? "/studio" :
           kind === "auction_win" ? "/orders" :
           kind === "commission_payment" ? "/commissions" :
+          kind === "event_ticket" ? "/events" :
           "/orders"
         } className="btn-lime mt-10 inline-flex">
           {kind === "upload_fee" ? "Back to Studio" :
            kind === "auction_win" ? "View Order" :
            kind === "commission_payment" ? "Back to Commissions" :
+           kind === "event_ticket" ? "See Events" :
            "View Orders"}
         </Link>
       </>}

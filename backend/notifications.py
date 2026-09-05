@@ -119,6 +119,7 @@ DEFAULT_PREFS = {
     "commission": True,
     "mention": True,
     "post": True,
+    "event": True,
 }
 
 
@@ -153,6 +154,8 @@ KIND_TO_CATEGORY = {
     "post_liked": "post", "post_comment": "post",
     "new_comment": "post", "comment_reply": "post", "artwork_shared": "post",
     "new_review": "post",
+    "event_rsvp": "event", "event_cancelled": "event",
+    "event_reminder": "event", "event_ticket_paid": "event",
 }
 
 

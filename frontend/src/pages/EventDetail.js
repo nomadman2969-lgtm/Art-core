@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { Calendar, Users, MapPin, ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, fileUrl } from "../api";
+import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 
 const catColor = { gallery_opening: "#D4AF37", pop_up: "#FF4D4D", festival: "#FF6EC7", meetup: "#7C3AED", workshop: "#00E5FF", live_painting: "#F5A623", virtual: "#CCFF00", market: "#00E5FF" };
@@ -29,6 +29,14 @@ export default function EventDetail() {
   const toggleRsvp = async () => {
     setBusy(true);
     try {
+      // Paid event → route to Stripe checkout for buying a ticket
+      if (!ev.is_free && !ev.rsvped) {
+        const r = await api.post(`/payments/events/${id}/ticket`, { origin_url: ORIGIN });
+        if (r.data.checkout_url) {
+          window.location.href = r.data.checkout_url;
+          return;
+        }
+      }
       const r = await api.post(`/events/${id}/rsvp`, {});
       setEv((e) => ({ ...e, rsvped: r.data.rsvped, rsvp_count: r.data.count }));
       toast.success(r.data.rsvped ? "You're going" : "RSVP removed");
@@ -117,7 +125,9 @@ export default function EventDetail() {
             {!ev.cancelled && (
               <button data-testid="rsvp-btn" onClick={toggleRsvp} disabled={busy}
                 className={`w-full mt-4 !py-3 ${ev.rsvped ? "btn-ghost" : "btn-lime"}`}>
-                {busy ? <Loader2 size={14} className="animate-spin inline" /> : (ev.rsvped ? "Cancel RSVP" : "RSVP")}
+                {busy ? <Loader2 size={14} className="animate-spin inline" /> :
+                  ev.rsvped ? "Cancel RSVP" :
+                  ev.is_free ? "RSVP" : `Get Ticket · $${ev.ticket_price}`}
               </button>
             )}
             {ev.max_capacity && (
