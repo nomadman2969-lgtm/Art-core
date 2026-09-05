@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { Calendar, Users, MapPin, ArrowLeft, Trash2, Loader2 } from "lucide-react";
+import { Calendar, Users, MapPin, ArrowLeft, Trash2, Loader2, QrCode, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
@@ -18,6 +18,8 @@ export default function EventDetail() {
   const [loading, setLoading] = useState(true);
   const [attendees, setAttendees] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [ticket, setTicket] = useState(null);
+  const [showTicket, setShowTicket] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -25,6 +27,15 @@ export default function EventDetail() {
     api.get(`/events/${id}/attendees`).then((r) => setAttendees(r.data)).catch(() => setAttendees([]));
   };
   useEffect(() => { load(); }, [id]);
+
+  // Load ticket details when the user has RSVP'd
+  useEffect(() => {
+    if (ev?.rsvped && !ev.cancelled) {
+      api.get(`/events/${id}/my-ticket`).then((r) => setTicket(r.data)).catch(() => setTicket(null));
+    } else {
+      setTicket(null);
+    }
+  }, [ev?.rsvped, ev?.cancelled, id]);
 
   const toggleRsvp = async () => {
     setBusy(true);
@@ -160,8 +171,97 @@ export default function EventDetail() {
               <Trash2 size={12} /> Cancel event
             </button>
           )}
+
+          {/* Attendee's ticket QR */}
+          {ticket && !ev.cancelled && (
+            <div className="border border-white/8 rounded-sm p-4 bg-[#121214]" data-testid="my-ticket-card">
+              <div className="flex items-center justify-between mb-2">
+                <div className="label-caps text-[#CCFF00] flex items-center gap-1">
+                  <QrCode size={12} /> Your Ticket
+                </div>
+                {ticket.checked_in && (
+                  <div className="label-caps text-[#CCFF00] flex items-center gap-1 text-xs">
+                    <CheckCircle2 size={12} /> Checked in
+                  </div>
+                )}
+              </div>
+              {showTicket ? (
+                <>
+                  {ticket.qr_image && (
+                    <img
+                      src={ticket.qr_image}
+                      alt="Ticket QR"
+                      data-testid="ticket-qr-img"
+                      className="w-full max-w-[220px] mx-auto bg-white p-2 rounded-sm my-2" />
+                  )}
+                  <div className="text-xs text-zinc-400 text-center">
+                    {ticket.user_name} · {ticket.paid ? `$${ticket.amount}` : "Free"}
+                  </div>
+                  <div className="text-[10px] text-zinc-600 text-center mt-1 break-all font-mono">
+                    ID {ticket.rsvp_id.slice(0, 8)}
+                  </div>
+                  <button data-testid="hide-ticket-btn" onClick={() => setShowTicket(false)}
+                    className="btn-ghost w-full mt-3 !py-2 text-xs">Hide QR</button>
+                </>
+              ) : (
+                <button data-testid="show-ticket-btn" onClick={() => setShowTicket(true)}
+                  className="btn-lime w-full !py-2 flex items-center justify-center gap-2 text-xs">
+                  <QrCode size={14} /> Show ticket QR
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Host check-in scanner */}
+          {isHost && !ev.cancelled && (
+            <HostCheckIn eventId={id} onCheckedIn={() => api.get(`/events/${id}/attendees`).then((r) => setAttendees(r.data))} />
+          )}
         </aside>
       </div>
     </div>
   );
 }
+
+function HostCheckIn({ eventId, onCheckedIn }) {
+  const [payload, setPayload] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [last, setLast] = useState(null);
+
+  const submit = async (e) => {
+    e?.preventDefault?.();
+    if (!payload.trim()) return;
+    setBusy(true);
+    try {
+      const r = await api.post(`/events/${eventId}/check-in`, { qr_payload: payload.trim() });
+      setLast({ name: r.data.user_name, already: !!r.data.already });
+      toast.success(r.data.already ? `${r.data.user_name} was already checked in` : `Checked in ${r.data.user_name}`);
+      setPayload("");
+      onCheckedIn?.();
+    } catch (er) {
+      toast.error(er?.response?.data?.detail || "Invalid ticket");
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="border border-white/8 rounded-sm p-4 bg-[#121214]" data-testid="host-checkin">
+      <div className="label-caps text-[#7C3AED] flex items-center gap-1 mb-2"><QrCode size={12} /> Door Check-in</div>
+      <div className="text-xs text-zinc-500 mb-3">Paste or scan a ticket QR code below. Any phone QR scanner app pointed at the attendee's phone will decode it — paste the result here.</div>
+      <form onSubmit={submit} className="flex gap-2">
+        <input data-testid="checkin-input" value={payload} onChange={(e) => setPayload(e.target.value)}
+          placeholder="artcore:ticket:..."
+          className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 text-xs outline-none focus:border-[#CCFF00]" />
+        <button data-testid="checkin-submit" type="submit" disabled={busy || !payload.trim()}
+          className="btn-lime !py-2 !px-3 flex items-center gap-1 text-xs">
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+        </button>
+      </form>
+      {last && (
+        <div data-testid="checkin-last" className="text-xs mt-2" style={{ color: last.already ? "#F5A623" : "#CCFF00" }}>
+          {last.already ? "⚠ Already in" : "✓ Checked in"} · {last.name}
+        </div>
+      )}
+    </div>
+  );
+}
+

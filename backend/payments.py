@@ -590,6 +590,14 @@ async def _apply_paid(session_id: str):
             "read": False, "created_at": now_iso(),
         })
     elif tx["kind"] == "event_ticket":
+        # Persist payment_intent for future refunds
+        try:
+            s = stripe.checkout.Session.retrieve(session_id)
+            pi = getattr(s, "payment_intent", None)
+            if pi:
+                await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"payment_intent": pi}})
+        except Exception:
+            pass
         # Idempotency: only create RSVP once per session
         existing_rsvp = await db.event_rsvps.find_one({"event_id": tx["event_id"], "user_id": tx["user_id"]})
         if not existing_rsvp:

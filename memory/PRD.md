@@ -321,3 +321,34 @@ Full commerce system audit + upgrade:
 - Frontend screenshots: near-me active with radius slider + lime location dot + circle + narrowed list; paid event detail shows "Get Ticket · $25" button + mini-map + cancel action.
 
 
+
+## Reminders + Refunds + QR + Feed Rail (Mar 1, 2026)
+
+### Event Reminder Push
+- `check_event_reminders()` in `events.py` — fires 24h and 1h before `start_at`, idempotent via `reminder_24h_sent` / `reminder_1h_sent` markers.
+- Opportunistically invoked from `GET /api/events` (cheap, no cron needed).
+- Fans push + in-app notification (kind=`event_reminder`) to every RSVP'd user.
+
+### Ticket Refunds
+- On event cancel (`DELETE /api/events/{id}`) — iterates every paid `payment_transactions` row (kind=event_ticket, not yet refunded), calls `stripe.Refund.create(payment_intent=..., reverse_transfer=True, refund_application_fee=True)`, updates tx + RSVP with `refunded: true`, notifies attendees with amount.
+- `_apply_paid()` now persists `payment_intent` on `event_ticket` transactions so refunds are direct (no session retrieval needed).
+- Cancel response returns `{cancelled, refunded, failed, amount}` summary.
+
+### Attendee QR Codes
+- `qrcode` lib installed. New endpoints:
+  - `GET /api/events/{id}/my-ticket` — returns `{rsvp_id, qr_payload, qr_image (data URL PNG), event_title, checked_in, ...}`. Rejects if no RSVP / cancelled / refunded.
+  - `POST /api/events/{id}/check-in` — host/admin scans a payload; validates format (`artcore:ticket:{rsvp_id}:{event_id}`), matches event, marks `checked_in: true` (idempotent, returns `already: true` on rescan).
+- Frontend `EventDetail.js`:
+  - **Your Ticket** panel (when user has RSVP + event not cancelled): show/hide button, QR image on white background, attendee name, price, short ID.
+  - **Door Check-in** panel (host only): paste-payload input + submit → toast confirms check-in with attendee name; second scan flags "Already in".
+
+### Events on Feed
+- `HomeFeed.js` fetches upcoming events near the user (geolocation optional, 100km radius, falls back to global).
+- Horizontal scrollable **Upcoming Events** rail between the composer prompt and filter chips — 8 cards max, cover image or gradient by category, category chip, price badge for paid events, date + city.
+- **See all →** link to `/events`.
+
+### Testing
+- Backend curl: RSVP → QR generation → check-in → duplicate scan (already) → invalid QR (400) → non-host attempt (403) → cancel (refund summary) → post-cancel my-ticket (400). All pass.
+- Frontend screenshots: QR + check-in panel rendering on event detail; upcoming events rail rendering on home feed with mixed free/paid cards.
+
+

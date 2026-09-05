@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
 import { toast } from "sonner";
-import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Palette, Filter, X, Plus } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Palette, Filter, X, Plus, Calendar, MapPin } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import FeedComposer from "../components/FeedComposer";
 
@@ -49,8 +49,28 @@ export default function HomeFeed() {
   const [loading, setLoading] = useState(true);
   const [activeFilters, setActiveFilters] = useState([]);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [nearbyEvents, setNearbyEvents] = useState([]);
 
   const canPost = user?.role === "artist" || user?.role === "admin";
+
+  // Fetch upcoming events near the user (best-effort, geolocation optional)
+  useEffect(() => {
+    const fetchEvents = (params) => {
+      const qs = new URLSearchParams({ upcoming_only: "true", ...params }).toString();
+      api.get(`/events?${qs}`)
+        .then((r) => setNearbyEvents(r.data.slice(0, 8)))
+        .catch(() => setNearbyEvents([]));
+    };
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => fetchEvents({ near_lat: String(pos.coords.latitude), near_lng: String(pos.coords.longitude), radius_km: "100" }),
+        () => fetchEvents({}),
+        { timeout: 4000, maximumAge: 10 * 60 * 1000 }
+      );
+    } else {
+      fetchEvents({});
+    }
+  }, []);
 
   const load = (filters = activeFilters) => {
     setLoading(true);
@@ -106,6 +126,53 @@ export default function HomeFeed() {
             <Plus size={12} /> Post
           </div>
         </button>
+      )}
+
+      {/* Nearby / upcoming events rail */}
+      {nearbyEvents.length > 0 && (
+        <div className="mb-6" data-testid="events-rail">
+          <div className="flex items-center justify-between mb-3">
+            <div className="label-caps text-[#FF4D4D] flex items-center gap-2"><MapPin size={12} /> Upcoming Events</div>
+            <Link to="/events" className="label-caps text-xs text-zinc-500 hover:text-[#CCFF00]">See all →</Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-2">
+            {nearbyEvents.map((e) => (
+              <Link
+                key={e.id}
+                to={`/events/${e.id}`}
+                data-testid={`rail-event-${e.id}`}
+                className="flex-shrink-0 w-56 border border-white/8 rounded-sm bg-[#121214] hover:border-[#CCFF00]/40 transition-colors overflow-hidden">
+                <div className="h-24 flex items-center justify-center relative"
+                  style={{ background: e.cover_image ? undefined : "linear-gradient(135deg, #FF4D4D30, #0A0A0C)" }}>
+                  {e.cover_image ? (
+                    <img
+                      src={e.cover_image.startsWith("http") ? e.cover_image : `${process.env.REACT_APP_BACKEND_URL}/api/files/${e.cover_image}`}
+                      alt="" className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <MapPin size={22} className="text-white/50" />
+                  )}
+                  <div className="absolute top-2 left-2 label-caps text-[10px] px-1.5 py-0.5 rounded-sm bg-black/70 text-white">
+                    {(e.category || "").replace(/_/g, " ")}
+                  </div>
+                  {!e.is_free && (
+                    <div className="absolute top-2 right-2 label-caps text-[10px] px-1.5 py-0.5 rounded-sm bg-[#F5A623] text-black">
+                      ${e.ticket_price}
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <div className="font-unbounded font-semibold text-sm truncate">{e.title}</div>
+                  <div className="text-xs text-zinc-500 flex items-center gap-1 mt-1">
+                    <Calendar size={10} /> {new Date(e.start_at).toLocaleDateString([], { month: "short", day: "numeric" })}
+                  </div>
+                  <div className="text-xs text-zinc-500 flex items-center gap-1 truncate">
+                    <MapPin size={10} /> {e.location?.city || e.location?.address || "TBA"}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Filter chips */}
