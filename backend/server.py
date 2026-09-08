@@ -26,6 +26,10 @@ from studio import router as studio_router, posts_router
 from notifications import router as notifications_router
 from orders import router as orders_router
 from offers import router as offers_router
+from realtime import router as realtime_router
+from certificates import router as certificates_router
+from disputes import router as disputes_router
+from growth import router as growth_router
 from connect import router as connect_router
 from push import router as push_router
 from events import router as events_router
@@ -51,6 +55,10 @@ app.include_router(posts_router)
 app.include_router(notifications_router)
 app.include_router(orders_router)
 app.include_router(offers_router)
+app.include_router(realtime_router)
+app.include_router(certificates_router)
+app.include_router(disputes_router)
+app.include_router(growth_router)
 app.include_router(connect_router)
 app.include_router(push_router)
 app.include_router(events_router)

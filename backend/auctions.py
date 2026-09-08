@@ -143,6 +143,8 @@ async def _process_proxies(auction_id: str):
             "amount": target, "auto": True, "created_at": now_iso(),
         }
         await db.bids.insert_one(bid)
+        from realtime import publish_soon
+        publish_soon(f"auction:{auction_id}", {"type": "bid", "amount": target, "user_name": top["user_name"]})
         prev_bidder = current_bidder
         if prev_bidder and prev_bidder != top["user_id"]:
             await db.notifications.insert_one({
@@ -479,6 +481,8 @@ async def place_bid(auction_id: str, req: BidReq, user: dict = Depends(get_curre
         "amount": req.amount, "created_at": now_iso(),
     }
     await db.bids.insert_one(bid)
+    from realtime import publish_soon
+    publish_soon(f"auction:{auction_id}", {"type": "bid", "amount": req.amount, "user_name": user["name"]})
     prev_bidder = a.get("current_bidder_id")
     # outbid notification
     if prev_bidder and prev_bidder != user["id"]:

@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { toast } from "sonner";
 import { RankBadge } from "./Rankings";
+import { BadgeRow } from "../components/BadgeRow";
 import {
   UserPlus, UserCheck, MessageCircle, Palette, Share2, Eye,
   Gavel, Clock, Heart, MessageSquare, Pin, MapPin, Instagram, Twitter, Globe,
@@ -56,7 +57,7 @@ export function ArtistStudioPage() {
     } catch { toast.error("Try again"); }
   };
   const share = () => {
-    const u = window.location.href;
+    const u = `${process.env.REACT_APP_BACKEND_URL}/api/share/studio/${artist.id}`;
     if (navigator.share) navigator.share({ title: `${artist.name}'s Studio · Art Core`, url: u }).catch(() => {});
     else { navigator.clipboard.writeText(u); toast.success("Link copied"); }
   };
@@ -84,6 +85,7 @@ export function ArtistStudioPage() {
               {config.artist_story?.style && <span className="label-caps">· {config.artist_story.style}</span>}
               {rank && <RankBadge tier={rank.tier} color={rank.tier_color} />}
             </div>
+            <BadgeRow userId={artist.id} />
             <div className="flex flex-wrap gap-6 mt-6">
               <MetricInline label="Followers" value={social?.followers ?? 0} />
               <MetricInline label="Following" value={social?.following ?? 0} />

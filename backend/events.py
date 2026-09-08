@@ -2,7 +2,7 @@
 import logging
 from typing import List, Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field, field_validator
 from db import db, new_id, now_iso, strip_mongo
 from auth import get_current_user, get_optional_user, require_role
@@ -10,10 +10,23 @@ from auth import get_current_user, get_optional_user, require_role
 router = APIRouter(prefix="/api/events", tags=["events"])
 log = logging.getLogger(__name__)
 
-EVENT_CATEGORIES = [
-    "gallery_opening", "pop_up", "festival", "meetup",
-    "workshop", "live_painting", "virtual", "market",
+# key, label, color — the frontend reads this via GET /events/meta/categories
+CATEGORY_META = [
+    ("exhibition", "Exhibition", "#F4F4F5"),
+    ("gallery_opening", "Gallery Opening", "#D4AF37"),
+    ("festival", "Art Festival", "#FF6EC7"),
+    ("street_art", "Street Art", "#CCFF00"),
+    ("pop_up", "Pop-up", "#FF4D4D"),
+    ("art_class", "Art Class", "#00E5FF"),
+    ("workshop", "Workshop", "#00B8CC"),
+    ("auction", "Auction", "#7C3AED"),
+    ("meetup", "Meetup", "#A78BFA"),
+    ("live_painting", "Live Painting", "#F5A623"),
+    ("museum", "Museum", "#E4E4E7"),
+    ("market", "Art Market", "#34D399"),
+    ("virtual", "Virtual", "#CCFF00"),
 ]
+EVENT_CATEGORIES = [k for k, _l, _c in CATEGORY_META]
 
 RECURRENCE_FREQ = ["weekly", "biweekly", "monthly"]
 RECURRENCE_MAX = 26  # cap: 6 months weekly, 12 months biweekly, 2 years monthly
@@ -46,11 +59,25 @@ class EventCreate(BaseModel):
     start_at: str  # ISO
     end_at: Optional[str] = None
     cover_image: Optional[str] = None  # storage path
+    images: List[str] = Field(default_factory=list)
+    venue: Optional[str] = Field(default=None, max_length=200)
+    organizer: Optional[str] = Field(default=None, max_length=200)
+    website: Optional[str] = Field(default=None, max_length=500)
+    ticket_info: Optional[str] = Field(default=None, max_length=500)
+    ticket_url: Optional[str] = Field(default=None, max_length=500)
+    tags: List[str] = Field(default_factory=list)
     max_capacity: Optional[int] = Field(default=None, ge=1, le=100000)
     is_free: bool = True
     ticket_price: Optional[float] = Field(default=None, ge=0)
     recurrence: Optional[Recurrence] = None
     reminders_enabled: bool = True
+
+    @field_validator("website", "ticket_url")
+    @classmethod
+    def _url(cls, v):
+        if v and not v.startswith(("http://", "https://")):
+            v = "https://" + v
+        return v
 
     @field_validator("category")
     @classmethod
@@ -79,8 +106,12 @@ async def _enrich(e: dict, me: Optional[dict] = None) -> dict:
     if host:
         e["host"] = {"id": host["id"], "name": host["name"], "role": host.get("role")}
     e["rsvp_count"] = await db.event_rsvps.count_documents({"event_id": e["id"]})
+    e["saved_count"] = await db.event_saves.count_documents({"event_id": e["id"]})
+    e.setdefault("images", [])
+    e.setdefault("organizer", (host or {}).get("name"))
     if me:
         e["rsvped"] = bool(await db.event_rsvps.find_one({"event_id": e["id"], "user_id": me["id"]}))
+        e["saved"] = bool(await db.event_saves.find_one({"event_id": e["id"], "user_id": me["id"]}))
     return e
 
 
@@ -98,6 +129,10 @@ async def create_event(req: EventCreate, user: dict = Depends(require_role("arti
             "title": req.title,
             "description": req.description,
             "category": req.category,
+            "images": [p for p in req.images if p][:8],
+            "venue": req.venue, "organizer": req.organizer or user["name"],
+            "website": req.website, "ticket_info": req.ticket_info, "ticket_url": req.ticket_url,
+            "tags": [t.strip().lower() for t in req.tags if t.strip()][:10],
             "location": req.location.model_dump(),
             "start_at": start_iso,
             "end_at": end_iso,
@@ -145,6 +180,12 @@ async def list_events(
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: float = 50,
+    q_search: Optional[str] = Query(default=None, alias="q"),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    sort: str = "soonest",  # soonest | trending | distance
+    saved_only: bool = False,
+    free_only: bool = False,
     limit: int = 60,
     me: Optional[dict] = Depends(get_optional_user),
 ):
@@ -168,6 +209,25 @@ async def list_events(
         q["host_id"] = host_id
     if upcoming_only:
         q["start_at"] = {"$gte": now_iso()}
+    if date_from or date_to:
+        rng = {}
+        if date_from: rng["$gte"] = date_from
+        if date_to: rng["$lte"] = date_to
+        if upcoming_only and rng.get("$gte", "") < now_iso():
+            rng["$gte"] = now_iso()
+        q["start_at"] = rng
+    if free_only:
+        q["is_free"] = True
+    if q_text := (q_search or "").strip():
+        import re as _re
+        rx = {"$regex": _re.escape(q_text), "$options": "i"}
+        q["$or"] = [{"title": rx}, {"description": rx}, {"venue": rx}, {"organizer": rx}, {"host_name": rx},
+                    {"location.city": rx}, {"location.address": rx}, {"tags": rx}]
+    if saved_only:
+        if not me:
+            raise HTTPException(401, "Login to see saved events")
+        saved_ids = [x["event_id"] for x in await db.event_saves.find({"user_id": me["id"]}, {"event_id": 1}).to_list(1000)]
+        q["id"] = {"$in": saved_ids}
     cursor = db.events.find(q).sort("start_at", 1).limit(limit)
     events = [await _enrich(e, me) for e in await cursor.to_list(limit)]
     # Naive haversine filter if requested
@@ -183,8 +243,38 @@ async def list_events(
                   math.sin(dlng / 2) ** 2)
             return 2 * R * math.asin(math.sqrt(aa))
         origin = (near_lat, near_lng)
-        events = [e for e in events if dist_km(origin, (e["location"]["lat"], e["location"]["lng"])) <= radius_km]
+        for e in events:
+            e["distance_km"] = round(dist_km(origin, (e["location"]["lat"], e["location"]["lng"])), 1)
+        events = [e for e in events if e["distance_km"] <= radius_km]
+        if sort == "distance":
+            events.sort(key=lambda e: e["distance_km"])
+    if sort == "trending":
+        events.sort(key=lambda e: (e.get("rsvp_count", 0), e.get("saved_count", 0)), reverse=True)
     return events
+
+
+@router.get("/meta/categories")
+async def categories():
+    return [{"key": k, "label": l, "color": c} for k, l, c in CATEGORY_META]
+
+
+@router.post("/{event_id}/save")
+async def toggle_save(event_id: str, user: dict = Depends(get_current_user)):
+    if not await db.events.find_one({"id": event_id}):
+        raise HTTPException(404, "Not found")
+    existing = await db.event_saves.find_one({"event_id": event_id, "user_id": user["id"]})
+    if existing:
+        await db.event_saves.delete_one({"id": existing["id"]})
+        return {"saved": False}
+    await db.event_saves.insert_one({"id": new_id(), "event_id": event_id, "user_id": user["id"], "created_at": now_iso()})
+    return {"saved": True}
+
+
+@router.get("/mine/saved")
+async def my_saved(me: dict = Depends(get_current_user)):
+    ids = [x["event_id"] for x in await db.event_saves.find({"user_id": me["id"]}).sort("created_at", -1).to_list(500)]
+    evs = {e["id"]: e for e in await db.events.find({"id": {"$in": ids}}).to_list(500)}
+    return [await _enrich(evs[i], me) for i in ids if i in evs]
 
 
 @router.get("/{event_id}")
@@ -759,6 +849,13 @@ class EventUpdate(BaseModel):
     is_free: Optional[bool] = None
     ticket_price: Optional[float] = Field(default=None, ge=0)
     reminders_enabled: Optional[bool] = None
+    images: Optional[List[str]] = None
+    venue: Optional[str] = Field(default=None, max_length=200)
+    organizer: Optional[str] = Field(default=None, max_length=200)
+    website: Optional[str] = Field(default=None, max_length=500)
+    ticket_info: Optional[str] = Field(default=None, max_length=500)
+    ticket_url: Optional[str] = Field(default=None, max_length=500)
+    tags: Optional[List[str]] = None
     apply_to: str = "this"  # "this" | "series"
 
     @field_validator("category")
@@ -795,6 +892,12 @@ async def edit_event(event_id: str, req: EventUpdate, user: dict = Depends(get_c
     if req.is_free is not None: patch["is_free"] = req.is_free
     if req.ticket_price is not None: patch["ticket_price"] = req.ticket_price
     if req.reminders_enabled is not None: patch["reminders_enabled"] = req.reminders_enabled
+    for k in ("images", "venue", "organizer", "website", "ticket_info", "ticket_url", "tags"):
+        v = getattr(req, k)
+        if v is not None:
+            if k in ("website", "ticket_url") and v and not v.startswith(("http://", "https://")):
+                v = "https://" + v
+            patch[k] = v
     # is_free/ticket_price consistency
     if patch.get("is_free") is True:
         patch["ticket_price"] = None

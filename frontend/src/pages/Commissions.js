@@ -24,7 +24,7 @@ export function CommissionsInbox() {
   const [tab, setTab] = useState(user?.role === "artist" || user?.role === "admin" ? "artist" : "buyer");
   const [items, setItems] = useState([]);
   const load = () => api.get(`/commissions/mine?as_role=${tab}`).then((r) => setItems(r.data));
-  useEffect(load, [tab]);
+  useEffect(() => { load(); }, [tab]);
 
   return (
     <div data-testid="commissions-inbox" className="max-w-[1200px] mx-auto px-6 md:px-12 pt-16 pb-32">

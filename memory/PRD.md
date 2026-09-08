@@ -421,7 +421,51 @@ Full commerce system audit + upgrade:
 - Backend curl: recurring create → 3 sibling events; capacity full returns 400 "join the waitlist"; waitlist join returns position 1; analytics returns full payload for host, 403 for non-host.
 - Frontend screenshots: sold-out event with purple Join Waitlist + series indicator; analytics modal with 3 RSVPs / 100% fill rate; Create Event with recurrence checkbox active + live hint.
 
-## Demo World + Attendee Broadcast + Waitlist Emails + Series Reminders (Mar 5, 2026)
+## Local Art Discovery (Events rebuild) + Onboarding + Share Cards + Badges (Mar 8, 2026)
+
+### Events → local art discovery system
+- **13 categories** (`CATEGORY_META` in `events.py`, served by `GET /api/events/meta/categories`): exhibition, gallery_opening, festival, street_art, pop_up, art_class, workshop, auction, meetup, live_painting, museum, market, virtual.
+- **Richer event model**: `venue, organizer (defaults to host), website, ticket_info, ticket_url, images[] (gallery ≤8), tags[]` on create + edit; URLs auto-prefixed https://.
+- **Discovery API** `GET /api/events` params: `q` (title/description/venue/organizer/city/address/tags regex), `category`, `date_from/date_to` (clamped to upcoming), `free_only`, `sort=soonest|trending|distance`, `near_lat/near_lng/radius_km` (adds `distance_km`), `saved_only` (auth). `_enrich` adds `saved`, `saved_count`.
+- **Save events**: `POST /api/events/{id}/save` toggle (`event_saves`), `GET /api/events/mine/saved`.
+- **Share**: `GET /api/share/event/{id}` (OG HTML + JS redirect) and `/api/share/og/event/{id}.png` (Pillow-rendered 1200×630 card, red accent).
+- **Frontend** `pages/Events.js` rewritten: hero "What's on near you", search bar, Near-me + radius slider, date presets (Today / This weekend / Next 7 days / This month) + custom range, category chips from API, Saved / Free chips, sort select, list grouped by day with rich cards (category + Hot badge, price, venue, organizer, attendee count, save/share/RSVP) and map view with category-colored pins. `components/events/CreateEventModal.js` extracted + new fields. `EventDetail.js`: Save / Share / Add-to-calendar (.ics with 24h alarm) buttons, venue/organizer/website cards, tags, gallery, ticket info + external ticket link.
+- No external events API is used — all events are community-hosted on the platform; seeded events are clearly demo-world data (`seed:'demo_v1'`). Geocoding uses OpenStreetMap Nominatim (no key).
+
+### Artist Onboarding — `pages/Onboarding.js` (`/onboarding`, artist/admin only)
+- 3 steps: pick theme (PATCH /studio) → upload first piece (POST /artworks; skippable) → publish (POST /studio/publish + `POST /api/onboarding/complete`; upload-fee checkout if configured). Artist signup now redirects here. `public_user` exposes `onboarded`.
+
+### Share cards — `backend/growth.py`
+- `/api/share/artwork/{id}`, `/api/share/studio/{id}`, `/api/share/event/{id}` return crawler-friendly OG/Twitter HTML with instant redirect; PNG cards at `/api/share/og/{kind}/{id}.png`. ArtworkDetail + ArtistStudio share buttons now share these URLs.
+
+### Achievement badges — `GET /api/users/{id}/badges`
+- Computed live: first_sale, ten_sales, auction_closer, commissioned, event_host, sold_out_show, rising (10 followers), hundred_club, five_star. `components/BadgeRow.js` renders earned chips on the studio header.
+
+### Testing — iteration_15: 17/17 backend + 100% frontend (desktop + mobile).
+
+
+
+### Realtime (WebSockets) — `backend/realtime.py`, `frontend/src/hooks/useLive.js`
+- `wss://<host>/api/ws?token=<jwt>&rooms=auction:<id>` — in-process hub; rooms `user:{id}` (implicit from JWT) and `auction:{id}`. Verified working through the K8s ingress.
+- Publishers: `auctions.py` (both bid paths → `{type:'bid'}`), `messages.deliver_dm` (→ `{type:'dm'}` to both parties), `signal_typing` (→ `{type:'typing'}`).
+- Frontend `useLive(rooms, onEvent)` with reconnect/backoff + 25s ping. AuctionDetail shows a lime **LIVE** indicator and refreshes on bid events (polling slows to 20s when connected); MessageThread refreshes on dm/typing (polling 15s). Polling remains the fallback if WS is unavailable.
+
+### Certificate of Authenticity — `backend/certificates.py`
+- `GET /api/orders/{oid}/certificate/{artwork_id}` (buyer/seller/admin; 400 if refunded) → dark-branded reportlab PDF: artwork image, title, artist, medium, dimensions, year, edition, buyer, sale date, cert no. `AC-XXXXXXXX-XXXXXX`, QR → `/artwork/{id}?cert=…`, signature block.
+- Frontend: **Certificate** button per receipt item (`coa-btn-{i}`) in `components/orders/OrderExtras.js`.
+
+### Order Disputes — `backend/disputes.py`
+- Buyer: `POST /api/orders/{oid}/dispute` `{reason: damaged|not_received|not_as_described|other, description ≥10, images[] (storage paths only)}` → `disputes` doc (open). One open dispute per order; new one allowed after resolution. `GET /api/orders/{oid}/dispute`, `GET /api/disputes/mine`.
+- Admin: `GET /api/admin/disputes[?status=]`, `POST /api/admin/disputes/{id}/resolve` `{action: refund_full|refund_partial|reject, amount?, note?}` — refunds reuse `admin.refund_order` (Stripe reverse_transfer). Notifications `dispute_opened` (seller + all admins) / `dispute_resolved` (buyer + seller).
+- Frontend: **Report a problem** panel on OrderDetail (`dispute-panel`, `open-dispute-btn`, form + photo upload, status chip); Admin **Disputes** tab (`components/admin/DisputesPanel.js`) with note, partial/full refund, reject.
+
+### Mobile-web polish (390px)
+- AuctionDetail: no horizontal overflow (`min-w-0` inputs, tighter padding, wrap on watch row). MessageThread: fixed-height card `h-[calc(100dvh-140px)]`, list scrolls internally instead of page-scrolling the composer under the nav. Feed/EventDetail/Tickets verified clean.
+- Fixed pre-existing runtime crash: `useEffect(load, …)` returning a Promise in Auctions (ProxyBidPanel, WatchToggle) and Commissions.
+
+### Testing — iteration_14: 9/9 backend + 100% frontend (desktop + 5 mobile screens). `/app/backend/tests/test_iter14_ws_coa_disputes.py`.
+
+
 
 ### Demo World (`backend/seed_demo.py`)
 - Run: `cd /app/backend && python seed_demo.py [--wipe-tests] [--no-images]`. Idempotent — every doc carries `seed: "demo_v1"` and is replaced on re-run. Generated images cached in `demo_assets` (47 images via Gemini `gemini-3.1-flash-image-preview`, stored in Emergent object storage under `house-of-monster/demo/*.jpg`, registered in `files` so `/api/files/...` serves them).

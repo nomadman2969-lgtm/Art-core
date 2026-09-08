@@ -55,6 +55,8 @@ const KIND_META = {
   event_waitlist_joined: { label: "You're on the waitlist", icon: <MapPin size={14} />, color: "#7C3AED" },
   event_waitlist_open: { label: "A seat opened up", icon: <MapPin size={14} />, color: "#CCFF00" },
   event_broadcast: { label: "Message from event host", icon: <MapPin size={14} />, color: "#7C3AED" },
+  dispute_opened: { label: "Order dispute opened", icon: <Bell size={14} />, color: "#FF4D4D" },
+  dispute_resolved: { label: "Dispute resolved", icon: <Check size={14} />, color: "#CCFF00" },
 };
 
 export default function Notifications() {

@@ -100,6 +100,7 @@ def public_user(u: dict) -> dict:
         "bio": u.get("bio"),
         "cover_image": u.get("cover_image"),
         "avatar": u.get("avatar"),
+        "onboarded": bool(u.get("onboarded")),
         "approved": u.get("approved", True),
     }
 

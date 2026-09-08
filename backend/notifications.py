@@ -36,7 +36,7 @@ async def _enrich(n: dict) -> dict:
             art = await db.artworks.find_one({"id": n["artwork_id"]})
             if art:
                 n["artwork"] = {"id": art["id"], "title": art["title"], "images": art.get("images", [])[:1]}
-    if kind == "order_shipped" and n.get("order_id"):
+    if kind in ("order_shipped", "dispute_opened", "dispute_resolved", "order_refunded", "payout_reversed") and n.get("order_id"):
         n["order"] = {"id": n["order_id"]}
     if kind == "payout_released" and n.get("order_id"):
         n["order"] = {"id": n["order_id"]}

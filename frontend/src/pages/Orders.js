@@ -4,6 +4,7 @@ import { api, fileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Package, Star, Download, Truck, CheckCircle2 } from "lucide-react";
+import { CertificateButton, DisputePanel } from "../components/orders/OrderExtras";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -229,6 +230,7 @@ export function OrderDetail() {
               <div className="label-caps mt-1">by {it.artist_name} · Qty {it.quantity}</div>
             </div>
             <div className="font-anton text-xl text-[#CCFF00]">${Number(it.price).toLocaleString()}</div>
+            {(isBuyer || isSeller) && !o.refunded && <CertificateButton orderId={o.id} artworkId={it.artwork_id} index={i} />}
             {isBuyer && fulfill.status === "delivered" && (
               reviewed[it.artwork_id] ? (
                 <div className="badge-lime">Reviewed</div>
@@ -248,6 +250,8 @@ export function OrderDetail() {
           {isBuyer && fulfill.status !== "delivered" && "You can leave a review once the piece is confirmed delivered."}
         </div>
       </div>
+
+      <DisputePanel order={o} isBuyer={isBuyer} onChanged={load} />
 
       {reviewFor && (
         <div className="mt-8 glass-card p-6 rounded-sm" data-testid="review-panel">

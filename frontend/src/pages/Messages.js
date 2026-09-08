@@ -4,6 +4,7 @@ import { api, fileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Search, Send, Paperclip, Image as ImageIcon, Palette, Check, CheckCheck, X, Smile } from "lucide-react";
+import { useLive } from "../hooks/useLive";
 
 const REACTION_EMOJIS = [
   { key: "heart", char: "❤️" },
@@ -102,8 +103,12 @@ export function MessageThread() {
   const lastTypeRef = useRef(0);
 
   const load = () => api.get(`/messages/thread/${userId}`).then((r) => setData(r.data));
-  useEffect(() => { load(); const t = setInterval(load, 3000); return () => clearInterval(t); }, [userId]);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [data?.messages?.length, data?.other_typing]);
+  const liveConnected = useLive([], (ev) => { if ((ev.type === "dm" || ev.type === "typing") && (ev.from_id === userId || ev.to_id === userId)) load(); });
+  useEffect(() => { load(); const t = setInterval(load, liveConnected ? 15000 : 3000); return () => clearInterval(t); }, [userId, liveConnected]);
+  useEffect(() => {
+    const el = endRef.current?.parentElement;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [data?.messages?.length, data?.other_typing]);
 
   const onTextChange = (v) => {
     setText(v);
@@ -148,9 +153,9 @@ export function MessageThread() {
   if (!data) return <div className="py-32 text-center label-caps text-zinc-500">Loading...</div>;
 
   return (
-    <div data-testid="message-thread" className="max-w-3xl mx-auto px-4 md:px-6 pt-6 md:pt-16 pb-32">
-      <button onClick={() => nav("/messages")} className="label-caps text-zinc-500 hover:text-[#CCFF00] mb-4">← Inbox</button>
-      <div className="border border-white/8 rounded-sm flex flex-col h-[calc(100vh-180px)] md:h-[70vh]">
+    <div data-testid="message-thread" className="max-w-3xl mx-auto px-3 md:px-6 pt-3 md:pt-16 pb-6 md:pb-32">
+      <button onClick={() => nav("/messages")} className="label-caps text-zinc-500 hover:text-[#CCFF00] mb-3">← Inbox</button>
+      <div className="border border-white/8 rounded-sm flex flex-col h-[calc(100dvh-140px)] md:h-[70vh]">
         <div className="p-4 border-b border-white/8 flex items-center gap-3 flex-shrink-0">
           <Link to={`/artist/${data.other?.id}`} className="w-11 h-11 rounded-full bg-[#CCFF00]/20 flex items-center justify-center font-anton flex-shrink-0">
             {data.other?.name?.[0]?.toUpperCase() || "?"}

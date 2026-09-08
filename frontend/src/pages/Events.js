@@ -1,14 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Calendar, Users, Plus, List as ListIcon, Map as MapIcon, X, Loader2, Search, Navigation } from "lucide-react";
+import { MapPin, Calendar, Users, Plus, List as ListIcon, Map as MapIcon, X, Search, Navigation, Bookmark, Share2, Ticket, Flame } from "lucide-react";
 import { toast } from "sonner";
 import { api, fileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { CreateEventModal } from "../components/events/CreateEventModal";
 
-// Fix leaflet default icon on webpack (icons can't resolve their default paths)
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -16,197 +16,269 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-const CATEGORIES = [
-  { key: "gallery_opening", label: "Gallery Opening", color: "#D4AF37" },
-  { key: "pop_up", label: "Pop-up", color: "#FF4D4D" },
-  { key: "festival", label: "Festival", color: "#FF6EC7" },
-  { key: "meetup", label: "Meetup", color: "#7C3AED" },
-  { key: "workshop", label: "Workshop", color: "#00E5FF" },
-  { key: "live_painting", label: "Live Painting", color: "#F5A623" },
-  { key: "virtual", label: "Virtual", color: "#CCFF00" },
-  { key: "market", label: "Art Market", color: "#00E5FF" },
-];
+export const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+const FALLBACK_CAT = { key: "exhibition", label: "Event", color: "#A1A1AA" };
 
-const catMeta = (k) => CATEGORIES.find((c) => c.key === k) || CATEGORIES[0];
-const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+const startOf = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const DATE_PRESETS = [
+  ["today", "Today", () => { const s = startOf(new Date()); const e = new Date(s); e.setDate(e.getDate() + 1); return [s, e]; }],
+  ["weekend", "This weekend", () => { const s = startOf(new Date()); const day = s.getDay(); const sat = new Date(s); sat.setDate(s.getDate() + ((6 - day + 7) % 7)); const mon = new Date(sat); mon.setDate(sat.getDate() + 2); return [day === 0 ? s : sat, mon]; }],
+  ["week", "Next 7 days", () => { const s = new Date(); const e = new Date(s); e.setDate(e.getDate() + 7); return [s, e]; }],
+  ["month", "This month", () => { const s = new Date(); const e = new Date(s.getFullYear(), s.getMonth() + 1, 1); return [s, e]; }],
+];
 
 function niceDate(iso) {
   if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+function dayKey(iso) { return new Date(iso).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }); }
+
+export function shareEvent(ev) {
+  const url = `${process.env.REACT_APP_BACKEND_URL}/api/share/event/${ev.id}`;
+  if (navigator.share) navigator.share({ title: ev.title, url }).catch(() => {});
+  else { navigator.clipboard?.writeText(url); toast.success("Link copied"); }
+}
+
+export async function toggleSaveEvent(ev, user, onChange) {
+  if (!user) return toast.error("Log in to save events");
+  try {
+    const r = await api.post(`/events/${ev.id}/save`);
+    toast.success(r.data.saved ? "Saved — we'll remind you" : "Removed from saved");
+    onChange?.();
+  } catch { toast.error("Failed"); }
 }
 
 export default function Events() {
   const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
   const [events, setEvents] = useState([]);
+  const [cats, setCats] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState("map"); // map | list
-  const [category, setCategory] = useState("");
+  const [view, setView] = useState("list");
   const [showCreate, setShowCreate] = useState(false);
-  const [myLocation, setMyLocation] = useState(null); // {lat, lng} or null
+  const [myLocation, setMyLocation] = useState(null);
   const [radiusKm, setRadiusKm] = useState(50);
   const [locBusy, setLocBusy] = useState(false);
+  const [q, setQ] = useState(params.get("q") || "");
+  const [qInput, setQInput] = useState(params.get("q") || "");
+  const [category, setCategory] = useState(params.get("category") || "");
+  const [datePreset, setDatePreset] = useState("");
+  const [customRange, setCustomRange] = useState({ from: "", to: "" });
+  const [sort, setSort] = useState("soonest");
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [freeOnly, setFreeOnly] = useState(false);
+
+  useEffect(() => { api.get("/events/meta/categories").then((r) => setCats(r.data)).catch(() => {}); }, []);
+  const catMeta = (k) => cats.find((c) => c.key === k) || FALLBACK_CAT;
+
+  const range = useMemo(() => {
+    if (customRange.from || customRange.to) return [customRange.from ? new Date(customRange.from) : null, customRange.to ? new Date(customRange.to + "T23:59:59") : null];
+    const p = DATE_PRESETS.find((x) => x[0] === datePreset);
+    return p ? p[2]() : [null, null];
+  }, [datePreset, customRange]);
 
   const load = () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (category) params.set("category", category);
-    if (myLocation) {
-      params.set("near_lat", String(myLocation.lat));
-      params.set("near_lng", String(myLocation.lng));
-      params.set("radius_km", String(radiusKm));
-    }
-    const q = params.toString();
-    api.get(`/events${q ? `?${q}` : ""}`).then((r) => setEvents(r.data)).catch(() => setEvents([])).finally(() => setLoading(false));
+    const p = new URLSearchParams();
+    if (category) p.set("category", category);
+    if (q) p.set("q", q);
+    if (range[0]) p.set("date_from", range[0].toISOString());
+    if (range[1]) p.set("date_to", range[1].toISOString());
+    if (sort !== "soonest") p.set("sort", sort);
+    if (savedOnly && user) p.set("saved_only", "true");
+    if (freeOnly) p.set("free_only", "true");
+    if (myLocation) { p.set("near_lat", myLocation.lat); p.set("near_lng", myLocation.lng); p.set("radius_km", radiusKm); }
+    api.get(`/events?${p}`).then((r) => setEvents(r.data)).catch(() => setEvents([])).finally(() => setLoading(false));
+    const sp = {}; if (q) sp.q = q; if (category) sp.category = category; setParams(sp, { replace: true });
   };
-  useEffect(() => { load(); }, [category, myLocation, radiusKm]);
+  useEffect(() => { load(); }, [category, q, range, sort, savedOnly, freeOnly, myLocation, radiusKm]); // eslint-disable-line
 
   const detectLocation = () => {
-    if (!navigator.geolocation) { toast.error("Geolocation not supported"); return; }
+    if (!navigator.geolocation) return toast.error("Geolocation not supported");
     setLocBusy(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setMyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        toast.success(`Showing events within ${radiusKm}km`);
-        setLocBusy(false);
-      },
-      (err) => {
-        toast.error(err.code === 1 ? "Location permission denied" : "Couldn't get your location");
-        setLocBusy(false);
-      },
-      { timeout: 8000, maximumAge: 5 * 60 * 1000 }
+      (pos) => { setMyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setSort("distance"); setLocBusy(false); toast.success(`Events within ${radiusKm}km`); },
+      (err) => { toast.error(err.code === 1 ? "Location permission denied" : "Couldn't get your location"); setLocBusy(false); },
+      { timeout: 8000, maximumAge: 300000 },
     );
   };
-  const clearLocation = () => { setMyLocation(null); toast("Showing events worldwide"); };
 
   const canHost = user?.role === "artist" || user?.role === "admin";
+  const chip = (active, color = "#CCFF00") => ({ borderColor: active ? color : "rgba(255,255,255,0.1)", background: active ? `${color}20` : "transparent", color: active ? color : "#A1A1AA" });
+  const activeFilters = [category, q, datePreset, customRange.from, customRange.to, savedOnly, freeOnly, myLocation].filter(Boolean).length;
+  const reset = () => { setCategory(""); setQ(""); setQInput(""); setDatePreset(""); setCustomRange({ from: "", to: "" }); setSavedOnly(false); setFreeOnly(false); setMyLocation(null); setSort("soonest"); };
 
   return (
-    <div data-testid="events-page" className="max-w-6xl mx-auto px-4 md:px-6 pt-10 pb-32">
-      <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
+    <div data-testid="events-page" className="max-w-7xl mx-auto px-4 md:px-6 pt-8 md:pt-12 pb-32">
+      <div className="grid lg:grid-cols-[1fr_auto] gap-6 items-end mb-8">
         <div>
-          <div className="label-caps text-[#FF4D4D]"><MapPin size={12} className="inline mr-2" /> On the Map</div>
-          <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3">Events</h1>
-          <div className="text-zinc-500 mt-2">Openings, pop-ups, festivals — meet artists in person.</div>
+          <div className="label-caps text-[#FF4D4D]"><MapPin size={12} className="inline mr-2" /> Local art discovery</div>
+          <h1 className="font-anton text-4xl sm:text-5xl lg:text-6xl uppercase mt-3 leading-[0.9]">What's on<br />near you</h1>
+          <p className="text-zinc-500 mt-3 text-sm md:text-base max-w-xl">Exhibitions, openings, festivals, street art, classes, auctions and pop-ups — hosted by real artists and organizers on Art Core.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button data-testid="view-map" onClick={() => setView("map")}
-            className={`btn-ghost !py-2 !px-3 flex items-center gap-1 ${view === "map" ? "!border-[#CCFF00] !text-[#CCFF00]" : ""}`}>
-            <MapIcon size={14} /> Map
-          </button>
-          <button data-testid="view-list" onClick={() => setView("list")}
-            className={`btn-ghost !py-2 !px-3 flex items-center gap-1 ${view === "list" ? "!border-[#CCFF00] !text-[#CCFF00]" : ""}`}>
-            <ListIcon size={14} /> List
-          </button>
-          {canHost && (
-            <button data-testid="create-event-btn" onClick={() => setShowCreate(true)} className="btn-lime !py-2 !px-3 flex items-center gap-1">
-              <Plus size={14} /> Host
-            </button>
-          )}
+          <button data-testid="view-list" onClick={() => setView("list")} className={`btn-ghost !py-2 !px-3 flex items-center gap-1 ${view === "list" ? "!border-[#CCFF00] !text-[#CCFF00]" : ""}`}><ListIcon size={14} /> List</button>
+          <button data-testid="view-map" onClick={() => setView("map")} className={`btn-ghost !py-2 !px-3 flex items-center gap-1 ${view === "map" ? "!border-[#CCFF00] !text-[#CCFF00]" : ""}`}><MapIcon size={14} /> Map</button>
+          {canHost && <button data-testid="create-event-btn" onClick={() => setShowCreate(true)} className="btn-lime !py-2 !px-3 flex items-center gap-1"><Plus size={14} /> Host</button>}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap mb-4 items-center">
-        <button data-testid="filter-cat-all" onClick={() => setCategory("")}
-          className="label-caps text-xs px-3 py-1.5 rounded-full border transition-colors"
-          style={{ borderColor: !category ? "#CCFF00" : "rgba(255,255,255,0.1)", background: !category ? "#CCFF0020" : "transparent", color: !category ? "#CCFF00" : "#A1A1AA" }}>All</button>
-        {CATEGORIES.map((c) => (
-          <button key={c.key} data-testid={`filter-cat-${c.key}`} onClick={() => setCategory(c.key)}
-            className="label-caps text-xs px-3 py-1.5 rounded-full border transition-colors"
-            style={{ borderColor: category === c.key ? c.color : "rgba(255,255,255,0.1)", background: category === c.key ? `${c.color}20` : "transparent", color: category === c.key ? c.color : "#A1A1AA" }}>
-            {c.label}
-          </button>
+      {/* Search + location */}
+      <form onSubmit={(e) => { e.preventDefault(); setQ(qInput.trim()); }} className="flex flex-col md:flex-row gap-2 mb-4">
+        <div className="flex-1 flex items-center gap-2 bg-white/[0.03] border border-white/12 rounded-sm px-3 focus-within:border-[#CCFF00]">
+          <Search size={14} className="text-zinc-500 flex-shrink-0" />
+          <input data-testid="events-search" value={qInput} onChange={(e) => setQInput(e.target.value)} placeholder="Search events, venues, cities, artists…"
+            className="w-full bg-transparent py-3 text-sm outline-none" />
+          {qInput && <button type="button" onClick={() => { setQInput(""); setQ(""); }} className="text-zinc-500"><X size={14} /></button>}
+        </div>
+        <button data-testid="events-search-btn" type="submit" className="btn-ghost !py-3 !px-4 text-xs">Search</button>
+        {myLocation ? (
+          <button type="button" data-testid="near-me-clear" onClick={() => { setMyLocation(null); setSort("soonest"); }}
+            className="btn-ghost !py-3 !px-4 text-xs flex items-center gap-2 !border-[#CCFF00] !text-[#CCFF00]"><Navigation size={12} /> Near me · {radiusKm}km <X size={11} /></button>
+        ) : (
+          <button type="button" data-testid="near-me-btn" onClick={detectLocation} disabled={locBusy} className="btn-ghost !py-3 !px-4 text-xs flex items-center gap-2"><Navigation size={12} /> {locBusy ? "Locating…" : "Near me"}</button>
+        )}
+      </form>
+      {myLocation && (
+        <div className="flex items-center gap-3 text-xs text-zinc-500 mb-4">
+          <span>Radius</span>
+          <input data-testid="radius-slider" type="range" min="5" max="500" step="5" value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} className="accent-[#CCFF00] flex-1 max-w-xs" />
+          <span className="text-white font-anton min-w-[4ch]">{radiusKm} km</span>
+        </div>
+      )}
+
+      {/* Date + category chips */}
+      <div className="flex gap-2 flex-wrap items-center mb-3">
+        <Calendar size={12} className="text-zinc-500" />
+        <button data-testid="date-any" onClick={() => { setDatePreset(""); setCustomRange({ from: "", to: "" }); }} className="label-caps text-xs px-3 py-1.5 rounded-full border" style={chip(!datePreset && !customRange.from && !customRange.to)}>Any date</button>
+        {DATE_PRESETS.map(([k, l]) => (
+          <button key={k} data-testid={`date-${k}`} onClick={() => { setDatePreset(k); setCustomRange({ from: "", to: "" }); }} className="label-caps text-xs px-3 py-1.5 rounded-full border" style={chip(datePreset === k)}>{l}</button>
+        ))}
+        <div className="flex items-center gap-1 text-xs text-zinc-500">
+          <input data-testid="date-from" type="date" value={customRange.from} onChange={(e) => { setDatePreset(""); setCustomRange((r) => ({ ...r, from: e.target.value })); }} className="bg-white/[0.03] border border-white/12 rounded-full px-2 py-1 text-xs outline-none" />
+          <span>→</span>
+          <input data-testid="date-to" type="date" value={customRange.to} onChange={(e) => { setDatePreset(""); setCustomRange((r) => ({ ...r, to: e.target.value })); }} className="bg-white/[0.03] border border-white/12 rounded-full px-2 py-1 text-xs outline-none" />
+        </div>
+      </div>
+      <div className="flex gap-2 flex-wrap items-center mb-3">
+        <button data-testid="filter-cat-all" onClick={() => setCategory("")} className="label-caps text-xs px-3 py-1.5 rounded-full border" style={chip(!category)}>All</button>
+        {cats.map((c) => (
+          <button key={c.key} data-testid={`filter-cat-${c.key}`} onClick={() => setCategory(category === c.key ? "" : c.key)} className="label-caps text-xs px-3 py-1.5 rounded-full border" style={chip(category === c.key, c.color)}>{c.label}</button>
         ))}
       </div>
-
-      {/* Near me controls */}
-      <div className="flex gap-2 items-center flex-wrap mb-6 pb-4 border-b border-white/8">
-        {myLocation ? (
-          <>
-            <button data-testid="near-me-clear" onClick={clearLocation}
-              className="label-caps text-xs px-3 py-1.5 rounded-full border border-[#CCFF00] bg-[#CCFF00]/15 text-[#CCFF00] flex items-center gap-1.5">
-              <Navigation size={12} /> Near me · {radiusKm}km <X size={11} className="ml-1" />
-            </button>
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <span>Radius</span>
-              <input data-testid="radius-slider" type="range" min="5" max="500" step="5" value={radiusKm}
-                onChange={(e) => setRadiusKm(Number(e.target.value))} className="accent-[#CCFF00]" />
-              <span className="text-white font-anton min-w-[3ch] text-right">{radiusKm}</span>
-              <span>km</span>
-            </div>
-          </>
-        ) : (
-          <button data-testid="near-me-btn" onClick={detectLocation} disabled={locBusy}
-            className="label-caps text-xs px-3 py-1.5 rounded-full border border-white/12 text-zinc-300 hover:border-[#CCFF00] hover:text-[#CCFF00] flex items-center gap-1.5">
-            {locBusy ? <Loader2 size={12} className="animate-spin" /> : <Navigation size={12} />} Near me
-          </button>
-        )}
-        <div className="text-xs text-zinc-500 ml-auto">
-          {events.length} {events.length === 1 ? "event" : "events"} {myLocation ? `within ${radiusKm}km` : "worldwide"}
-        </div>
+      <div className="flex gap-2 flex-wrap items-center mb-6 pb-4 border-b border-white/8">
+        {user && <button data-testid="filter-saved" onClick={() => setSavedOnly((v) => !v)} className="label-caps text-xs px-3 py-1.5 rounded-full border flex items-center gap-1" style={chip(savedOnly, "#FF6EC7")}><Bookmark size={11} /> Saved</button>}
+        <button data-testid="filter-free" onClick={() => setFreeOnly((v) => !v)} className="label-caps text-xs px-3 py-1.5 rounded-full border" style={chip(freeOnly, "#34D399")}>Free</button>
+        <select data-testid="events-sort" value={sort} onChange={(e) => setSort(e.target.value)} className="label-caps text-xs px-3 py-1.5 rounded-full border border-white/10 bg-[#0A0A0C] text-zinc-400 outline-none">
+          <option value="soonest">Soonest first</option>
+          <option value="trending">Trending</option>
+          {myLocation && <option value="distance">Closest first</option>}
+        </select>
+        <span className="text-xs text-zinc-500 ml-auto" data-testid="events-count">{loading ? "Loading…" : `${events.length} event${events.length === 1 ? "" : "s"}`}</span>
+        {activeFilters > 0 && <button data-testid="events-reset" onClick={reset} className="label-caps text-xs text-[#FF4D4D]">Reset</button>}
       </div>
 
-      {loading && !events.length ? (
-        <div className="text-center py-16 label-caps text-zinc-500">Loading...</div>
+      {view === "map" ? (
+        <EventsMap events={events} myLocation={myLocation} radiusKm={radiusKm} catMeta={catMeta} user={user} onChange={load} />
       ) : (
-        <>
-          {view === "map" && <EventsMap events={events} myLocation={myLocation} radiusKm={radiusKm} onChange={load} />}
-          {view === "list" && <EventsList events={events} onChange={load} />}
-        </>
+        <EventsList events={events} loading={loading} catMeta={catMeta} user={user} onChange={load} savedOnly={savedOnly} />
       )}
 
-      {showCreate && (
-        <CreateEventModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load(); }} />
-      )}
+      {showCreate && <CreateEventModal categories={cats} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load(); }} />}
     </div>
   );
 }
 
-function EventsMap({ events, myLocation, radiusKm, onChange }) {
+function EventsList({ events, loading, catMeta, user, onChange, savedOnly }) {
+  if (loading && events.length === 0) return <div className="py-24 text-center label-caps text-zinc-500">Loading events…</div>;
+  if (events.length === 0) return (
+    <div className="border border-dashed border-white/10 rounded-sm p-16 text-center" data-testid="events-empty">
+      <Calendar size={28} className="mx-auto text-zinc-600 mb-3" />
+      <div className="font-anton text-2xl uppercase">{savedOnly ? "No saved events yet" : "Nothing matches"}</div>
+      <div className="text-zinc-500 text-sm mt-2">{savedOnly ? "Tap the bookmark on any event to save it here." : "Try another date, category, or widen your radius."}</div>
+    </div>
+  );
+  const groups = events.reduce((acc, e) => { const k = dayKey(e.start_at); (acc[k] = acc[k] || []).push(e); return acc; }, {});
+  return (
+    <div className="space-y-10" data-testid="events-list-view">
+      {Object.entries(groups).map(([day, list]) => (
+        <section key={day}>
+          <div className="flex items-center gap-3 mb-4"><div className="font-anton text-xl uppercase">{day}</div><div className="flex-1 h-px bg-white/8" /></div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {list.map((e) => <EventCard key={e.id} event={e} catMeta={catMeta} user={user} onChange={onChange} />)}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+export function EventCard({ event, catMeta, user, onChange }) {
+  const meta = catMeta(event.category);
+  const full = event.max_capacity && event.rsvp_count >= event.max_capacity;
+  const trending = event.rsvp_count >= 5;
+  return (
+    <div data-testid={`event-card-${event.id}`} className="group border border-white/8 rounded-sm overflow-hidden bg-[#0F0F11] hover:border-white/20 transition-colors flex flex-col">
+      <Link to={`/events/${event.id}`} className="relative block aspect-[16/10] overflow-hidden bg-white/[0.03]">
+        {event.cover_image ? <img src={resolveImg(event.cover_image)} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+          : <div className="w-full h-full flex items-center justify-center text-zinc-700"><Calendar size={28} /></div>}
+        <div className="absolute top-2 left-2 flex gap-1.5">
+          <span className="label-caps text-[10px] px-2 py-1 rounded-sm backdrop-blur-md" style={{ background: `${meta.color}33`, color: meta.color }}>{meta.label}</span>
+          {trending && <span className="label-caps text-[10px] px-2 py-1 rounded-sm bg-[#FF4D4D]/30 text-[#FF4D4D] backdrop-blur-md flex items-center gap-1"><Flame size={10} /> Hot</span>}
+        </div>
+        <div className="absolute bottom-2 left-2 label-caps text-[10px] px-2 py-1 rounded-sm bg-black/60 backdrop-blur-md text-white">
+          {event.is_free ? "Free" : `$${Number(event.ticket_price).toLocaleString()}`}{event.distance_km != null ? ` · ${event.distance_km} km` : ""}
+        </div>
+      </Link>
+      <div className="p-4 flex-1 flex flex-col">
+        <div className="text-xs text-[#CCFF00] label-caps">{niceDate(event.start_at)}</div>
+        <Link to={`/events/${event.id}`} className="font-unbounded font-semibold text-sm mt-1.5 leading-snug line-clamp-2 hover:text-[#CCFF00]">{event.title}</Link>
+        <div className="text-xs text-zinc-500 mt-2 flex items-center gap-1 truncate"><MapPin size={11} className="flex-shrink-0" /> {[event.venue, event.location?.city || event.location?.address].filter(Boolean).join(" · ") || "Location TBA"}</div>
+        <div className="text-xs text-zinc-500 mt-1 truncate">by {event.organizer || event.host_name}</div>
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/8">
+          <span className="text-xs text-zinc-400 flex items-center gap-1"><Users size={12} /> {event.rsvp_count}{event.max_capacity ? `/${event.max_capacity}` : ""}{full ? " · Full" : ""}</span>
+          <div className="flex items-center gap-1">
+            <button data-testid={`save-event-${event.id}`} onClick={() => toggleSaveEvent(event, user, onChange)} title="Save"
+              className={`p-1.5 rounded-sm hover:bg-white/5 ${event.saved ? "text-[#FF6EC7]" : "text-zinc-500"}`}><Bookmark size={14} fill={event.saved ? "currentColor" : "none"} /></button>
+            <button data-testid={`share-event-${event.id}`} onClick={() => shareEvent(event)} title="Share" className="p-1.5 rounded-sm hover:bg-white/5 text-zinc-500"><Share2 size={14} /></button>
+            <Link to={`/events/${event.id}`} data-testid={`rsvp-link-${event.id}`} className="ml-1 label-caps text-[10px] px-2.5 py-1.5 rounded-sm border border-[#CCFF00]/40 text-[#CCFF00] hover:bg-[#CCFF00]/10 flex items-center gap-1">
+              <Ticket size={11} /> {event.rsvped ? "Going" : event.is_free ? "RSVP" : "Tickets"}
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventsMap({ events, myLocation, radiusKm, catMeta, user, onChange }) {
   const [selected, setSelected] = useState(null);
-  // Default center — user location if available, else auto-fit events, else NYC-ish
   const center = useMemo(() => {
     if (myLocation) return [myLocation.lat, myLocation.lng];
     if (events.length === 0) return [40.7128, -74.006];
-    const avgLat = events.reduce((s, e) => s + e.location.lat, 0) / events.length;
-    const avgLng = events.reduce((s, e) => s + e.location.lng, 0) / events.length;
-    return [avgLat, avgLng];
+    return [events.reduce((s, e) => s + e.location.lat, 0) / events.length, events.reduce((s, e) => s + e.location.lng, 0) / events.length];
   }, [events, myLocation]);
-
-  // Custom icon for the "you are here" marker (lime dot)
-  const meIcon = useMemo(() => L.divIcon({
-    className: "",
-    html: '<div style="width:16px;height:16px;background:#CCFF00;border:2px solid #0A0A0C;border-radius:50%;box-shadow:0 0 0 6px rgba(204,255,0,0.25)"></div>',
-    iconSize: [16, 16], iconAnchor: [8, 8],
-  }), []);
+  const meIcon = useMemo(() => L.divIcon({ className: "", html: '<div style="width:16px;height:16px;background:#CCFF00;border:2px solid #0A0A0C;border-radius:50%;box-shadow:0 0 0 6px rgba(204,255,0,0.25)"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }), []);
+  const pin = (color, active) => L.divIcon({ className: "", iconSize: [26, 26], iconAnchor: [13, 26], popupAnchor: [0, -26],
+    html: `<div style="width:26px;height:26px;background:${color};border:2px solid #0A0A0C;border-radius:50% 50% 50% 0;transform:rotate(-45deg) scale(${active ? 1.25 : 1});box-shadow:0 2px 8px rgba(0,0,0,.6)"></div>` });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 h-[70vh]" data-testid="events-map-view">
-      <div className="border border-white/8 rounded-sm overflow-hidden h-full">
-        <MapContainer center={center} zoom={events.length || myLocation ? 4 : 3} scrollWheelZoom style={{ height: "100%", width: "100%", background: "#0A0A0C" }}>
-          <TileLayer
-            attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
-            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            className="grayscale contrast-125"
-          />
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 h-[60vh] md:h-[70vh]" data-testid="events-map-view">
+      <div className="border border-white/8 rounded-sm overflow-hidden h-full min-h-[300px]">
+        <MapContainer center={center} zoom={4} scrollWheelZoom style={{ height: "100%", width: "100%", background: "#0A0A0C" }}>
+          <TileLayer attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" className="grayscale contrast-125" />
           <FitToBounds events={events} myLocation={myLocation} radiusKm={radiusKm} />
-          {myLocation && (
-            <>
-              <Marker position={[myLocation.lat, myLocation.lng]} icon={meIcon}>
-                <Popup>You are here</Popup>
-              </Marker>
-              <Circle center={[myLocation.lat, myLocation.lng]} radius={radiusKm * 1000}
-                pathOptions={{ color: "#CCFF00", fillColor: "#CCFF00", fillOpacity: 0.05, weight: 1, dashArray: "6 6" }} />
-            </>
-          )}
+          {myLocation && (<>
+            <Marker position={[myLocation.lat, myLocation.lng]} icon={meIcon}><Popup>You are here</Popup></Marker>
+            <Circle center={[myLocation.lat, myLocation.lng]} radius={radiusKm * 1000} pathOptions={{ color: "#CCFF00", fillColor: "#CCFF00", fillOpacity: 0.05, weight: 1, dashArray: "6 6" }} />
+          </>)}
           {events.map((e) => (
-            <Marker key={e.id} position={[e.location.lat, e.location.lng]} eventHandlers={{ click: () => setSelected(e) }}>
+            <Marker key={e.id} position={[e.location.lat, e.location.lng]} icon={pin(catMeta(e.category).color, selected?.id === e.id)} eventHandlers={{ click: () => setSelected(e) }}>
               <Popup>
                 <div style={{ minWidth: 200 }}>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>{e.title}</div>
                   <div style={{ fontSize: 11, color: "#666" }}>{niceDate(e.start_at)}</div>
-                  <div style={{ fontSize: 12, marginTop: 4 }}>{e.location.city || e.location.address || ""}</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>{[e.venue, e.location.city].filter(Boolean).join(" · ")}</div>
                   <Link to={`/events/${e.id}`} style={{ color: "#7C3AED", fontSize: 12, display: "inline-block", marginTop: 6 }}>View →</Link>
                 </div>
               </Popup>
@@ -215,13 +287,24 @@ function EventsMap({ events, myLocation, radiusKm, onChange }) {
         </MapContainer>
       </div>
       <div className="border border-white/8 rounded-sm overflow-y-auto max-h-[70vh]" data-testid="events-side-list">
-        {events.length === 0 ? (
-          <div className="text-center py-16 label-caps text-zinc-500 px-4">No events {myLocation ? "in range" : "yet"}.</div>
-        ) : (
+        {events.length === 0 ? <div className="text-center py-16 label-caps text-zinc-500 px-4">No events {myLocation ? "in range" : "match"}.</div> : (
           <div className="divide-y divide-white/8">
-            {events.map((e) => (
-              <MiniEventCard key={e.id} event={e} onSelect={() => setSelected(e)} active={selected?.id === e.id} onChange={onChange} />
-            ))}
+            {events.map((e) => {
+              const m = catMeta(e.category);
+              return (
+                <Link key={e.id} to={`/events/${e.id}`} data-testid={`event-mini-${e.id}`} onMouseEnter={() => setSelected(e)} className={`block p-4 hover:bg-white/[0.04] ${selected?.id === e.id ? "bg-white/[0.04]" : ""}`}>
+                  <div className="flex items-start gap-3">
+                    {e.cover_image && <img src={resolveImg(e.cover_image)} alt="" className="w-16 h-16 object-cover rounded-sm flex-shrink-0" loading="lazy" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="label-caps text-[10px]" style={{ color: m.color }}>{m.label}{e.distance_km != null ? ` · ${e.distance_km} km` : ""}</div>
+                      <div className="font-unbounded text-xs font-semibold mt-1 truncate">{e.title}</div>
+                      <div className="text-[11px] text-zinc-500 mt-1">{niceDate(e.start_at)}</div>
+                      <div className="text-[11px] text-zinc-500 truncate">{[e.venue, e.location.city].filter(Boolean).join(" · ")}</div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
@@ -235,263 +318,8 @@ function FitToBounds({ events, myLocation, radiusKm }) {
     const points = events.map((e) => [e.location.lat, e.location.lng]);
     if (myLocation) points.push([myLocation.lat, myLocation.lng]);
     if (points.length === 0) return;
-    if (points.length === 1) {
-      map.setView(points[0], myLocation ? 10 : 12);
-      return;
-    }
-    const bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+    if (points.length === 1) { map.setView(points[0], myLocation ? 10 : 12); return; }
+    map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 12 });
   }, [events, myLocation, radiusKm, map]);
   return null;
-}
-
-function MiniEventCard({ event, onSelect, active, onChange }) {
-  const meta = catMeta(event.category);
-  return (
-    <Link
-      to={`/events/${event.id}`}
-      data-testid={`event-mini-${event.id}`}
-      onMouseEnter={onSelect}
-      className={`block p-4 hover:bg-white/[0.04] ${active ? "bg-white/[0.04]" : ""}`}>
-      <div className="flex items-start gap-3">
-        {event.cover_image && (
-          <img src={resolveImg(event.cover_image)} alt="" className="w-16 h-16 object-cover rounded-sm flex-shrink-0" loading="lazy" />
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="label-caps text-[10px] px-1.5 py-0.5 rounded-sm" style={{ background: `${meta.color}22`, color: meta.color }}>{meta.label}</span>
-            {event.is_free ? <span className="label-caps text-[10px] text-[#CCFF00]">Free</span> : <span className="label-caps text-[10px] text-[#F5A623]">${event.ticket_price}</span>}
-          </div>
-          <div className="font-unbounded font-semibold text-sm truncate">{event.title}</div>
-          <div className="text-xs text-zinc-500 mt-1 flex items-center gap-1"><Calendar size={10} /> {niceDate(event.start_at)}</div>
-          <div className="text-xs text-zinc-500 flex items-center gap-1"><MapPin size={10} /> {event.location.city || event.location.address || "TBA"}</div>
-          <div className="text-xs text-zinc-500 flex items-center gap-1 mt-1"><Users size={10} /> {event.rsvp_count} RSVPs</div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function EventsList({ events, onChange }) {
-  if (events.length === 0) return (
-    <div className="border border-dashed border-white/10 py-24 text-center rounded-sm">
-      <div className="label-caps text-zinc-500">No events match yet.</div>
-    </div>
-  );
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="events-list-view">
-      {events.map((e) => (
-        <EventCard key={e.id} event={e} onChange={onChange} />
-      ))}
-    </div>
-  );
-}
-
-function EventCard({ event, onChange }) {
-  const meta = catMeta(event.category);
-  return (
-    <Link to={`/events/${event.id}`} data-testid={`event-card-${event.id}`}
-      className="border border-white/8 rounded-sm overflow-hidden hover:border-[#CCFF00]/40 transition-colors bg-[#121214] flex flex-col">
-      {event.cover_image ? (
-        <img src={resolveImg(event.cover_image)} alt={event.title} className="w-full h-40 object-cover" loading="lazy" />
-      ) : (
-        <div className="w-full h-40 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${meta.color}30, #0A0A0C)` }}>
-          <MapPin size={32} className="text-white/40" />
-        </div>
-      )}
-      <div className="p-4 flex-1 flex flex-col">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="label-caps text-[10px] px-1.5 py-0.5 rounded-sm" style={{ background: `${meta.color}22`, color: meta.color }}>{meta.label}</span>
-          {event.is_free ? <span className="label-caps text-[10px] text-[#CCFF00]">Free</span> : <span className="label-caps text-[10px] text-[#F5A623]">${event.ticket_price}</span>}
-        </div>
-        <div className="font-anton text-xl uppercase leading-tight">{event.title}</div>
-        <div className="text-xs text-zinc-400 mt-2 flex items-center gap-1"><Calendar size={10} /> {niceDate(event.start_at)}</div>
-        <div className="text-xs text-zinc-500 flex items-center gap-1 truncate"><MapPin size={10} /> {event.location.city || event.location.address || "TBA"}</div>
-        <div className="text-xs text-zinc-500 flex items-center gap-1 mt-1"><Users size={10} /> {event.rsvp_count} RSVPs</div>
-      </div>
-    </Link>
-  );
-}
-
-/* ---------------- Create Event Modal ---------------- */
-function CreateEventModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({
-    title: "", description: "", category: "gallery_opening",
-    address: "", city: "", lat: "", lng: "",
-    start_at: "", end_at: "",
-    is_free: true, ticket_price: "",
-    cover_image: null,
-    // recurrence
-    recurring: false, freq: "weekly", count: 4,
-    reminders_enabled: true,
-  });
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [geocoding, setGeocoding] = useState(false);
-
-  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const upload = async (file) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const fd = new FormData(); fd.append("file", file);
-      const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setF("cover_image", r.data.path);
-    } catch { toast.error("Upload failed"); }
-    setUploading(false);
-  };
-
-  const geocode = async () => {
-    const query = [form.address, form.city].filter(Boolean).join(", ");
-    if (!query.trim()) { toast.error("Enter an address or city first"); return; }
-    setGeocoding(true);
-    try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`,
-        { headers: { "Accept": "application/json" } });
-      const data = await r.json();
-      if (data && data[0]) {
-        setF("lat", parseFloat(data[0].lat).toFixed(6));
-        setF("lng", parseFloat(data[0].lon).toFixed(6));
-        toast.success("Location found");
-      } else {
-        toast.error("Couldn't find that place");
-      }
-    } catch { toast.error("Geocoding failed"); }
-    setGeocoding(false);
-  };
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.title || !form.description || !form.start_at || !form.lat || !form.lng) {
-      toast.error("Fill title, description, start time, and location");
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = {
-        title: form.title,
-        description: form.description,
-        category: form.category,
-        location: {
-          lat: parseFloat(form.lat), lng: parseFloat(form.lng),
-          address: form.address || null, city: form.city || null,
-        },
-        start_at: new Date(form.start_at).toISOString(),
-        end_at: form.end_at ? new Date(form.end_at).toISOString() : null,
-        cover_image: form.cover_image,
-        is_free: form.is_free,
-        ticket_price: form.is_free ? null : parseFloat(form.ticket_price) || 0,
-        recurrence: form.recurring ? { frequency: form.freq, count: Math.max(2, Math.min(26, Number(form.count) || 2)) } : null,
-        reminders_enabled: form.reminders_enabled,
-      };
-      await api.post("/events", payload);
-      toast.success("Event created");
-      onCreated();
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Failed");
-    }
-    setSaving(false);
-  };
-
-  return (
-    <div data-testid="create-event-modal" onClick={onClose}
-      className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
-      <div onClick={(e) => e.stopPropagation()} className="bg-[#121214] border border-white/10 rounded-sm w-full max-w-2xl my-auto">
-        <div className="flex items-center justify-between p-4 border-b border-white/8">
-          <div className="font-unbounded font-semibold">Host an event</div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
-        </div>
-        <form onSubmit={submit} className="p-4 space-y-4">
-          <input data-testid="event-title" placeholder="Title" value={form.title} onChange={(e) => setF("title", e.target.value)}
-            className="w-full bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00]" />
-          <textarea data-testid="event-description" placeholder="Describe the vibe, what people can expect..." rows={4}
-            value={form.description} onChange={(e) => setF("description", e.target.value)}
-            className="w-full bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm resize-none" />
-          <div className="grid grid-cols-2 gap-3">
-            <select data-testid="event-category" value={form.category} onChange={(e) => setF("category", e.target.value)}
-              className="bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm">
-              {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-            </select>
-            <label className="btn-ghost !py-3 cursor-pointer text-center flex items-center justify-center gap-2 text-xs">
-              {uploading ? <Loader2 size={14} className="animate-spin" /> : (form.cover_image ? "Change cover" : "Cover image")}
-              <input data-testid="event-cover" type="file" accept="image/*" className="hidden"
-                onChange={(e) => upload(e.target.files?.[0])} />
-            </label>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input data-testid="event-address" placeholder="Address" value={form.address} onChange={(e) => setF("address", e.target.value)}
-              className="bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm" />
-            <input data-testid="event-city" placeholder="City" value={form.city} onChange={(e) => setF("city", e.target.value)}
-              className="bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm" />
-          </div>
-          <button type="button" data-testid="event-geocode" onClick={geocode}
-            className="btn-ghost !py-2 !text-xs w-full flex items-center justify-center gap-2">
-            {geocoding ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-            Find coordinates from address
-          </button>
-          <div className="grid grid-cols-2 gap-3">
-            <input data-testid="event-lat" placeholder="Latitude" value={form.lat} onChange={(e) => setF("lat", e.target.value)}
-              className="bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm" />
-            <input data-testid="event-lng" placeholder="Longitude" value={form.lng} onChange={(e) => setF("lng", e.target.value)}
-              className="bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-xs text-zinc-500 mb-1">Start</div>
-              <input data-testid="event-start" type="datetime-local" value={form.start_at} onChange={(e) => setF("start_at", e.target.value)}
-                className="w-full bg-white/[0.03] border border-white/12 px-3 py-2.5 rounded-sm outline-none focus:border-[#CCFF00] text-sm" />
-            </div>
-            <div>
-              <div className="text-xs text-zinc-500 mb-1">End (optional)</div>
-              <input data-testid="event-end" type="datetime-local" value={form.end_at} onChange={(e) => setF("end_at", e.target.value)}
-                className="w-full bg-white/[0.03] border border-white/12 px-3 py-2.5 rounded-sm outline-none focus:border-[#CCFF00] text-sm" />
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
-            <input data-testid="event-free" type="checkbox" checked={form.is_free} onChange={(e) => setF("is_free", e.target.checked)} />
-            Free event
-          </label>
-          {!form.is_free && (
-            <input data-testid="event-price" type="number" step="0.01" placeholder="Ticket price"
-              value={form.ticket_price} onChange={(e) => setF("ticket_price", e.target.value)}
-              className="w-full bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm" />
-          )}
-          <div className="border-t border-white/8 pt-3 space-y-3">
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input data-testid="event-recurring" type="checkbox" checked={form.recurring}
-                onChange={(e) => setF("recurring", e.target.checked)} />
-              Make it a recurring series
-            </label>
-            {form.recurring && (
-              <div className="grid grid-cols-2 gap-3">
-                <select data-testid="event-freq" value={form.freq} onChange={(e) => setF("freq", e.target.value)}
-                  className="bg-white/[0.03] border border-white/12 px-3 py-2.5 rounded-sm text-sm outline-none focus:border-[#CCFF00]">
-                  <option value="weekly">Weekly</option>
-                  <option value="biweekly">Biweekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-                <input data-testid="event-count" type="number" min="2" max="26" placeholder="How many total?"
-                  value={form.count} onChange={(e) => setF("count", e.target.value)}
-                  className="bg-white/[0.03] border border-white/12 px-3 py-2.5 rounded-sm text-sm outline-none focus:border-[#CCFF00]" />
-                <div className="col-span-2 text-xs text-zinc-500">
-                  Creates {Math.max(2, Math.min(26, Number(form.count) || 2))} events, each {form.freq === "weekly" ? "7" : form.freq === "biweekly" ? "14" : "30"} days apart.
-                </div>
-              </div>
-            )}
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
-              <input data-testid="event-reminders" type="checkbox" checked={form.reminders_enabled}
-                onChange={(e) => setF("reminders_enabled", e.target.checked)} />
-              Send 24h + 1h reminders to attendees{form.recurring ? " (every occurrence)" : ""}
-            </label>
-          </div>
-          <button data-testid="event-submit" type="submit" disabled={saving}
-            className="btn-lime w-full !py-3 flex items-center justify-center gap-2">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            Create event
-          </button>
-        </form>
-      </div>
-    </div>
-  );
 }

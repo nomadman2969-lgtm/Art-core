@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Gavel, Clock, TrendingUp, Trophy, CreditCard } from "lucide-react";
+import { Gavel, Clock, TrendingUp, Trophy, CreditCard, Radio } from "lucide-react";
+import { useLive } from "../hooks/useLive";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -125,11 +126,12 @@ export function AuctionDetail() {
     api.get(`/auctions/${id}`).then((r) => { setA(r.data); }).catch(() => nav("/auctions"));
     api.get(`/auctions/${id}/bids`).then((r) => setBids(r.data));
   };
+  const liveConnected = useLive([`auction:${id}`], (ev) => { if (ev.type === "bid") load(); });
   useEffect(() => {
     load();
-    const t = setInterval(load, 3000);
+    const t = setInterval(load, liveConnected ? 20000 : 3000);
     return () => clearInterval(t);
-  }, [id]);
+  }, [id, liveConnected]);
 
   const placeBid = async (e) => {
     e.preventDefault();
@@ -151,21 +153,23 @@ export function AuctionDetail() {
   const iWon = a.status === "ended" && a.winner_id === user?.id;
 
   return (
-    <div data-testid="auction-detail" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-12 pb-32">
-      <div className="grid md:grid-cols-12 gap-10">
-        <div className="md:col-span-7">
+    <div data-testid="auction-detail" className="max-w-[1600px] mx-auto px-4 md:px-12 pt-6 md:pt-12 pb-32 overflow-x-hidden">
+      <div className="grid md:grid-cols-12 gap-6 md:gap-10">
+        <div className="md:col-span-7 min-w-0">
           <div className="aspect-[4/3] bg-black overflow-hidden border border-white/8 rounded-sm">
             <img src={resolveImg(a.artwork?.images?.[0])} alt="" className="w-full h-full object-cover" />
           </div>
           <div className="mt-4">
-            <div className="label-caps text-[#7C3AED]">Auctioning</div>
+            <div className="label-caps text-[#7C3AED] flex items-center gap-3">Auctioning
+              {liveConnected && <span data-testid="live-indicator" className="inline-flex items-center gap-1 text-[10px] text-[#CCFF00]"><Radio size={10} className="animate-pulse" /> LIVE</span>}
+            </div>
             <div className="font-anton text-4xl mt-2">{a.artwork?.title}</div>
             <div className="text-sm text-zinc-500 mt-1">by <Link to={`/artist/${a.seller?.id}`} className="text-[#CCFF00]">{a.seller?.name}</Link></div>
           </div>
         </div>
 
-        <div className="md:col-span-5">
-          <div className="glass-card p-6 rounded-sm">
+        <div className="md:col-span-5 min-w-0">
+          <div className="glass-card p-4 md:p-6 rounded-sm">
             {a.status === "scheduled" ? (
               <>
                 <div className="label-caps text-[#F5A623]">Starts in</div>
@@ -190,7 +194,7 @@ export function AuctionDetail() {
             )}
             <div className="mt-8 border-t border-white/8 pt-6">
               <div className="label-caps">Current bid</div>
-              <div className="font-anton text-6xl text-[#CCFF00] mt-2">${Number(a.current_bid || a.start_price).toLocaleString()}</div>
+              <div className="font-anton text-5xl md:text-6xl text-[#CCFF00] mt-2 break-words">${Number(a.current_bid || a.start_price).toLocaleString()}</div>
               <div className="text-xs text-zinc-500 mt-2">
                 {a.bid_count} bid{a.bid_count === 1 ? "" : "s"} · Start ${Number(a.start_price).toLocaleString()}
                 {a.reserve_price > 0 && ` · Reserve $${Number(a.reserve_price).toLocaleString()}`}
@@ -210,7 +214,7 @@ export function AuctionDetail() {
                   <div className="flex gap-2">
                     <input data-testid="bid-input" type="number" min={minNext} step="1" required
                       value={amount} onChange={(e) => setAmount(e.target.value)}
-                      className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none focus:border-[#CCFF00] font-unbounded" />
+                      className="flex-1 min-w-0 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-3 outline-none focus:border-[#CCFF00] font-unbounded" />
                     <button data-testid="bid-submit" disabled={placing} className="btn-lime">
                       {placing ? "..." : "Bid"}
                     </button>
@@ -362,7 +366,7 @@ function ProxyBidPanel({ auctionId, minNext, onSet }) {
   const [max, setMax] = useState("");
   const [busy, setBusy] = useState(false);
   const load = () => api.get(`/auctions/${auctionId}/proxy-bid/mine`).then((r) => setMine(r.data)).catch(() => {});
-  useEffect(load, [auctionId]);
+  useEffect(() => { load(); }, [auctionId]);
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -388,7 +392,7 @@ function ProxyBidPanel({ auctionId, minNext, onSet }) {
       ) : (
         <form onSubmit={submit} className="flex gap-2">
           <input data-testid="proxy-input" type="number" min={minNext} step="1" placeholder={`min $${minNext}`} value={max} onChange={(e) => setMax(e.target.value)}
-            className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#7C3AED]" />
+            className="flex-1 min-w-0 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none focus:border-[#7C3AED]" />
           <button data-testid="proxy-set" disabled={busy || !max} className="btn-violet !py-2 !text-xs">Set Max</button>
         </form>
       )}
@@ -400,7 +404,7 @@ function ProxyBidPanel({ auctionId, minNext, onSet }) {
 function WatchToggle({ auctionId }) {
   const [state, setState] = useState({ watching: false, count: 0 });
   const load = () => api.get(`/auctions/${auctionId}/watch`).then((r) => setState(r.data)).catch(() => {});
-  useEffect(load, [auctionId]);
+  useEffect(() => { load(); }, [auctionId]);
   const toggle = async () => {
     try {
       if (state.watching) await api.delete(`/auctions/${auctionId}/watch`);
@@ -409,7 +413,7 @@ function WatchToggle({ auctionId }) {
     } catch { toast.error("Failed"); }
   };
   return (
-    <div className="mt-4 pt-4 border-t border-white/8 flex items-center justify-between" data-testid="watch-panel">
+    <div className="mt-4 pt-4 border-t border-white/8 flex items-center justify-between gap-3 flex-wrap" data-testid="watch-panel">
       <div>
         <div className="label-caps">Watching · {state.count}</div>
         <div className="text-xs text-zinc-500 mt-1">Get notified on leader changes and 6h before payment deadline.</div>

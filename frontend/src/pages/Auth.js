@@ -107,7 +107,7 @@ export function Register() {
     try {
       const u = await register({ email, password, name, role });
       toast.success("Welcome to Art Core");
-      nav(u.role === "artist" ? "/studio" : "/dashboard");
+      nav(u.role === "artist" ? "/onboarding" : "/dashboard");
     } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
     finally { setBusy(false); }
   };

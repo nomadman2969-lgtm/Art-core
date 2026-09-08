@@ -7,8 +7,19 @@ import { toast } from "sonner";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { BroadcastModal } from "../components/events/BroadcastModal";
+import { shareEvent, toggleSaveEvent } from "./Events";
+import { Bookmark, Share2, Globe, ExternalLink, CalendarPlus, Building2 } from "lucide-react";
 
-const catColor = { gallery_opening: "#D4AF37", pop_up: "#FF4D4D", festival: "#FF6EC7", meetup: "#7C3AED", workshop: "#00E5FF", live_painting: "#F5A623", virtual: "#CCFF00", market: "#00E5FF" };
+const catColor = { exhibition: "#F4F4F5", gallery_opening: "#D4AF37", festival: "#FF6EC7", street_art: "#CCFF00", pop_up: "#FF4D4D", art_class: "#00E5FF", workshop: "#00B8CC", auction: "#7C3AED", meetup: "#A78BFA", live_painting: "#F5A623", museum: "#E4E4E7", market: "#34D399", virtual: "#CCFF00" };
+
+function downloadIcs(ev) {
+  const fmt = (iso) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const loc = [ev.venue, ev.location?.address, ev.location?.city].filter(Boolean).join(", ");
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Art Core//Events//EN", "BEGIN:VEVENT", `UID:${ev.id}@artcorestudio.net`, `DTSTAMP:${fmt(new Date().toISOString())}`,
+    `DTSTART:${fmt(ev.start_at)}`, `DTEND:${fmt(ev.end_at || new Date(new Date(ev.start_at).getTime() + 7200000).toISOString())}`, `SUMMARY:${ev.title}`,
+    `DESCRIPTION:${(ev.description || "").replace(/\n/g, "\\n").slice(0, 500)}`, `LOCATION:${loc}`, `URL:${window.location.href}`, "BEGIN:VALARM", "TRIGGER:-PT24H", "ACTION:DISPLAY", `DESCRIPTION:Tomorrow: ${ev.title}`, "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" })); a.download = `${ev.title.replace(/[^a-z0-9]+/gi, "-")}.ics`; a.click();
+}
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
 export default function EventDetail() {
@@ -132,14 +143,33 @@ export default function EventDetail() {
 
       <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-8">
         <div>
-          <span className="label-caps text-xs px-2 py-1 rounded-sm" style={{ background: `${color}22`, color }}>{(ev.category || "").replace(/_/g, " ")}</span>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <span className="label-caps text-xs px-2 py-1 rounded-sm" style={{ background: `${color}22`, color }}>{(ev.category || "").replace(/_/g, " ")}</span>
+            <div className="flex items-center gap-1">
+              <button data-testid="save-event-btn" onClick={() => toggleSaveEvent(ev, user, load)} className={`btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1 ${ev.saved ? "!text-[#FF6EC7] !border-[#FF6EC7]/40" : ""}`}>
+                <Bookmark size={12} fill={ev.saved ? "currentColor" : "none"} /> {ev.saved ? "Saved" : "Save"}
+              </button>
+              <button data-testid="share-event-btn" onClick={() => shareEvent(ev)} className="btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1"><Share2 size={12} /> Share</button>
+              <button data-testid="calendar-event-btn" onClick={() => downloadIcs(ev)} className="btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1"><CalendarPlus size={12} /> Calendar</button>
+            </div>
+          </div>
           <h1 className="font-anton text-4xl md:text-5xl uppercase mt-3 leading-tight">{ev.title}</h1>
           <div className="flex items-center gap-6 text-sm text-zinc-400 mt-3 flex-wrap">
             <div className="flex items-center gap-1"><Calendar size={12} /> {new Date(ev.start_at).toLocaleString()}</div>
             {ev.end_at && <div className="flex items-center gap-1">— {new Date(ev.end_at).toLocaleString()}</div>}
             <div className="flex items-center gap-1"><Users size={12} /> {ev.rsvp_count} going</div>
           </div>
+          <div className="grid sm:grid-cols-2 gap-3 mt-6">
+            <div className="border border-white/8 rounded-sm p-3"><div className="label-caps text-zinc-500 text-[10px] mb-1 flex items-center gap-1"><Building2 size={10} /> Venue</div><div className="text-sm" data-testid="event-venue-text">{ev.venue || ev.location?.address || "TBA"}</div><div className="text-xs text-zinc-500">{[ev.location?.address && ev.venue ? ev.location.address : null, ev.location?.city].filter(Boolean).join(", ")}</div></div>
+            <div className="border border-white/8 rounded-sm p-3"><div className="label-caps text-zinc-500 text-[10px] mb-1">Organizer</div><div className="text-sm" data-testid="event-organizer-text">{ev.organizer || ev.host?.name}</div>{ev.website && <a data-testid="event-website-link" href={ev.website} target="_blank" rel="noreferrer" className="text-xs text-[#CCFF00] hover:underline inline-flex items-center gap-1 mt-0.5"><Globe size={10} /> {ev.website.replace(/^https?:\/\//, "").slice(0, 40)}</a>}</div>
+          </div>
+          {ev.tags?.length > 0 && <div className="flex flex-wrap gap-1.5 mt-3">{ev.tags.map((t) => <Link key={t} to={`/events?q=${encodeURIComponent(t)}`} className="text-[10px] label-caps px-2 py-1 border border-white/10 rounded-full text-zinc-400 hover:border-[#CCFF00] hover:text-[#CCFF00]">#{t}</Link>)}</div>}
           <div className="text-zinc-300 whitespace-pre-wrap mt-6 leading-relaxed">{ev.description}</div>
+          {ev.images?.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-6" data-testid="event-gallery">
+              {ev.images.map((im, i) => <img key={i} src={resolveImg(im)} alt="" loading="lazy" className="w-full aspect-square object-cover rounded-sm" />)}
+            </div>
+          )}
           {ev.host?.id && (
             <div className="mt-8 pt-6 border-t border-white/8">
               <div className="label-caps text-zinc-500 mb-2">Hosted by</div>
@@ -170,6 +200,8 @@ export default function EventDetail() {
           <div className="border border-white/8 rounded-sm p-4 bg-[#121214]">
             <div className="label-caps text-zinc-500 mb-2">Price</div>
             <div className="font-anton text-3xl">{ev.is_free ? "FREE" : `$${ev.ticket_price}`}</div>
+            {ev.ticket_info && <div className="text-xs text-zinc-400 mt-1" data-testid="event-ticket-info">{ev.ticket_info}</div>}
+            {ev.ticket_url && <a data-testid="event-ticket-url" href={ev.ticket_url} target="_blank" rel="noreferrer" className="text-xs text-[#CCFF00] hover:underline inline-flex items-center gap-1 mt-1"><ExternalLink size={10} /> External tickets</a>}
             {ev.series_id && (
               <div className="text-xs text-[#F5A623] mt-1 flex items-center gap-1">
                 <Clock size={11} /> Session {ev.series_seq}/{ev.series_total} in this series

@@ -89,6 +89,9 @@ async def deliver_dm(sender: dict, to_user_id: str, text: str, attachment: Optio
         "created_at": now_iso(),
     }
     await db.messages.insert_one(msg)
+    from realtime import publish_soon
+    publish_soon(f"user:{to_user_id}", {"type": "dm", "from_id": sender["id"], "message_id": msg["id"]})
+    publish_soon(f"user:{sender['id']}", {"type": "dm", "from_id": sender["id"], "to_id": to_user_id, "message_id": msg["id"]})
     if not notify:
         return msg
     from datetime import datetime, timezone, timedelta
@@ -222,6 +225,8 @@ async def signal_typing(user_id: str, me: dict = Depends(get_current_user)):
         {"$set": {"from_id": me["id"], "to_id": user_id, "expires_at": expires}},
         upsert=True,
     )
+    from realtime import publish_soon
+    publish_soon(f"user:{user_id}", {"type": "typing", "from_id": me["id"]})
     return {"ok": True}
 
 

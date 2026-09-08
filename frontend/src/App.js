@@ -32,6 +32,7 @@ import Notifications from "@/pages/Notifications";
 import Events from "@/pages/Events";
 import EventDetail from "@/pages/EventDetail";
 import Tickets from "@/pages/Tickets";
+import Onboarding from "@/pages/Onboarding";
 import NotFound from "@/pages/NotFound";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -76,6 +77,7 @@ function App() {
                 <Route path="/messages/:userId" element={<RequireAuth><MessageThread /></RequireAuth>} />
                 <Route path="/dashboard" element={<RequireAuth><BuyerDashboard /></RequireAuth>} />
                 <Route path="/studio" element={<RequireRole roles={["artist", "admin"]}><StudioEditor /></RequireRole>} />
+                <Route path="/onboarding" element={<RequireRole roles={["artist", "admin"]}><Onboarding /></RequireRole>} />
                 <Route path="/studio/upload" element={<RequireRole roles={["artist", "admin"]}><UploadArtwork /></RequireRole>} />
                 <Route path="/admin" element={<RequireRole roles={["admin"]}><AdminDashboard /></RequireRole>} />
 

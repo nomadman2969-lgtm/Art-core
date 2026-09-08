@@ -53,7 +53,7 @@ export default function ArtworkDetail() {
   const isSold = art.status === "sold";
 
   const share = async () => {
-    const url = window.location.href;
+    const url = `${process.env.REACT_APP_BACKEND_URL}/api/share/artwork/${id}`;
     if (navigator.share) { try { await navigator.share({ title: art.title, url }); } catch {} }
     else { try { await navigator.clipboard.writeText(url); } catch {} toast.success("Link copied"); }
     try { await api.post(`/artworks/${id}/share`, { target: navigator.share ? "native" : "copy_link" }); } catch {}

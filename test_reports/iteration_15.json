@@ -1,0 +1,32 @@
+{
+  "summary": "Iter 15 full-stack verification of the local Events discovery rebuild, saved events, share cards (OG HTML + PNG for artwork/studio/event), achievement badges, and the 3-step /onboarding page. 17/17 backend pytest cases pass. All frontend flows verified on desktop 1920x900 and mobile 390x844.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter15_events_growth.py",
+    "/app/test_reports/pytest/iter15_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "growth.py _share_html: og:image URL is not escaped through html.escape — an event/artwork title is escaped but the image URL is a trusted concatenation with APP_URL and the raw id. Since ids come from new_id() (uuid4) this is safe today, but any future non-uuid id would allow attribute-injection. Recommend passing image through html.escape too for defense-in-depth.",
+    "events.py list_events: the trending sort is applied AFTER the initial `.sort('start_at',1).limit(limit)` cursor. Meaning trending is really 'trending among the next N soonest events', not the true trending. With 8 seeded events and default limit=60 this is fine, but at scale you can miss trending items with start_at further in the future. Consider a separate aggregation for `sort=trending`.",
+    "events.py list_events: `date_from/date_to` overrides `upcoming_only` when only `date_from` is set (rng['$gte'] is enforced), but if `date_to` alone is supplied there is no upcoming clamp — a past-only $lte range will silently return past events even when upcoming_only=True (default). Consider merging with an existing $gte for upcoming.",
+    "events.py toggle_save: uses `db.event_saves.delete_one({\"id\": existing[\"id\"]})` which requires the doc has an id field — matches insert schema, good. But `find_one` there returns the mongo _id which isn't stripped in the returned dict (never returned back — fine).",
+    "growth.py badges: `event_host` requires `hosted >= 1` but only counts non-cancelled hosted events. If an artist's only event was cancelled they lose the earned badge even though they historically hosted it. Consider persisting an achievements ledger.",
+    "growth.py OG PNG rendering: PIL text rendering on every request with no cache — CDN Cache-Control:public, max-age=3600 helps, but first-hit latency is ~200-300ms. Fine for MVP.",
+    "Onboarding.js is only reachable if role==='artist' from Auth.js Register — but /onboarding route itself is not role-gated on the router. A collector who guesses the URL can see the page. Non-critical (no destructive action) but worth a role guard."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter15_events_growth.py"
+  ],
+  "success_rate": {
+    "backend": "100% (17/17 pytest)",
+    "frontend": "100% (events discovery, search, category/date/free/trending/distance filters, save-toggle w/ toast + saved_only + empty-state, event detail with venue/organizer/website/ticket + calendar .ics download 'Neon-Rooftop-Demo-Artist-Solo-Show.ics', share card returns /api/share/{artwork|studio}/{id}, artist studio shows badge-first_sale/event_host/sold_out_show, /onboarding 3-step with theme grid → skip art → publish → nav to /artist/{id}, mobile 390 scrollWidth=390 on both /events and /events/{id})"
+  },
+  "test_credentials": "Used seeded demo.collector, demo.artist and a fresh onboard_test_<ts>@example.com artist (will be wiped by seed reset per the E1 note).",
+  "seed_data_creation": "Created one throwaway artist (Onboard Tester, email onboard_test_<ts>@example.com) via the register+onboarding flow, plus a few ephemeral TEST_iter15 events (all deleted in the same test). Toggled a save on Neon Rooftop for demo.collector during discovery, then unsaved (final state = UNSAVED as required).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file test_iter15_events_growth.py is stable and takes ~13s. Login response shape is {token, user} (NOT access_token). Do NOT re-run onboarding without cleaning up throwaway artist rows or the /artists page will accumulate 'Onboard Tester' entries visually. Neon Rooftop event id may change if seed is re-run — always resolve it via GET /api/events?q=Neon Rooftop.",
+  "rca of the issue": "No issues found in scope of iteration 15."
+}

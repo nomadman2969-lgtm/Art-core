@@ -1,0 +1,34 @@
+{
+  "summary": "Iter 14 full-stack verification of: (1) WebSocket realtime for auction bids + DM/typing, (2) Certificate of Authenticity PDF, (3) Order Disputes end-to-end, (4) desktop realtime auction bidding + admin resolve UI, (5) mobile (390x800) polish of feed/auction/messages/event/tickets. 9/9 backend pytest cases passed (WS hello/ping, WS invalid-token=null user, WS Calor auction bid broadcast, WS DM + typing, COA success/401/404/403, full dispute flow incl. 400/422/403 guards and admin resolve + notifications). All frontend flows verified on preview URL with demo-collector, demo-artist, and monster admin.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_ws_coa_disputes.py",
+    "/app/test_reports/pytest/iter14_results.xml"
+  ],
+  "action_items": [
+    "MINOR UX gap in /app/frontend/src/components/orders/OrderExtras.js line 65: `canOpen = isBuyer && !order.refunded && !dispute` treats a *previously-resolved* dispute as blocking a new one, even though the backend (disputes.py) explicitly allows a new dispute once the prior one has status 'refunded' or 'rejected'. Consider `!dispute || ['refunded','rejected'].includes(dispute.status)` so the buyer can escalate a second problem after a first was resolved."
+  ],
+  "critical_code_review_comments": [
+    "realtime.py: publish_soon uses asyncio.get_running_loop().create_task — fine but the RuntimeError branch is a silent no-op. If ever called from a sync context (e.g. background thread) the message is lost with no log. Add a warning log.",
+    "realtime.py: no auth on the auction room join — any client can subscribe to any `auction:{id}` and observe bid stream. That's fine for a public feed but worth an explicit comment; the DM `user:{id}` room is properly derived from the JWT so cross-user snooping is not possible. Good.",
+    "certificates.py: `if o.get('refunded')` blocks certificate download AFTER refund — good. But it does NOT re-validate that dispute_status is not 'refunded' when order refund flag hasn't been flipped (edge case for partial refunds). Consider also blocking on dispute-refund states.",
+    "disputes.py open_dispute: `seller_id = (o.get('artist_payouts') or [{}])[0].get('artist_id')` picks only the FIRST seller for multi-artist carts. Second artist won't get a `dispute_opened` notification. For MVP that's acceptable — but flag if cart-splitting is added later.",
+    "disputes.py: no image URL validation on `images: List[str]` — any URL is accepted. If these render in admin UI you could get SSRF/tracking-pixel via arbitrary domains. Consider whitelisting to Cloudflare R2/tenant storage domain.",
+    "OrderExtras.js: `canOpen` predicate blocks reopening after resolution (see action_items) — divergence from backend permission."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter14_ws_coa_disputes.py"
+  ],
+  "success_rate": {"backend": "100% (9/9 pytest)", "frontend": "100% (COA download 200 application/pdf, LIVE indicator + bid broadcast under 3s, admin dispute reject flow, all 5 mobile screens scrollWidth=390, no runtime error overlay anywhere)"},
+  "test_credentials": "Used seeded demo.collector, demo.artist, monster admin.",
+  "seed_data_creation": "Created 2 disputes on order_fb53a5e1 during the run (both resolved to 'rejected' via admin flow). Placed one small bid on the Calor auction (amount ~1751-1776 — well under the 2000 reserve, no winner triggered). One DM 'ws check' from demo collector to demo artist (short, harmless). No seeded documents mutated or deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "WS endpoint = wss://<host>/api/ws?token=<jwt>&rooms=auction:<id> — first message is {type:'hello',user_id}. `publish_soon` fans out {type:'bid'|'dm'|'typing'}. COA: GET /api/orders/{oid}/certificate/{artwork_id} — 200 application/pdf, %PDF magic bytes, attachment. Disputes: only OPEN/UNDER_REVIEW blocks a new one; refund_partial without amount → 400; only admin can list /api/admin/disputes. Frontend order navigation: click text=DELIVERED or text=SHIPPED to open detail; artwork titles NOT rendered on order-list card (only Order #{short-id}, date, badge). Auction list endpoint returns titles under `artwork.title`, not top-level `title` — my first bid test failed to match Calor until fixed. Message send button testid is `message-send` (not `send-btn`). Login redirects to /dashboard, not /feed.",
+  "rca of the issue": "N/A — no regressions found. All 4 iter14 features function correctly at both API and UI layers. Only observation is the minor UX divergence noted in action_items."
+}

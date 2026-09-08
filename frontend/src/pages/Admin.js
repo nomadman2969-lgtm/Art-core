@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api, fileUrl } from "../api";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { DisputesPanel } from "../components/admin/DisputesPanel";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -66,6 +67,7 @@ export default function AdminDashboard() {
     ["artists", "Artists"],
     ["mentorship", "Mentorship"],
     ["refunds", "Refunds"],
+    ["disputes", "Disputes"],
   ];
 
   return (
@@ -201,6 +203,7 @@ export default function AdminDashboard() {
       {tab === "refunds" && (
         <RefundsPanel items={refundables} onReload={load} />
       )}
+      {tab === "disputes" && <DisputesPanel />}
     </div>
   );
 }
