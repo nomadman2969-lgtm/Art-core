@@ -15,3 +15,8 @@ api.interceptors.request.use((config) => {
 export const fileUrl = (path) => (path ? `${API}/files/${path}` : null);
 // Resized JPEG variant for grids/feeds (240 | 480 | 960)
 export const thumbUrl = (path, w = 480) => (path ? (path.startsWith("http") ? path : `${API}/files/${path}?w=${w}`) : null);
+
+export function copyText(t) {
+  const fallback = () => { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch {} document.body.removeChild(ta); };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).catch(fallback); else fallback();
+}

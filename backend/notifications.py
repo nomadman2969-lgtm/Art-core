@@ -58,7 +58,8 @@ async def _enrich(n: dict) -> dict:
     if kind in ("new_comment", "comment_reply", "artwork_shared",
                 "mentioned_in_comment", "mentioned_in_post_comment", "mentioned_in_post",
                 "post_liked", "post_comment", "new_message",
-                "event_broadcast", "event_rsvp", "event_ticket_paid"):
+                "event_broadcast", "event_rsvp", "event_ticket_paid",
+                "followed_new_artwork", "followed_new_post", "followed_new_event"):
         if n.get("from_user_id"):
             u = await db.users.find_one({"id": n["from_user_id"]})
             if u:
@@ -159,6 +160,7 @@ KIND_TO_CATEGORY = {
     "event_reminder": "event", "event_ticket_paid": "event",
     "event_waitlist_open": "event", "event_waitlist_joined": "event", "event_broadcast": "event",
     "report_opened": "system", "report_resolved": "system", "moderation_action": "system",
+    "followed_new_artwork": "social", "followed_new_post": "social", "followed_new_event": "social",
 }
 
 

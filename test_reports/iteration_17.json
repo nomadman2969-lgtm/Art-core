@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 17 covered follow alerts, Staff Picks (public/admin), calendar ICS feed (backend + UI), and the mobile /feed sideways-scroll bug check. 8/8 pytest cases pass; all key frontend flows verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CalendarSubscribe.js", "issue": "navigator.clipboard.writeText Promise is not caught; in envs where clipboard write is denied (Safari without permission / headless), an UnhandledPromiseRejection triggers the React dev error overlay covering the modal. Wrap with .catch() and add a document.execCommand('copy') fallback.", "selector": "[data-testid=\"calendar-copy\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter17_engage.py",
+    "/app/test_reports/pytest/iter17_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Harden CalendarSubscribe copy handler: `navigator.clipboard?.writeText(t).catch(()=>{})` + textarea execCommand fallback."
+  ],
+  "critical_code_review_comments": [
+    "engage.py notify_followers writes bulk notifications synchronously but fires push tasks via asyncio.create_task — fine, but no error path if insert_many fails partway.",
+    "Staff Picks admin panel save button label is 'PUBLISH' rather than 'SAVE'; toast text matches spec ('Staff Picks published to the home page').",
+    "calendar-modal wrapper is fixed inset-0 (correct); modal content max-w-lg with w-full works at 390x844 (verified visually).",
+    "Notifications.js line 236 uses <Link to={to}> when to != null — correctly routes followed_new_event to /events/{event_id}."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter17_engage.py (new)"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% of critical flows verified"},
+  "test_credentials": "As per /app/memory/test_credentials.md (demo-collector-btn, demo-artist-btn, monster admin)",
+  "seed_data_creation": "Created and deleted ITER17 post + 2 ITER17 events during testing. All cleaned. Staff Picks restored to original 3 artworks (Chrome Skull Palm Trees, Throwie in Gold, Hologram Koi) + 1 event, title 'Staff Picks · This Week', blurb 'Neon, chrome and one very good rooftop.'. Collector remains following demo artist.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Verified: (a) follow alerts (post & event) create notifications with kind=followed_new_post/event, preview + event_title + event_id populated; clicking followed_new_event row navigates to /events/{id}. (b) GET /api/staff-picks returns title/blurb/artworks(with artist.name)/events; PUT /api/admin/staff-picks: 403 for non-admin, order preserved, invalid ids dropped, >12 truncated; restored to spec. (c) Calendar: POST /api/calendar/token returns https url + webcal_url + google_url (calendar.google.com/calendar/r?cid=webcal://); idempotent; ICS body has BEGIN:VCALENDAR, X-WR-CALNAME with 'Demo Collector', >=3 VEVENTs, SUMMARY '(Going)'/'(Saved)', VALARM TRIGGER:-PT24H, URL and UID; DELETE invalidates old url (404) and next POST returns new token; bad token 404; unauth POST 401. (d) Frontend mobile 390x844: document scrollWidth==390 and window.scrollX==0 on /feed, /events, /; events-rail scrolls internally (bounded by content width). (e) Home logged-out shows staff-picks with 3 artworks + 1 event; /feed shows staff-picks above recommended-rail (loads ~3s after mount). (f) Admin /admin -> tab-picks -> staff-picks-panel: picks-title/blurb prefilled, 31 art tiles + 10 event tiles, selected tiles show numbered badges; publish saves and reflects on home. (g) Calendar modal at 390x844 fits and shows all 3 links + copy + reset toasts. NOTE minor: CalendarSubscribe.js clipboard.writeText not catching rejection — surfaces React error overlay when clipboard permission denied; playwright must call context.grant_permissions(['clipboard-write']).",
+  "rca of the issue": "n/a — no functional bugs. Only minor DX issue: unhandled clipboard promise rejection in CalendarSubscribe.js line 11. Repro: open /tickets, click calendar-subscribe-btn, click calendar-copy without granting clipboard permission -> React dev error overlay pops (NotAllowedError). Mitigation: `navigator.clipboard?.writeText(t).catch(()=>{})` + fallback via hidden textarea + document.execCommand('copy')."
+}

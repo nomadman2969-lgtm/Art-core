@@ -148,9 +148,11 @@ async def create_event(req: EventCreate, user: dict = Depends(require_role("arti
             "created_at": now_iso(),
         }
 
+    from engage import notify_followers_soon
     if not req.recurrence:
         e = make_event(req.start_at, req.end_at, None, 0, 1)
         await db.events.insert_one(e)
+        notify_followers_soon(user["id"], "followed_new_event", f"{user['name']} announced an event", e["title"], f"/events/{e['id']}", event_id=e["id"], event_title=e["title"])
         return await _enrich(e, user)
 
     # Build the series
@@ -169,6 +171,7 @@ async def create_event(req: EventCreate, user: dict = Depends(require_role("arti
             series_id, i + 1, req.recurrence.count,
         ))
     await db.events.insert_many(docs)
+    notify_followers_soon(user["id"], "followed_new_event", f"{user['name']} announced a series", docs[0]["title"], f"/events/{docs[0]['id']}", event_id=docs[0]["id"], event_title=docs[0]["title"])
     return await _enrich(docs[0], user)
 
 

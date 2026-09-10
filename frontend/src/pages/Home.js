@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { ArtCard, resolveImg } from "../components/ArtCard";
 import { LiveAuctionRail, SignatureStudio } from "../components/HomeExtras";
+import { StaffPicks } from "../components/home/StaffPicks";
 import { ArrowUpRight, TrendingUp, Zap, Users, Gavel, Trophy } from "lucide-react";
 
 const HERO_BG = "https://images.unsplash.com/photo-1611063158871-7dd3ed4a2ac8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwzfHxncmFmZml0aSUyMHN0cmVldCUyMGFydHxlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85";
@@ -79,6 +80,8 @@ export default function Home() {
 
       {/* LIVE AUCTIONS RAIL (real-time polling) */}
       <LiveAuctionRail />
+
+      <StaffPicks />
 
       {/* CATEGORIES */}
       <section className="max-w-[1600px] mx-auto px-6 md:px-12 py-24">

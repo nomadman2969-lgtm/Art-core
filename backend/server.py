@@ -31,6 +31,7 @@ from certificates import router as certificates_router
 from disputes import router as disputes_router
 from growth import router as growth_router
 from reports import router as reports_router
+from engage import router as engage_router
 from connect import router as connect_router
 from push import router as push_router
 from events import router as events_router
@@ -61,6 +62,7 @@ app.include_router(certificates_router)
 app.include_router(disputes_router)
 app.include_router(growth_router)
 app.include_router(reports_router)
+app.include_router(engage_router)
 app.include_router(connect_router)
 app.include_router(push_router)
 app.include_router(events_router)

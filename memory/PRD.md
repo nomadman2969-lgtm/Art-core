@@ -421,6 +421,13 @@ Full commerce system audit + upgrade:
 - Backend curl: recurring create → 3 sibling events; capacity full returns 400 "join the waitlist"; waitlist join returns position 1; analytics returns full payload for host, 403 for non-host.
 - Frontend screenshots: sold-out event with purple Join Waitlist + series indicator; analytics modal with 3 RSVPs / 100% fill rate; Create Event with recurrence checkbox active + live hint.
 
+## Follow Alerts + Staff Picks + Calendar Sync + Mobile Feed (Mar 10, 2026)
+- **Follow alerts** (`backend/engage.py notify_followers`): followers get in-app + push (`followed_new_post` on studio post create, `followed_new_event` on event/series create, `followed_new_artwork` when an artwork goes live after the upload fee). Labels in Notifications.js; category "social".
+- **Staff Picks**: `GET /api/staff-picks` (public, enriched, drops removed/past items) and `PUT /api/admin/staff-picks {title, blurb, artwork_ids≤12, event_ids≤6}` stored in `settings.global.staff_picks`. `components/home/StaffPicks.js` on Home (full) + Feed (compact); Admin **Staff Picks** tab (`components/admin/StaffPicksPanel.js`) with numbered tile picker.
+- **Calendar sync**: `POST /api/calendar/token` (per-user secret, URL derived from request host), `DELETE` to rotate, `GET /api/calendar/{token}.ics` — RSVP'd "(Going)" + saved "(Saved)" events, 24h VALARM, GEO, 6h refresh hint. `components/CalendarSubscribe.js` on /tickets with Google / Apple(webcal) / copy / regenerate.
+- **Mobile feed**: `/feed` root gets `overflow-x-hidden`; rails scroll internally (verified scrollWidth == 390). Shared `copyText()` helper in api.js with execCommand fallback.
+- Testing — iteration_17: 8/8 backend + frontend pass (one LOW clipboard hardening applied afterwards).
+
 ## Moderation + Recommendations + Host Pages + Thumbnails (Mar 10, 2026)
 
 ### Report Content — `backend/reports.py`

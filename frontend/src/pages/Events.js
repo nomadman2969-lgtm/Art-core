@@ -5,7 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin, Calendar, Users, Plus, List as ListIcon, Map as MapIcon, X, Search, Navigation, Bookmark, Share2, Ticket, Flame } from "lucide-react";
 import { toast } from "sonner";
-import { api, thumbUrl } from "../api";
+import { api, thumbUrl, copyText } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { CreateEventModal } from "../components/events/CreateEventModal";
 import { RecommendedEvents } from "../components/events/RecommendedEvents";
@@ -37,7 +37,7 @@ function dayKey(iso) { return new Date(iso).toLocaleDateString([], { weekday: "l
 export function shareEvent(ev) {
   const url = `${process.env.REACT_APP_BACKEND_URL}/api/share/event/${ev.id}`;
   if (navigator.share) navigator.share({ title: ev.title, url }).catch(() => {});
-  else { navigator.clipboard?.writeText(url); toast.success("Link copied"); }
+  else { copyText(url); toast.success("Link copied"); }
 }
 
 export async function toggleSaveEvent(ev, user, onChange) {

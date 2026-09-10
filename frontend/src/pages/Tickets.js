@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
 import { toast } from "sonner";
 import { Ticket, Calendar, MapPin, QrCode, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { CalendarSubscribe } from "../components/CalendarSubscribe";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 const catColor = { gallery_opening: "#D4AF37", pop_up: "#FF4D4D", festival: "#FF6EC7", meetup: "#7C3AED", workshop: "#00E5FF", live_painting: "#F5A623", virtual: "#CCFF00", market: "#00E5FF" };
@@ -23,10 +24,13 @@ export default function Tickets() {
 
   return (
     <div data-testid="tickets-page" className="max-w-3xl mx-auto px-4 md:px-6 pt-10 pb-32">
-      <div className="mb-6">
-        <div className="label-caps text-[#CCFF00]"><Ticket size={12} className="inline mr-2" /> My Wallet</div>
-        <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3">Tickets</h1>
-        <div className="text-zinc-500 mt-2">Every event you're going to — QR code always in your pocket.</div>
+      <div className="mb-6 flex items-end justify-between flex-wrap gap-4">
+        <div>
+          <div className="label-caps text-[#CCFF00]"><Ticket size={12} className="inline mr-2" /> My Wallet</div>
+          <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3">Tickets</h1>
+          <div className="text-zinc-500 mt-2">Every event you're going to — QR code always in your pocket.</div>
+        </div>
+        <CalendarSubscribe />
       </div>
 
       <div className="flex gap-1 mb-8 border-b border-white/8">

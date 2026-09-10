@@ -6,6 +6,7 @@ import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Pal
 import { useAuth } from "../context/AuthContext";
 import { ReportButton } from "../components/ReportButton";
 import { RecommendedEvents } from "../components/events/RecommendedEvents";
+import { StaffPicks } from "../components/home/StaffPicks";
 import FeedComposer from "../components/FeedComposer";
 
 const resolveImg = (p) => thumbUrl(p, 960);
@@ -92,7 +93,7 @@ export default function HomeFeed() {
 
   if (loading && !feed) return <div className="py-32 text-center label-caps text-zinc-500">Loading your feed...</div>;
   return (
-    <div data-testid="home-feed" className="max-w-2xl mx-auto px-4 md:px-6 pt-10 pb-32">
+    <div data-testid="home-feed" className="max-w-2xl mx-auto px-4 md:px-6 pt-10 pb-32 overflow-x-hidden">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="label-caps text-[#CCFF00]"><Users size={12} className="inline mr-2" /> Home Feed</div>
@@ -130,6 +131,7 @@ export default function HomeFeed() {
         </button>
       )}
 
+      <StaffPicks compact />
       <RecommendedEvents />
 
       {/* Trending upcoming events rail */}

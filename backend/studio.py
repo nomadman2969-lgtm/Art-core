@@ -696,6 +696,9 @@ async def create_post(req: PostCreate, user: dict = Depends(require_role("artist
         "created_at": now_iso(),
     }
     await db.studio_posts.insert_one(p)
+    from engage import notify_followers_soon
+    notify_followers_soon(user["id"], "followed_new_post", f"{user['name']} posted", (p.get("text") or p.get("kind", "update"))[:120],
+                          f"/artist/{user['id']}", post_id=p["id"], preview=(p.get("text") or "")[:120], post_kind=p.get("kind"))
     await _notify_mentions(mentions, user, "mentioned_in_post", post_id=p["id"])
     return strip_mongo(p)
 

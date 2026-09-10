@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { DisputesPanel } from "../components/admin/DisputesPanel";
 import { ReportsPanel } from "../components/admin/ReportsPanel";
+import { StaffPicksPanel } from "../components/admin/StaffPicksPanel";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -70,6 +71,7 @@ export default function AdminDashboard() {
     ["refunds", "Refunds"],
     ["disputes", "Disputes"],
     ["reports", "Reports"],
+    ["picks", "Staff Picks"],
   ];
 
   return (
@@ -207,6 +209,7 @@ export default function AdminDashboard() {
       )}
       {tab === "disputes" && <DisputesPanel />}
       {tab === "reports" && <ReportsPanel />}
+      {tab === "picks" && <StaffPicksPanel />}
     </div>
   );
 }

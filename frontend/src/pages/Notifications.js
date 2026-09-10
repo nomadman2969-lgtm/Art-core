@@ -57,6 +57,9 @@ const KIND_META = {
   event_broadcast: { label: "Message from event host", icon: <MapPin size={14} />, color: "#7C3AED" },
   dispute_opened: { label: "Order dispute opened", icon: <Bell size={14} />, color: "#FF4D4D" },
   dispute_resolved: { label: "Dispute resolved", icon: <Check size={14} />, color: "#CCFF00" },
+  followed_new_artwork: { label: "New work from an artist you follow", icon: <Heart size={14} />, color: "#CCFF00" },
+  followed_new_post: { label: "New post from an artist you follow", icon: <Heart size={14} />, color: "#CCFF00" },
+  followed_new_event: { label: "An artist you follow announced an event", icon: <MapPin size={14} />, color: "#FF4D4D" },
   report_opened: { label: "New content report", icon: <Bell size={14} />, color: "#FF4D4D" },
   report_resolved: { label: "Your report was reviewed", icon: <Check size={14} />, color: "#CCFF00" },
   moderation_action: { label: "Moderation notice", icon: <Bell size={14} />, color: "#F5A623" },
@@ -219,6 +222,7 @@ export default function Notifications() {
                       {n.other?.name && (n.artwork?.title || n.commission?.subject) && <span className="text-zinc-500"> · </span>}
                       {n.artwork?.title && <span>{n.artwork.title}</span>}
                       {n.commission?.subject && <span>{n.commission.subject}</span>}
+                      {n.preview && n.kind === "followed_new_post" && <span className="text-zinc-500"> — {n.preview}</span>}
                       {n.event_title && !n.artwork?.title && <span>{n.other?.name ? " · " : ""}{n.event_title}{n.position ? ` · #${n.position}` : ""}</span>}
                       {n.preview && n.kind === "event_broadcast" && <span className="text-zinc-500"> — {n.preview}</span>}
                       {n.amount != null && <span className="ml-2 text-[#CCFF00] font-anton">${Number(n.amount).toLocaleString()}</span>}

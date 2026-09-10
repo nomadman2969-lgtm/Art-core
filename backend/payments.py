@@ -121,6 +121,10 @@ async def upload_fee_checkout(req: UploadFeeReq, user: dict = Depends(require_ro
     if fee <= 0:
         # Free — go live immediately
         await db.artworks.update_one({"id": req.artwork_id}, {"$set": {"status": "live"}})
+        _art = await db.artworks.find_one({"id": req.artwork_id})
+        if _art:
+            from engage import notify_followers_soon
+            notify_followers_soon(_art["artist_id"], "followed_new_artwork", f"New work from {user['name']}", _art["title"], f"/artwork/{_art['id']}", artwork_id=_art["id"])
         return {"checkout_url": None, "session_id": None, "free": True}
     amount_cents = int(round(fee * 100))
     session = stripe.checkout.Session.create(
@@ -476,6 +480,11 @@ async def _apply_paid(session_id: str):
             })
     elif tx["kind"] == "upload_fee":
         await db.artworks.update_one({"id": tx["artwork_id"]}, {"$set": {"status": "live"}})
+        _art = await db.artworks.find_one({"id": tx["artwork_id"]})
+        if _art:
+            from engage import notify_followers_soon
+            _artist = await db.users.find_one({"id": _art["artist_id"]}) or {}
+            notify_followers_soon(_art["artist_id"], "followed_new_artwork", f"New work from {_artist.get('name', 'an artist')}", _art["title"], f"/artwork/{_art['id']}", artwork_id=_art["id"])
     elif tx["kind"] == "auction_win":
         settings = await get_settings()
         commission = float(settings["commission_percent"]) / 100.0

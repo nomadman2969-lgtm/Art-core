@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Calendar, Users, MapPin, UserPlus, UserCheck, Palette, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, thumbUrl, fileUrl } from "../api";
+import { api, thumbUrl, fileUrl, copyText } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { EventCard } from "./Events";
 import { ReportButton } from "../components/ReportButton";
@@ -32,7 +32,7 @@ export default function HostPage() {
   const share = () => {
     const url = `${process.env.REACT_APP_BACKEND_URL}/api/share/studio/${id}`;
     if (navigator.share) navigator.share({ title: `${data.host.name} · Events`, url }).catch(() => {});
-    else { navigator.clipboard?.writeText(url); toast.success("Link copied"); }
+    else { copyText(url); toast.success("Link copied"); }
   };
 
   if (data === null) return <div className="py-32 text-center label-caps text-zinc-500">Loading…</div>;
