@@ -370,7 +370,7 @@ async def home_feed(
             include_artworks = "artwork" in kind_set
             include_posts = any(k != "artwork" for k in kind_set)
     if followed_ids and include_posts:
-        post_filter = {"artist_id": {"$in": followed_ids}}
+        post_filter = {"artist_id": {"$in": followed_ids}, "hidden": {"$ne": True}}
         if kind_set:
             post_kinds = [k for k in kind_set if k != "artwork"]
             if post_kinds:

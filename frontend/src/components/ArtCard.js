@@ -1,9 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { fileUrl } from "../api";
+import { thumbUrl } from "../api";
 import { Heart, MessageCircle } from "lucide-react";
 
-export const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+export const resolveImg = (p) => thumbUrl(p, 480);
 
 export function ArtCard({ art, tall = false, wide = false }) {
   const aspect = wide ? "aspect-[4/3]" : tall ? "aspect-[3/4]" : "aspect-square";

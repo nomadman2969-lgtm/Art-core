@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, fileUrl } from "../api";
+import { api, thumbUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { ArtCard } from "../components/ArtCard";
 import { toast } from "sonner";
 import { UserPlus, UserCheck, MessageCircle, MapPin, Palette } from "lucide-react";
 import { RankBadge } from "./Rankings";
 
-const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+const resolveImg = (p) => thumbUrl(p, 480);
 
 export function ArtistsList() {
   const [artists, setArtists] = useState([]);

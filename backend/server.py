@@ -30,6 +30,7 @@ from realtime import router as realtime_router
 from certificates import router as certificates_router
 from disputes import router as disputes_router
 from growth import router as growth_router
+from reports import router as reports_router
 from connect import router as connect_router
 from push import router as push_router
 from events import router as events_router
@@ -59,6 +60,7 @@ app.include_router(realtime_router)
 app.include_router(certificates_router)
 app.include_router(disputes_router)
 app.include_router(growth_router)
+app.include_router(reports_router)
 app.include_router(connect_router)
 app.include_router(push_router)
 app.include_router(events_router)
@@ -120,6 +122,14 @@ async def startup():
         }
         await db.users.insert_one(admin)
         logger.info("Seeded admin user")
+
+    try:
+        from seed_demo import refresh_demo_dates
+        moved = await refresh_demo_dates()
+        if moved:
+            logger.info("Rolled %d demo events forward", moved)
+    except Exception as e:  # noqa
+        logger.warning("demo refresh skipped: %s", e)
 
     # Seed demo artist + demo collector (one-click login on /login)
     demo_accounts = [

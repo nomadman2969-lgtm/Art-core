@@ -6,6 +6,7 @@ import { useCart } from "../context/CartContext";
 import { toast } from "sonner";
 import { RankBadge } from "./Rankings";
 import { BadgeRow } from "../components/BadgeRow";
+import { ReportButton } from "../components/ReportButton";
 import {
   UserPlus, UserCheck, MessageCircle, Palette, Share2, Eye,
   Gavel, Clock, Heart, MessageSquare, Pin, MapPin, Instagram, Twitter, Globe,
@@ -114,6 +115,7 @@ export function ArtistStudioPage() {
                 </button>
               )}
               <button data-testid="studio-share" onClick={share} className="btn-ghost"><Share2 size={14} className="mr-2" /> Share</button>
+              <ReportButton targetType="user" targetId={artist.id} ownerId={artist.id} />
               {isOwner && (
                 <Link to="/studio" data-testid="studio-edit" className="btn-lime">Edit Studio</Link>
               )}

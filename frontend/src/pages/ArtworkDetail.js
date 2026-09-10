@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, fileUrl } from "../api";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
+import { ReportButton } from "../components/ReportButton";
 import { toast } from "sonner";
 import { Share2, Heart, MessageCircle, Send, Tag, X, Bookmark } from "lucide-react";
 import MentionInput from "../components/MentionInput";
@@ -143,6 +144,7 @@ export default function ArtworkDetail() {
               <span>{likes.count}</span>
             </button>
             <button data-testid="share-btn" onClick={share} className="btn-ghost"><Share2 size={14} className="mr-2" /> Share</button>
+            <ReportButton targetType="artwork" targetId={art.id} ownerId={art.artist?.id} />
             <button data-testid="save-btn" onClick={toggleSave} className="btn-ghost">
               <Bookmark size={14} className="mr-2" fill={saved ? "#CCFF00" : "none"} color={saved ? "#CCFF00" : undefined} />
               {saved ? "Saved" : "Save"}

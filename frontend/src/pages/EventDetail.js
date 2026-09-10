@@ -8,6 +8,7 @@ import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { BroadcastModal } from "../components/events/BroadcastModal";
 import { shareEvent, toggleSaveEvent } from "./Events";
+import { ReportButton } from "../components/ReportButton";
 import { Bookmark, Share2, Globe, ExternalLink, CalendarPlus, Building2 } from "lucide-react";
 
 const catColor = { exhibition: "#F4F4F5", gallery_opening: "#D4AF37", festival: "#FF6EC7", street_art: "#CCFF00", pop_up: "#FF4D4D", art_class: "#00E5FF", workshop: "#00B8CC", auction: "#7C3AED", meetup: "#A78BFA", live_painting: "#F5A623", museum: "#E4E4E7", market: "#34D399", virtual: "#CCFF00" };
@@ -151,6 +152,7 @@ export default function EventDetail() {
               </button>
               <button data-testid="share-event-btn" onClick={() => shareEvent(ev)} className="btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1"><Share2 size={12} /> Share</button>
               <button data-testid="calendar-event-btn" onClick={() => downloadIcs(ev)} className="btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1"><CalendarPlus size={12} /> Calendar</button>
+              <ReportButton targetType="event" targetId={ev.id} ownerId={ev.host?.id} compact />
             </div>
           </div>
           <h1 className="font-anton text-4xl md:text-5xl uppercase mt-3 leading-tight">{ev.title}</h1>
@@ -173,13 +175,13 @@ export default function EventDetail() {
           {ev.host?.id && (
             <div className="mt-8 pt-6 border-t border-white/8">
               <div className="label-caps text-zinc-500 mb-2">Hosted by</div>
-              <Link to={`/artist/${ev.host.id}`} className="flex items-center gap-3 hover:text-[#CCFF00]">
+              <Link to={`/host/${ev.host.id}`} data-testid="host-page-link" className="flex items-center gap-3 hover:text-[#CCFF00]">
                 <div className="w-10 h-10 rounded-full bg-[#7C3AED]/30 flex items-center justify-center font-anton">
                   {ev.host.name?.[0]?.toUpperCase()}
                 </div>
                 <div>
                   <div className="font-unbounded font-semibold">{ev.host.name}</div>
-                  <div className="text-xs text-zinc-500 label-caps">{ev.host.role}</div>
+                  <div className="text-xs text-zinc-500 label-caps">{ev.host.role} · All events →</div>
                 </div>
               </Link>
             </div>

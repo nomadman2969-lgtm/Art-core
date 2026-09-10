@@ -1,0 +1,88 @@
+{
+  "summary": "Iter 16 FRONTEND ONLY verification of (1) Report Content flow + Admin Reports moderation, (2) 'Picked for you' recommendations rail on /feed and /events, (3) Host Pages /host/:id, and (4) thumbnails (?w=) + mobile 390x844 layout. All required flows PASS on the deployed preview. One data note: no 'Neon Rooftop' event exists in current seed — used the equivalent seeded Demo-Artist-hosted event 'Live Painting Battle: Kai vs Dex' (id 841eb52e-...) which is the only event whose host_id equals demo artist. Also Demo Artist upcoming/past counts differ from the spec (see notes) — this is a data/seed drift, not a UI bug.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_flows": {
+    "report_flow_collector": {
+      "artwork_detail_shows_report_btn_artwork": true,
+      "modal_opens_with_report_reason_and_report_details": true,
+      "select_stolen_art_then_submit_shows_review_toast": true,
+      "toast_text_matched": "Thanks — our team will review this",
+      "compact_report_btn_post_present_on_feed": true,
+      "report_btn_user_present_on_artist_page": true,
+      "report_btn_event_present_on_demo_artist_event_detail": true,
+      "own_artwork_no_report_btn_artwork_when_logged_in_as_owner": true
+    },
+    "admin_reports": {
+      "tab_reports_present": true,
+      "reports_panel_lists_open_report_with_target_owner_reporter_reason": true,
+      "reports_filter_open_resolved_all_buttons_present": true,
+      "report_note_{id}_input_and_report_dismiss_{id}_present": true,
+      "confirm_dialog_accepted_and_toast_report_resolved_shown": true,
+      "item_removed_from_open_after_dismiss": true,
+      "item_visible_in_resolved_filter_with_'dismiss'_label_and_note_'reviewed'": true
+    },
+    "recommendations": {
+      "feed_recommended_rail_present_with_>=1_cards": true,
+      "events_recommended_rail_present_with_4_cards": true,
+      "reason_chip_present_on_cards": "e.g. 'KAI RIVERA — YOU FOLLOW THEM', 'DEMO ARTIST — YOU FOLLOW THEM'",
+      "rail_positioned_above_trending_events_on_feed": true,
+      "clicking_a_recommended_card_navigates_to_/events/{id}": true
+    },
+    "host_page": {
+      "host_id_used": "d50bb5ba-e58f-469e-8795-659d71d399a3",
+      "host_name": "DEMO ARTIST",
+      "host_stats_tiles": {"events_hosted": 3, "upcoming": 1, "total_attendees": 14, "followers": 7},
+      "spec_expected_stats": {"events_hosted": 3, "upcoming": 2, "total_attendees": "any", "followers": "any"},
+      "host_follow_btn_toggle_following_follow_following": true,
+      "left_final_state_as_following": true,
+      "host_studio_link_present": true,
+      "host_share_btn_present": true,
+      "host_tab_upcoming_label": "UPCOMING (1)",
+      "host_tab_past_label": "PAST (2)",
+      "events_list_organizer_line_links_to_/host/{id}": true,
+      "logged_out_visit_renders": true,
+      "logged_out_follow_click_shows_'log in to follow'_toast": true
+    },
+    "thumbnails": {
+      "explore_artwork_imgs_?w=_and_loaded": "10/10",
+      "feed_article_imgs_?w=_and_loaded": "20/39 (remainder are avatars, event-rail covers, badges — none of which are 'artwork/post' <img> from ArtCard/PostCard; acceptable)",
+      "artwork_detail_main_image_has_no_?w=": true
+    },
+    "mobile_390": {
+      "/host/{id}_document.documentElement.scrollWidth": 390,
+      "host_header_buttons_visible_and_wrapped": true,
+      "/events_scrollWidth": 390,
+      "recommended_rail_horizontal_scroll_within_viewport_no_page_overflow": true,
+      "report_modal_on_artwork_fits_within_390_viewport": true
+    }
+  },
+  "test_report_links": [],
+  "action_items": [
+    "SEED/DATA NOTE (non-blocking): the review script referenced a 'Neon Rooftop' event, but the current seed has no such event. The only event hosted by Demo Artist is 'Live Painting Battle: Kai vs Dex' (841eb52e-4a37-474f-b666-d339fa44741b). The UI features (report-btn-event, host-page-link → /host/{demo_artist_id}) were verified against that event and all pass. Consider adding a 'Neon Rooftop' seeded event or updating the test rubric.",
+    "SEED/DATA NOTE (non-blocking): Demo Artist stats show Events hosted=3 / Upcoming=1 / Past=2, but the review rubric expected Upcoming=2 / Past=1. Figures are consistent with current seed dates — this is data drift, not a UI regression.",
+    "MINOR CODE-REVIEW (non-blocking): HostPage host-follow-btn label is uppercased via CSS (`FOLLOWING` vs `Following`). Requirement is textual — string 'Following' is present in the DOM but rendered uppercase; consider preserving the mixed-case label so text-matching in tests/PW is easier."
+  ],
+  "critical_code_review_comments": [
+    "RecommendedEvents.js: `useEffect(...,[user?.id])` triggers on user id change. On very fast route pushes the rail can flash empty for ~200ms while `/api/events/recommended` resolves — during network throttling this made an earlier test run miss the rail (needed networkidle before assertion). Consider a subtle skeleton or a `loading` state so the rail area holds space instead of rendering null.",
+    "HostPage.js host-follow-btn: text is uppercase via CSS (label-caps). Consumers relying on exact string match ('Following' vs 'FOLLOWING') will get false negatives — either use text-transform:none for the state label or expose a data-attribute like `data-following='true|false'` for testability.",
+    "ReportsPanel data-testid convention `report-{uuid}` clashes with the generic `[data-testid^='report-']` selector (which is also used by report-btn-*, report-modal, report-reason, report-details, report-submit, report-note-{id}, report-dismiss-{id}, report-btn-user/post/event/artwork). Selection code needs a UUID regex filter to isolate report rows — fine for testing but consider `report-item-{id}` for clarity.",
+    "HomeFeed.js: The 'Picked for you' rail renders above the 'Trending Events' rail as expected, but on mobile the trending rail (events-rail) width can push page overflow when covers exceed viewport. scrollWidth==390 was verified on /events, but /feed should also be validated on mobile in a future iteration.",
+    "Thumbnails coverage on /feed: only ~50% of <img> under <article> use thumbUrl(). Avatars and event-rail covers still request originals. Recommend passing all list-view images through thumbUrl(x, 480|960) — this is on top of the CDN caching already added in iter 16 backend."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "n/a (frontend only per E1 request)",
+    "frontend": "100% of in-scope flows (Report content + Admin moderation + Recommendations + Host page + Thumbnails + Mobile 390) verified PASS. 2 non-blocking seed-data mismatches noted."
+  },
+  "test_credentials": "Used seeded demo-collector-btn / demo-artist-btn one-tap and monster@houseofmonster.com / MonsterAdmin2026! — all from /app/memory/test_credentials.md.",
+  "seed_data_creation": "Created two artwork reports as demo.collector (stolen_art on 'Hologram Koi' by Yuki Tanaka). One was later resolved by monster admin via Dismiss with note 'reviewed'. The other report may remain Open in the admin queue — safe to keep or clean up in next seed cycle. Left demo.collector following DEMO ARTIST (as required).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Wait for `networkidle` before asserting on the recommended-rail (component fetches /api/events/recommended in a useEffect on user?.id). Explore artcards use data-testid `artcard-{id}` (not artwork-card-). Login submit button has no type=submit — use text 'SIGN IN' or the demo one-tap buttons. host-follow-btn label is uppercased by CSS (case-insensitive match required). 'Neon Rooftop' event does not exist in seed — use the Demo-Artist-hosted event 841eb52e-4a37-474f-b666-d339fa44741b (Live Painting Battle: Kai vs Dex) for host-page-link and report-btn-event checks. Demo Artist host_id = d50bb5ba-e58f-469e-8795-659d71d399a3.",
+  "rca of the issue": "No functional bugs found."
+}

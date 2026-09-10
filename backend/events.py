@@ -258,6 +258,74 @@ async def categories():
     return [{"key": k, "label": l, "color": c} for k, l, c in CATEGORY_META]
 
 
+@router.get("/recommended")
+async def recommended(limit: int = 6, me: dict = Depends(get_current_user)):
+    """Picked for you: hosts you follow > categories/cities you've saved or attended > trending."""
+    followed = {f["followed_id"] for f in await db.follows.find({"follower_id": me["id"]}, {"followed_id": 1}).to_list(2000)}
+    my_ids = {r["event_id"] for r in await db.event_rsvps.find({"user_id": me["id"]}, {"event_id": 1}).to_list(2000)}
+    saved_ids = {s["event_id"] for s in await db.event_saves.find({"user_id": me["id"]}, {"event_id": 1}).to_list(2000)}
+    seen = my_ids | saved_ids
+    liked_cats, liked_cities = {}, {}
+    for e in await db.events.find({"id": {"$in": list(seen)}}, {"category": 1, "location": 1}).to_list(2000):
+        liked_cats[e.get("category")] = liked_cats.get(e.get("category"), 0) + 1
+        city = (e.get("location") or {}).get("city")
+        if city:
+            liked_cities[city] = liked_cities.get(city, 0) + 1
+    cands = await db.events.find({"cancelled": {"$ne": True}, "start_at": {"$gte": now_iso()}, "host_id": {"$ne": me["id"]}}).sort("start_at", 1).limit(300).to_list(300)
+    scored = []
+    for e in cands:
+        if e["id"] in seen:
+            continue
+        score, why = 0.0, []
+        if e["host_id"] in followed:
+            score += 3; why.append(f"{e.get('host_name', 'An artist')} — you follow them")
+        if liked_cats.get(e.get("category")):
+            score += 2; why.append("Matches events you've saved")
+        city = (e.get("location") or {}).get("city")
+        if city and liked_cities.get(city):
+            score += 1; why.append(f"In {city}")
+        rsvps = await db.event_rsvps.count_documents({"event_id": e["id"]})
+        if rsvps >= 5:
+            score += 1; why.append("Trending")
+        if score > 0:
+            en = await _enrich(e, me)
+            en["reason"] = why[0]; en["score"] = score
+            scored.append(en)
+    scored.sort(key=lambda x: (-x["score"], x["start_at"]))
+    out, seen_series = [], set()
+    for e in scored:
+        if e.get("series_id"):
+            if e["series_id"] in seen_series:
+                continue
+            seen_series.add(e["series_id"])
+        out.append(e)
+    return out[:max(1, min(limit, 20))]
+
+
+@router.get("/hosts/{user_id}")
+async def host_page(user_id: str, me: Optional[dict] = Depends(get_optional_user)):
+    u = await db.users.find_one({"id": user_id})
+    if not u:
+        raise HTTPException(404, "Host not found")
+    evs = await db.events.find({"host_id": user_id, "removed": {"$ne": True}}).sort("start_at", -1).to_list(500)
+    now = now_iso()
+    upcoming = [await _enrich(e, me) for e in reversed([e for e in evs if e["start_at"] >= now and not e.get("cancelled")])]
+    past = [await _enrich(e, me) for e in evs if e["start_at"] < now or e.get("cancelled")]
+    ev_ids = [e["id"] for e in evs]
+    attendees = await db.event_rsvps.count_documents({"event_id": {"$in": ev_ids}}) if ev_ids else 0
+    cfg = await db.studio_configs.find_one({"artist_id": user_id}) or {}
+    return {
+        "host": {"id": u["id"], "name": u["name"], "role": u.get("role"), "bio": u.get("bio"), "avatar": u.get("avatar"),
+                 "cover_image": u.get("cover_image"), "location": (cfg.get("artist_story") or {}).get("location"),
+                 "is_artist": u.get("role") == "artist"},
+        "stats": {"events": len(evs), "upcoming": len(upcoming), "attendees": attendees,
+                  "followers": await db.follows.count_documents({"followed_id": user_id}),
+                  "categories": sorted({e.get("category") for e in evs if e.get("category")})},
+        "is_following": bool(me and await db.follows.find_one({"follower_id": me["id"], "followed_id": user_id})),
+        "upcoming": upcoming, "past": past[:30],
+    }
+
+
 @router.post("/{event_id}/save")
 async def toggle_save(event_id: str, user: dict = Depends(get_current_user)):
     if not await db.events.find_one({"id": event_id}):

@@ -421,6 +421,27 @@ Full commerce system audit + upgrade:
 - Backend curl: recurring create → 3 sibling events; capacity full returns 400 "join the waitlist"; waitlist join returns position 1; analytics returns full payload for host, 403 for non-host.
 - Frontend screenshots: sold-out event with purple Join Waitlist + series indicator; analytics modal with 3 RSVPs / 100% fill rate; Create Event with recurrence checkbox active + live hint.
 
+## Moderation + Recommendations + Host Pages + Thumbnails (Mar 10, 2026)
+
+### Report Content — `backend/reports.py`
+- `POST /api/reports {target_type: artwork|post|user|event, target_id, reason, details}` (auth; no self-reports; one open report per user/target). Admins notified (`report_opened`).
+- Admin: `GET /api/admin/reports[?status]`, `GET /api/admin/reports/stats`, `POST /api/admin/reports/{id}/resolve {action: dismiss|warn_user|remove_content|suspend_user, note}` — resolves all open reports on that target together; remove_content → artwork status `removed` / post `hidden` / event cancelled / user `approved=False`; notifications `report_resolved` (reporters) + `moderation_action` (owner). Feed + studio post queries filter `hidden != True`.
+- Frontend `components/ReportButton.js` (artwork detail, studio header, feed post cards, event detail, host page) + Admin **Reports** tab (`components/admin/ReportsPanel.js`, grouped by target with report counts).
+
+### Event Recommendations — `GET /api/events/recommended`
+- Scores upcoming events: +3 followed host, +2 category matches saved/attended events, +1 same city, +1 trending (≥5 RSVPs); excludes RSVP'd/saved/own, one per series. Returns `reason` text. Rail `components/events/RecommendedEvents.js` on /events and /feed ("Picked for you").
+
+### Host Pages — `GET /api/events/hosts/{user_id}`, route `/host/:id` (`pages/HostPage.js`)
+- Cover/avatar header, stats (events hosted, upcoming, total attendees, followers), category chips, Follow (reuses /users/{id}/follow), Studio link, share, report; Upcoming/Past tabs with EventCards. Event detail "Hosted by" and card organizer lines link here.
+
+### Faster image loading
+- `GET /api/files/{path}?w=240|480|960` → resized progressive JPEG (Pillow), cached in object storage under `thumbs/{w}/{path}`, headers `Cache-Control: public, max-age=31536000, immutable`, `CDN-Cache-Control`, `ETag`. NOTE: the preview ingress overrides Cache-Control to no-store; production edge should honor it. `api.js thumbUrl(path, w)`; grids/feeds (ArtCard, HomeFeed, Artists, HomeExtras, Events, admin panels) use thumbnails; detail pages stay full-res. Typical saving 258 KB → 36 KB.
+
+### Demo evergreen
+- `seed_demo.refresh_demo_dates()` runs at backend startup: rolls seeded upcoming events forward by whole weeks once they pass (series shift together and are re-spaced weekly).
+
+### Testing — iteration_16: backend 18/19 (1 = ingress Cache-Control, infra) + frontend 100%.
+
 ## Local Art Discovery (Events rebuild) + Onboarding + Share Cards + Badges (Mar 8, 2026)
 
 ### Events → local art discovery system

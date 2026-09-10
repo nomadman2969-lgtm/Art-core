@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, fileUrl } from "../api";
+import { api, thumbUrl } from "../api";
 import { Gavel, Clock } from "lucide-react";
 
-const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+const resolveImg = (p) => thumbUrl(p, 480);
 
 /**
  * Live auction rail that polls /api/auctions?status=live every 6s and flashes

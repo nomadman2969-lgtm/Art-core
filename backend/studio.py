@@ -315,7 +315,7 @@ async def get_studio(artist_id: str, preview: bool = False, viewer: Optional[dic
             au["artwork"] = {"id": art["id"], "title": art["title"], "images": art.get("images", [])}
         auctions.append(au)
     # Recent posts
-    posts_c = db.studio_posts.find({"artist_id": artist_id}).sort([("pinned", -1), ("created_at", -1)]).limit(30)
+    posts_c = db.studio_posts.find({"artist_id": artist_id, "hidden": {"$ne": True}}).sort([("pinned", -1), ("created_at", -1)]).limit(30)
     posts = [strip_mongo(p) for p in await posts_c.to_list(30)]
     # Followers
     followers = await db.follows.count_documents({"followed_id": artist_id})
@@ -702,7 +702,7 @@ async def create_post(req: PostCreate, user: dict = Depends(require_role("artist
 
 @posts_router.get("")
 async def list_posts(artist_id: str, limit: int = 30):
-    cursor = db.studio_posts.find({"artist_id": artist_id}).sort([("pinned", -1), ("created_at", -1)]).limit(limit)
+    cursor = db.studio_posts.find({"artist_id": artist_id, "hidden": {"$ne": True}}).sort([("pinned", -1), ("created_at", -1)]).limit(limit)
     return [strip_mongo(p) for p in await cursor.to_list(limit)]
 
 

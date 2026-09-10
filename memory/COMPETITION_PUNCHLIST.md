@@ -9,7 +9,7 @@
 
 ## Tier 2 — Strong differentiators judges will remember
 6. ~~WebSockets for auctions + DMs~~ ✅ DONE (Mar 6) — (replace 5s polling). Live bid ticks and instant typing indicators make the "real-time" claim visibly true.
-7. **Trust & safety mini-suite:** ~~order dispute flow~~ ✅ DONE (disputes) (buyer opens → admin resolves → refund), report artwork/user, admin moderation queue. Answers the inevitable "what if the painting arrives damaged?" question.
+7. ~~Trust & safety mini-suite~~ ✅ DONE — disputes + report content/moderation queue (buyer opens → admin resolves → refund), report artwork/user, admin moderation queue. Answers the inevitable "what if the painting arrives damaged?" question.
 8. ~~Provenance / Certificate of Authenticity~~ ✅ DONE (Mar 6) — — generated PDF per sold original with artwork image, dimensions, artist signature block, order id, QR back to the artwork page. Cheap to build, huge perceived value.
 9. ~~Studio share cards~~ ✅ DONE (Mar 8) — — OG image per studio/artwork so links look great on Instagram/X. Artists share → growth loop.
 10. ~~Onboarding flow for new artists~~ ✅ DONE (Mar 8) — — 3 steps: pick a theme → upload first piece → publish studio. Currently new users land on an empty studio.
@@ -19,7 +19,7 @@
 12. **Founder story page** with real content (currently placeholder).
 13. ~~Rankings/gamification~~ ✅ badges DONE (Mar 8) — — badges for first sale, sold-out show, 100 followers. Visible on studio header.
 14. **Accessibility sweep** — focus rings, alt text on artwork images (use title), contrast on lime-on-white buttons.
-15. **Performance** — lazy-load artwork images, thumbnail variants (400px) for grids; current generated images are ~300 KB each.
+15. ~~Performance~~ ✅ thumbnails DONE (Mar 10) — — lazy-load artwork images, thumbnail variants (400px) for grids; current generated images are ~300 KB each.
 16. **Get 5–10 real artists posting** before the deadline. Even tiny real traction beats any feature.
 
 ## Already strong — lead with these

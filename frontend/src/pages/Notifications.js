@@ -57,6 +57,9 @@ const KIND_META = {
   event_broadcast: { label: "Message from event host", icon: <MapPin size={14} />, color: "#7C3AED" },
   dispute_opened: { label: "Order dispute opened", icon: <Bell size={14} />, color: "#FF4D4D" },
   dispute_resolved: { label: "Dispute resolved", icon: <Check size={14} />, color: "#CCFF00" },
+  report_opened: { label: "New content report", icon: <Bell size={14} />, color: "#FF4D4D" },
+  report_resolved: { label: "Your report was reviewed", icon: <Check size={14} />, color: "#CCFF00" },
+  moderation_action: { label: "Moderation notice", icon: <Bell size={14} />, color: "#F5A623" },
 };
 
 export default function Notifications() {

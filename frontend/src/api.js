@@ -13,3 +13,5 @@ api.interceptors.request.use((config) => {
 });
 
 export const fileUrl = (path) => (path ? `${API}/files/${path}` : null);
+// Resized JPEG variant for grids/feeds (240 | 480 | 960)
+export const thumbUrl = (path, w = 480) => (path ? (path.startsWith("http") ? path : `${API}/files/${path}?w=${w}`) : null);

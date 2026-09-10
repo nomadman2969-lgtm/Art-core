@@ -626,3 +626,36 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+async def refresh_demo_dates():
+    """Keep the demo world evergreen: roll seeded upcoming events forward by whole weeks once they pass (series move together)."""
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    now = _dt.now(_tz.utc)
+    moved = 0
+    evs = await db.events.find({"seed": SEED, "cancelled": {"$ne": True}, "title": {"$not": {"$regex": "^Spring Open Studio"}}}).to_list(500)
+    groups: dict = {}
+    for e in evs:
+        groups.setdefault(e.get("series_id") or e["id"], []).append(e)
+    for members in groups.values():
+        members.sort(key=lambda x: x["start_at"])
+        first = _dt.fromisoformat(members[0]["start_at"])
+        if first >= now:
+            continue
+        shift = _td(weeks=((now - first).days // 7) + 1)
+        for e in members:
+            patch = {"start_at": iso(_dt.fromisoformat(e["start_at"]) + shift)}
+            if e.get("end_at"):
+                patch["end_at"] = iso(_dt.fromisoformat(e["end_at"]) + shift)
+            await db.events.update_one({"id": e["id"]}, {"$set": patch, "$unset": {"reminder_24h_sent": "", "reminder_1h_sent": ""}})
+            moved += 1
+    # re-space any series whose occurrences collided (7 days apart from the earliest)
+    for sid in {e["series_id"] for e in evs if e.get("series_id")}:
+        occ = sorted(await db.events.find({"series_id": sid}).to_list(50), key=lambda x: (x.get("series_seq") or 0))
+        base = min(_dt.fromisoformat(o["start_at"]) for o in occ)
+        for k, o in enumerate(occ):
+            want = base + _td(weeks=k)
+            if _dt.fromisoformat(o["start_at"]) != want:
+                dur = _dt.fromisoformat(o["end_at"]) - _dt.fromisoformat(o["start_at"]) if o.get("end_at") else None
+                await db.events.update_one({"id": o["id"]}, {"$set": {"start_at": iso(want), **({"end_at": iso(want + dur)} if dur else {})}})
+    return moved

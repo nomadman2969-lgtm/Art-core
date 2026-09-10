@@ -77,13 +77,45 @@ async def upload_video(file: UploadFile = File(...), user: dict = Depends(get_cu
     return {"path": result["path"], "url": f"/api/files/{result['path']}", "content_type": ctype, "size": len(data)}
 
 
+THUMB_WIDTHS = (240, 480, 960)
+
+
 @router.get("/files/{path:path}")
-async def download(path: str):
+async def download(path: str, w: Optional[int] = None):
     record = await db.files.find_one({"storage_path": path, "is_deleted": False})
     if not record:
         raise HTTPException(404, "File not found")
+    import hashlib as _hl
+    headers = {"Cache-Control": "public, max-age=31536000, immutable",
+               "CDN-Cache-Control": "public, max-age=31536000",
+               "ETag": '"' + _hl.md5(f"{path}:{w or 0}:{record.get('size', 0)}".encode()).hexdigest() + '"'}
+    ctype_rec = record.get("content_type", "")
+    if w and ctype_rec.startswith("image/") and "svg" not in ctype_rec:
+        w = min(THUMB_WIDTHS, key=lambda x: abs(x - w))
+        tpath = f"thumbs/{w}/{path}"
+        try:
+            data, _ = get_object(tpath)
+            return Response(content=data, media_type="image/jpeg", headers=headers)
+        except Exception:
+            pass
+        data, _ = get_object(path)
+        try:
+            from PIL import Image, ImageOps
+            import io as _io
+            img = ImageOps.exif_transpose(Image.open(_io.BytesIO(data))).convert("RGB")
+            if img.width > w:
+                img = img.resize((w, max(1, round(img.height * w / img.width))), Image.LANCZOS)
+            out = _io.BytesIO(); img.save(out, format="JPEG", quality=78, optimize=True, progressive=True)
+            thumb = out.getvalue()
+            try:
+                put_object(tpath, thumb, "image/jpeg")
+            except Exception:
+                pass
+            return Response(content=thumb, media_type="image/jpeg", headers=headers)
+        except Exception:
+            return Response(content=data, media_type=ctype_rec, headers=headers)
     data, ctype = get_object(path)
-    return Response(content=data, media_type=record.get("content_type", ctype))
+    return Response(content=data, media_type=ctype_rec or ctype, headers=headers)
 
 
 # ---------- Artwork models ----------

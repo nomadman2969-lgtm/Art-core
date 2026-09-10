@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, fileUrl } from "../api";
+import { api, thumbUrl } from "../api";
 import { toast } from "sonner";
 import { Heart, MessageCircle, Share2, Bookmark, Sparkles, Users, ImagePlus, Palette, Filter, X, Plus, Calendar, MapPin } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { ReportButton } from "../components/ReportButton";
+import { RecommendedEvents } from "../components/events/RecommendedEvents";
 import FeedComposer from "../components/FeedComposer";
 
-const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+const resolveImg = (p) => thumbUrl(p, 960);
 
 const POST_KIND_META = {
   update: { label: "Update", color: "#CCFF00" },
@@ -127,6 +129,8 @@ export default function HomeFeed() {
           </div>
         </button>
       )}
+
+      <RecommendedEvents />
 
       {/* Trending upcoming events rail */}
       {nearbyEvents.length > 0 && (
@@ -281,6 +285,7 @@ function PostCard({ post, onChange }) {
             {post.pinned && <span className="label-caps text-[#F5A623]">· Pinned</span>}
           </div>
         </div>
+        <ReportButton targetType="post" targetId={post.id} ownerId={post.artist?.id} compact />
       </div>
       {post.video ? (
         <video data-testid={`post-video-${post.id}`} src={resolveImg(post.video)} controls playsInline preload="metadata"

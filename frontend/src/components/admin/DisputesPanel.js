@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, fileUrl } from "../../api";
+import { api, thumbUrl } from "../../api";
 import { REASON_LABELS, DISPUTE_STATUS } from "../orders/OrderExtras";
 
-const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+const resolveImg = (p) => thumbUrl(p, 240);
 
 export function DisputesPanel() {
   const [items, setItems] = useState([]);

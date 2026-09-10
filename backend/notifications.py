@@ -158,6 +158,7 @@ KIND_TO_CATEGORY = {
     "event_rsvp": "event", "event_cancelled": "event",
     "event_reminder": "event", "event_ticket_paid": "event",
     "event_waitlist_open": "event", "event_waitlist_joined": "event", "event_broadcast": "event",
+    "report_opened": "system", "report_resolved": "system", "moderation_action": "system",
 }
 
 

@@ -5,9 +5,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin, Calendar, Users, Plus, List as ListIcon, Map as MapIcon, X, Search, Navigation, Bookmark, Share2, Ticket, Flame } from "lucide-react";
 import { toast } from "sonner";
-import { api, fileUrl } from "../api";
+import { api, thumbUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { CreateEventModal } from "../components/events/CreateEventModal";
+import { RecommendedEvents } from "../components/events/RecommendedEvents";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -16,7 +17,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-export const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
+export const resolveImg = (p) => thumbUrl(p, 480);
 const FALLBACK_CAT = { key: "exhibition", label: "Event", color: "#A1A1AA" };
 
 const startOf = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
@@ -122,6 +123,8 @@ export default function Events() {
           {canHost && <button data-testid="create-event-btn" onClick={() => setShowCreate(true)} className="btn-lime !py-2 !px-3 flex items-center gap-1"><Plus size={14} /> Host</button>}
         </div>
       </div>
+
+      <RecommendedEvents />
 
       {/* Search + location */}
       <form onSubmit={(e) => { e.preventDefault(); setQ(qInput.trim()); }} className="flex flex-col md:flex-row gap-2 mb-4">
@@ -234,7 +237,7 @@ export function EventCard({ event, catMeta, user, onChange }) {
         <div className="text-xs text-[#CCFF00] label-caps">{niceDate(event.start_at)}</div>
         <Link to={`/events/${event.id}`} className="font-unbounded font-semibold text-sm mt-1.5 leading-snug line-clamp-2 hover:text-[#CCFF00]">{event.title}</Link>
         <div className="text-xs text-zinc-500 mt-2 flex items-center gap-1 truncate"><MapPin size={11} className="flex-shrink-0" /> {[event.venue, event.location?.city || event.location?.address].filter(Boolean).join(" · ") || "Location TBA"}</div>
-        <div className="text-xs text-zinc-500 mt-1 truncate">by {event.organizer || event.host_name}</div>
+        <Link to={`/host/${event.host_id}`} className="text-xs text-zinc-500 mt-1 truncate block hover:text-[#CCFF00]">by {event.organizer || event.host_name}</Link>
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/8">
           <span className="text-xs text-zinc-400 flex items-center gap-1"><Users size={12} /> {event.rsvp_count}{event.max_capacity ? `/${event.max_capacity}` : ""}{full ? " · Full" : ""}</span>
           <div className="flex items-center gap-1">
