@@ -82,7 +82,17 @@ async def public_settings():
         "commission_percent": s.get("commission_percent", 4.0),
         "upload_fee": s.get("upload_fee", 5.0),
         "currency": s.get("currency", "usd"),
+        "processing_percent": s.get("processing_percent", 2.9),
+        "processing_fixed": s.get("processing_fixed", 0.30),
+        "seller_pays_processing": True,
     }
+
+
+@app.get("/api/settings/fee-preview")
+async def fee_preview(gross: float):
+    from payments import get_settings as _gs, split_amount
+    settings = await _gs()
+    return {"gross": round(float(gross), 2), **split_amount(gross, settings), "commission_percent": settings["commission_percent"]}
 
 
 app.add_middleware(

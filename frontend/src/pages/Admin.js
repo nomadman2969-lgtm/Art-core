@@ -36,6 +36,8 @@ export default function AdminDashboard() {
       commission_percent: Number(settings.commission_percent),
       upload_fee: Number(settings.upload_fee),
       currency: settings.currency,
+      processing_percent: Number(settings.processing_percent ?? 2.9),
+      processing_fixed: Number(settings.processing_fixed ?? 0.3),
     });
     toast.success("Settings saved");
   };
@@ -104,6 +106,16 @@ export default function AdminDashboard() {
           <Row label="Commission %">
             <input data-testid="commission-input" type="number" step="0.1" value={settings.commission_percent}
               onChange={(e) => setSettings({ ...settings, commission_percent: e.target.value })}
+              className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
+          </Row>
+          <Row label="Card processing % (charged to seller)">
+            <input data-testid="processing-percent-input" type="number" step="0.1" value={settings.processing_percent ?? 2.9}
+              onChange={(e) => setSettings({ ...settings, processing_percent: e.target.value })}
+              className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
+          </Row>
+          <Row label="Card processing fixed (USD)">
+            <input data-testid="processing-fixed-input" type="number" step="0.05" value={settings.processing_fixed ?? 0.3}
+              onChange={(e) => setSettings({ ...settings, processing_fixed: e.target.value })}
               className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
           </Row>
           <Row label="Upload fee (USD)">

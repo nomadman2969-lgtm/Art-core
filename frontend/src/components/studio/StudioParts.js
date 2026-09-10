@@ -648,6 +648,35 @@ export function PostsEditor({ userId }) {
 }
 
 // ---------- Payouts panel (Stripe Connect) ----------
+function FeePreview() {
+  const [gross, setGross] = useState(100);
+  const [split, setSplit] = useState(null);
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try { const r = await api.get("/settings/fee-preview", { params: { gross: Number(gross) || 0 } }); setSplit(r.data); } catch { /* ignore */ }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [gross]);
+  const money = (v) => `$${Number(v || 0).toFixed(2)}`;
+  return (
+    <div className="mt-4 p-4 rounded-sm bg-white/[0.03] border border-white/10 max-w-lg" data-testid="fee-preview">
+      <div className="label-caps text-zinc-400 mb-2">What you'd keep on a sale of</div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-zinc-500">$</span>
+        <input data-testid="fee-preview-input" type="number" min="0" step="1" value={gross} onChange={(e) => setGross(e.target.value)}
+          className="w-28 bg-transparent border border-white/12 rounded-sm px-2 py-1 outline-none text-sm" />
+      </div>
+      {split && (
+        <div className="grid grid-cols-3 gap-3 text-xs">
+          <div><div className="text-zinc-500">Art Core fee ({split.commission_percent}%)</div><div className="font-unbounded text-zinc-300" data-testid="fee-preview-platform">-{money(split.platform_take)}</div></div>
+          <div><div className="text-zinc-500">Card processing</div><div className="font-unbounded text-zinc-300" data-testid="fee-preview-processing">-{money(split.processing_fee)}</div></div>
+          <div><div className="text-zinc-500">You receive</div><div className="font-unbounded text-[#CCFF00]" data-testid="fee-preview-net">{money(split.net)}</div></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PayoutsPanel({ dashboard, refresh, refreshUser }) {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -694,9 +723,10 @@ export function PayoutsPanel({ dashboard, refresh, refreshUser }) {
             {requirements.length > 0 && (
               <div className="text-xs text-[#F5A623] mt-2">Stripe still needs: {requirements.slice(0, 4).join(", ")}{requirements.length > 4 ? "..." : ""}</div>
             )}
-            <div className="text-xs text-zinc-500 mt-3 max-w-lg">
-              Art Core uses Stripe Connect Express to route your share of each sale directly to your bank. The platform keeps its commission automatically; you receive the rest.
+            <div className="text-xs text-zinc-500 mt-3 max-w-lg" data-testid="fee-explainer">
+              Art Core uses Stripe Connect Express to route your share of each sale directly to your bank. On every sale you keep everything except Art Core's platform fee and Stripe's standard card processing (~2.9% + 30¢) — no listing fees, no subscriptions.
             </div>
+            <FeePreview />
           </div>
           <div className="flex flex-col gap-2">
             {(!status?.connected || !chargesOn) && (

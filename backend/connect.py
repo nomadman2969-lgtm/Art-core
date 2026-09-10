@@ -121,10 +121,13 @@ async def build_transfer_options(seller_id: str, gross_amount: float) -> dict:
     settings = await _get_settings()
     fee_pct = float(settings["commission_percent"]) / 100.0
     application_fee_cents = int(round(gross_amount * fee_pct * 100))
+    # on_behalf_of makes the seller the settlement merchant: Stripe's processing fee is
+    # debited from the seller's side, so the platform keeps the full application fee.
     return {
         "payment_intent_data": {
             "application_fee_amount": application_fee_cents,
             "transfer_data": {"destination": account_id},
+            "on_behalf_of": account_id,
         },
     }
 

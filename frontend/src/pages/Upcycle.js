@@ -76,7 +76,7 @@ export default function Upcycle() {
         )}
         {myLoc && <input data-testid="upcycle-radius" type="range" min="5" max="500" step="5" value={radiusKm} onChange={(e) => setRadiusKm(Number(e.target.value))} className="accent-[#CCFF00] w-32" />}
         <button data-testid="upcycle-pickup" onClick={() => setPickupOnly((v) => !v)} className="label-caps text-xs px-3 py-1.5 rounded-full border flex items-center gap-1" style={chip(pickupOnly)}><MapPin size={11} /> Local pickup only</button>
-        <span className="text-[11px] text-zinc-500 flex items-center gap-1 ml-1"><Truck size={11} /> Sellers ship their own way or meet locally · Art Core takes just 4%</span>
+        <span className="text-[11px] text-zinc-500 flex items-center gap-1 ml-1"><Truck size={11} /> Sellers ship their own way or meet locally · Art Core takes just 4% + card processing · no listing fees</span>
       </div>
       <div className="flex gap-2 flex-wrap items-center mb-6 pb-4 border-b border-white/8">
         <button data-testid="upcycle-type-all" onClick={() => setType("")} className="label-caps text-xs px-3 py-1.5 rounded-full border" style={chip(!type)}>All</button>

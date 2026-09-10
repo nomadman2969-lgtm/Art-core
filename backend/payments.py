@@ -23,12 +23,23 @@ async def get_settings() -> dict:
             "upload_fee": 5.0,
             "currency": "usd",
             "deposit_percent": 50.0,
+            "processing_percent": 2.9,
+            "processing_fixed": 0.30,
             "aotw_artwork_id": None,
             "created_at": now_iso(),
         }
         await db.settings.insert_one(default)
         return default
     return strip_mongo(s)
+
+
+def split_amount(gross: float, settings: dict) -> dict:
+    """Seller-pays-processing split: platform keeps commission, seller nets gross - commission - card processing."""
+    gross = float(gross)
+    platform_take = round(gross * float(settings["commission_percent"]) / 100.0, 2)
+    processing_fee = round(gross * float(settings.get("processing_percent", 2.9)) / 100.0 + float(settings.get("processing_fixed", 0.30)), 2) if gross > 0 else 0.0
+    net = round(max(0.0, gross - platform_take - processing_fee), 2)
+    return {"platform_take": platform_take, "processing_fee": processing_fee, "net": net}
 
 
 # ---------- Buyer checkout ----------
@@ -433,7 +444,7 @@ async def _apply_paid(session_id: str):
         return
     if tx["kind"] == "buyer_order":
         settings = await get_settings()
-        commission = float(settings["commission_percent"]) / 100.0
+        _splits = [split_amount(it["price"] * it["quantity"], settings) for it in tx["items"]]
         order = {
             "id": new_id(),
             "session_id": session_id,
@@ -442,16 +453,18 @@ async def _apply_paid(session_id: str):
             "total": tx["amount"],
             "currency": tx["currency"],
             "commission_percent": settings["commission_percent"],
-            "platform_take": round(tx["amount"] * commission, 2),
+            "platform_take": round(sum(s["platform_take"] for s in _splits), 2),
+            "processing_fee": round(sum(s["processing_fee"] for s in _splits), 2),
             "artist_payouts": [
                 {
                     "artist_id": it["artist_id"],
                     "artwork_id": it["artwork_id"],
                     "gross": round(it["price"] * it["quantity"], 2),
-                    "net": round(it["price"] * it["quantity"] * (1 - commission), 2),
+                    "processing_fee": sp["processing_fee"],
+                    "net": sp["net"],
                     "status": "pending",
                 }
-                for it in tx["items"]
+                for it, sp in zip(tx["items"], _splits)
             ],
             "fulfillment": {"status": "pending", "shipped_at": None, "delivered_at": None, "tracking": None, "carrier": None},
             "created_at": now_iso(),
@@ -487,8 +500,8 @@ async def _apply_paid(session_id: str):
             notify_followers_soon(_art["artist_id"], "followed_new_artwork", f"New work from {_artist.get('name', 'an artist')}", _art["title"], f"/artwork/{_art['id']}", artwork_id=_art["id"])
     elif tx["kind"] == "auction_win":
         settings = await get_settings()
-        commission = float(settings["commission_percent"]) / 100.0
         gross = float(tx["amount"])
+        sp = split_amount(gross, settings)
         # Detect if Stripe already routed funds via destination charge
         seller = await db.users.find_one({"id": tx["seller_id"]})
         auto_paid = bool(seller and seller.get("stripe_charges_enabled") and seller.get("stripe_account_id"))
@@ -501,10 +514,11 @@ async def _apply_paid(session_id: str):
             "total": gross,
             "currency": tx["currency"],
             "commission_percent": settings["commission_percent"],
-            "platform_take": round(gross * commission, 2),
+            "platform_take": sp["platform_take"],
+            "processing_fee": sp["processing_fee"],
             "artist_payouts": [{
                 "artist_id": tx["seller_id"], "artwork_id": tx["artwork_id"],
-                "gross": gross, "net": round(gross * (1 - commission), 2), "status": payout_status,
+                "gross": gross, "processing_fee": sp["processing_fee"], "net": sp["net"], "status": payout_status,
             }],
             "fulfillment": {"status": "pending", "shipped_at": None, "delivered_at": None, "tracking": None, "carrier": None},
             "source": "auction",
@@ -536,8 +550,8 @@ async def _apply_paid(session_id: str):
         })
     elif tx["kind"] == "offer_payment":
         settings = await get_settings()
-        commission = float(settings["commission_percent"]) / 100.0
         gross = float(tx["amount"])
+        sp = split_amount(gross, settings)
         seller = await db.users.find_one({"id": tx["seller_id"]})
         auto_paid = bool(seller and seller.get("stripe_charges_enabled") and seller.get("stripe_account_id"))
         payout_status = "auto_transferred" if auto_paid else "pending"
@@ -549,10 +563,11 @@ async def _apply_paid(session_id: str):
             "total": gross,
             "currency": tx["currency"],
             "commission_percent": settings["commission_percent"],
-            "platform_take": round(gross * commission, 2),
+            "platform_take": sp["platform_take"],
+            "processing_fee": sp["processing_fee"],
             "artist_payouts": [{
                 "artist_id": tx["seller_id"], "artwork_id": tx["artwork_id"],
-                "gross": gross, "net": round(gross * (1 - commission), 2), "status": payout_status,
+                "gross": gross, "processing_fee": sp["processing_fee"], "net": sp["net"], "status": payout_status,
             }],
             "fulfillment": {"status": "pending", "shipped_at": None, "delivered_at": None, "tracking": None, "carrier": None},
             "source": "offer",
@@ -586,12 +601,13 @@ async def _apply_paid(session_id: str):
         })
     elif tx["kind"] == "commission_payment":
         settings = await get_settings()
-        commission = float(settings["commission_percent"]) / 100.0
         gross = float(tx["amount"])
+        sp = split_amount(gross, settings)
         await db.commissions.update_one({"id": tx["commission_id"]}, {"$set": {
             "paid": True, "paid_at": now_iso(), "status": "paid",
-            "platform_take": round(gross * commission, 2),
-            "net_to_artist": round(gross * (1 - commission), 2),
+            "platform_take": sp["platform_take"],
+            "processing_fee": sp["processing_fee"],
+            "net_to_artist": sp["net"],
         }})
         await db.notifications.insert_one({
             "id": new_id(), "user_id": tx["artist_id"], "kind": "commission_paid",

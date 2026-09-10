@@ -590,3 +590,10 @@ Then click Verify in Resend → Domains.
 ## 2026-06 — Fee change
 - Global commission changed 3% → 4% (backend defaults in admin.py/payments.py/server.py/events.py, DB settings.global, Upcycle copy). Verified via GET /api/settings.
 - Answered user: 4% application fee stays in platform Stripe balance; remainder routed to artist Connect Express account via destination charge. Platform Stripe account claim URL lives in backend/.env STRIPE_ONBOARDING_URL; artists connect at /studio → Payouts.
+
+## 2026-06 — Seller-pays-processing (all sale types)
+- connect.py build_transfer_options adds on_behalf_of=seller account → Stripe processing fee debited from seller side; platform keeps full 4%.
+- payments.split_amount(gross, settings) used by buyer_order/auction_win/offer_payment/commission_payment + events host analytics (also fixed settings id bug "platform"→"global"). Orders now store processing_fee.
+- Settings: processing_percent (2.9), processing_fixed (0.30) editable in /admin; GET /api/settings/fee-preview?gross=X.
+- Studio Payouts tab: FeePreview calculator. $100 sale → platform $4.00, Stripe $3.20, artist $92.80.
+- Tested: iteration_19.json all pass.

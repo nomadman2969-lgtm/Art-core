@@ -545,14 +545,16 @@ async def event_analytics(event_id: str, user: dict = Depends(get_current_user))
     revenue_gross = sum(float(r.get("amount") or 0) for r in rsvps if r.get("paid") and not r.get("refunded"))
     revenue_refunded = sum(float(r.get("amount") or 0) for r in rsvps if r.get("refunded"))
 
-    # Fee estimate: use platform settings if available
+    # Fee estimate: seller-pays-processing split from platform settings
     try:
-        settings = await db.settings.find_one({"id": "platform"}) or {}
-        commission_pct = float(settings.get("commission_percent", 4)) / 100.0
+        from payments import get_settings as _gs, split_amount as _split
+        _settings = await _gs()
+        _sp = _split(revenue_gross, _settings)
+        est_platform_fee = _sp["platform_take"] + _sp["processing_fee"]
+        net_to_host = _sp["net"]
     except Exception:
-        commission_pct = 0.03
-    est_platform_fee = revenue_gross * commission_pct
-    net_to_host = max(0.0, revenue_gross - est_platform_fee)
+        est_platform_fee = revenue_gross * 0.04
+        net_to_host = max(0.0, revenue_gross - est_platform_fee)
 
     # RSVP curve — count per day since creation
     try:

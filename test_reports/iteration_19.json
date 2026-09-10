@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 19 focused fee-math regression: platform 4% + seller-pays-processing (2.9% + $0.30). All 9 backend pytest cases pass and all frontend fee UI verifications pass. Settings restored to 4 / 2.9 / 0.30 after test.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter19_fees.py",
+    "/app/test_reports/pytest/iter19.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "connect.build_transfer_options correctly attaches payment_intent_data.on_behalf_of when seller has Connect account, ensuring Stripe processing fee is charged to the seller settlement merchant.",
+    "payments.split_amount now returns processing_fee=0 when gross=0 (guarded), preventing the $0.30 fixed fee from being subtracted from a $0 sale.",
+    "events.py host analytics gracefully falls back to 4% if split_amount import fails — acceptable, but consider removing the fallback once main path is stable to avoid drift.",
+    "server.py startup seed for settings does not include processing_percent/processing_fixed keys — relies on payments.get_settings default insert. Consider aligning seed for clarity."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter19_fees.py"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100%"},
+  "test_credentials": "admin monster@houseofmonster.com / MonsterAdmin2026!; artist demo.artist@artcorestudio.net / DemoArtist2026!; buyer demo.collector@artcorestudio.net / DemoCollector2026!",
+  "seed_data_creation": "None. Admin PATCH test toggled processing 3.1/0.5 then restored to 2.9/0.30.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend fee regression suite lives at /app/backend/tests/test_iter19_fees.py — run alongside existing iter18 suite. Login response uses key 'token' (not access_token). Studio Payouts tab is reached via /studio then clicking the 'Payouts' tab text; the FeePreview inputs are data-testid=fee-preview-input/platform/processing/net. Admin Settings tab is at /admin -> click 'Settings' tab; inputs are data-testid=processing-percent-input, processing-fixed-input.",
+  "rca of the issue": "N/A — no bugs found. Fee math verified: gross=100 → platform 4.00 / processing 3.20 / net 92.80; gross=30 → 1.20 / 1.17 / 27.63; gross=0 → 0/0/0. Frontend PayoutsPanel matches @390px with no horizontal overflow. Upcycle banner reads 'Art Core takes just 4% + card processing · no listing fees'. Buyer checkout still returns valid Stripe test-mode checkout URL."
+}

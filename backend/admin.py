@@ -17,6 +17,8 @@ class SettingsUpdate(BaseModel):
     commission_percent: Optional[float] = None
     upload_fee: Optional[float] = None
     currency: Optional[str] = None
+    processing_percent: Optional[float] = None
+    processing_fixed: Optional[float] = None
 
 
 async def _get_settings():
