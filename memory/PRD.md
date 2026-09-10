@@ -421,6 +421,18 @@ Full commerce system audit + upgrade:
 - Backend curl: recurring create → 3 sibling events; capacity full returns 400 "join the waitlist"; waitlist join returns position 1; analytics returns full payload for host, 403 for non-host.
 - Frontend screenshots: sold-out event with purple Join Waitlist + series indicator; analytics modal with 3 RSVPs / 100% fill rate; Create Event with recurrence checkbox active + live hint.
 
+## Upcycle Section + 3% Platform Fee + Local Pickup (Mar 10, 2026)
+- **Upcycle** (`/upcycle`, nav "Upcycle"): furniture turned into art. Artworks gained `section` (art|upcycle), `furniture_type` (chair/table/dresser/cabinet/lamp/mirror/shelf/bench/other), `materials`, `before_image` (Before/After toggle on cards + detail), `delivery` ['ships','local_pickup'] (eBay-style: seller ships their own way or local pickup), `location {lat,lng,city}`.
+- API: `GET /api/upcycle/meta` (type counts); `GET /api/artworks?section=&furniture_type=&pickup_only=&near_lat=&near_lng=&radius_km=` (adds `distance_km`, sorted by distance). Upload form (`/studio/upload?section=upcycle`) has section toggle + upcycle-only fields (type, materials, delivery toggles, city geocode via Nominatim, before photo).
+- 5 demo upcycle pieces seeded with generated before/after images (`/app/backend/seed_demo.py` image cache + `/tmp/seed_upcycle.py` logic — re-create under /app if needed).
+- **Platform fee is now 3%** (`settings.global.commission_percent = 3.0`, defaults in payments/admin/server; event analytics reads the same key). Money flow: Stripe Connect destination charges → artist 97% to their connected account, 3% application fee + $5 listing fee stay in the platform Stripe balance.
+- Testing — iteration_18: 18/18 backend + frontend pass (desktop + mobile).
+
+### Queued (user-picked, not yet built)
+- Artist Analytics dashboard (studio visits, saves, follower growth, top pieces)
+- Gift Tickets (buy a ticket for a friend by email, QR delivered)
+- Two-Factor Login (TOTP authenticator; integration_expert auth playbook already fetched — bcrypt/PyJWT; use pyotp)
+
 ## Follow Alerts + Staff Picks + Calendar Sync + Mobile Feed (Mar 10, 2026)
 - **Follow alerts** (`backend/engage.py notify_followers`): followers get in-app + push (`followed_new_post` on studio post create, `followed_new_event` on event/series create, `followed_new_artwork` when an artwork goes live after the upload fee). Labels in Notifications.js; category "social".
 - **Staff Picks**: `GET /api/staff-picks` (public, enriched, drops removed/past items) and `PUT /api/admin/staff-picks {title, blurb, artwork_ids≤12, event_ids≤6}` stored in `settings.global.staff_picks`. `components/home/StaffPicks.js` on Home (full) + Feed (compact); Admin **Staff Picks** tab (`components/admin/StaffPicksPanel.js`) with numbered tile picker.

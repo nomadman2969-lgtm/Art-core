@@ -4,6 +4,7 @@ import { api, fileUrl } from "../api";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { ReportButton } from "../components/ReportButton";
+import { BeforeAfter } from "./Upcycle";
 import { toast } from "sonner";
 import { Share2, Heart, MessageCircle, Send, Tag, X, Bookmark } from "lucide-react";
 import MentionInput from "../components/MentionInput";
@@ -103,7 +104,9 @@ export default function ArtworkDetail() {
       <div className="grid md:grid-cols-12 gap-10">
         <div className="md:col-span-7">
           <div className="aspect-[4/5] bg-black overflow-hidden border border-white/8 rounded-sm">
-            <img src={resolveImg(art.images[idx])} alt={art.title} className="w-full h-full object-contain" />
+            {art.section === "upcycle" && art.before_image && idx === 0
+              ? <BeforeAfter before={art.before_image} after={art.images[0]} title={art.title} className="!object-contain" />
+              : <img src={resolveImg(art.images[idx])} alt={art.title} className="w-full h-full object-contain" />}
           </div>
           {art.images.length > 1 && (
             <div className="grid grid-cols-6 gap-2 mt-3">
@@ -118,13 +121,16 @@ export default function ArtworkDetail() {
         </div>
 
         <div className="md:col-span-5 md:sticky md:top-24 self-start">
-          <div className="label-caps">{art.medium}{art.style ? ` · ${art.style}` : ""}</div>
+          <div className="label-caps flex items-center gap-2 flex-wrap">{art.medium}{art.style && art.style !== "upcycle" ? ` · ${art.style}` : ""}
+            {art.delivery?.includes("local_pickup") && <span data-testid="pickup-badge" className="label-caps text-[10px] px-2 py-1 rounded-sm bg-[#34D399]/15 text-[#34D399]">Local pickup{art.location?.city ? ` · ${art.location.city}` : ""}</span>}
+            {art.section === "upcycle" && <Link to="/upcycle" data-testid="upcycle-badge" className="label-caps text-[10px] px-2 py-1 rounded-sm bg-[#34D399]/20 text-[#34D399] hover:bg-[#34D399]/30">Upcycle · {art.furniture_type || "furniture"}</Link>}
+          </div>
           <h1 className="font-anton text-5xl md:text-6xl uppercase mt-3 leading-[0.95]">{art.title}</h1>
           <div className="mt-4 flex items-center gap-3">
             <Link to={`/artist/${art.artist?.id}`} data-testid="link-artist" className="font-unbounded text-sm text-[#CCFF00] hover:underline">by {art.artist?.name}</Link>
           </div>
           <div className="mt-8 font-anton text-4xl text-[#CCFF00]">${Number(art.price).toLocaleString()}</div>
-          <div className="mt-2 text-sm text-zinc-500">{art.width_in} × {art.height_in} in · {art.medium}</div>
+          <div className="mt-2 text-sm text-zinc-500">{art.width_in} × {art.height_in} in · {art.medium}{art.materials ? ` · ${art.materials}` : ""}</div>
 
           <div className="flex flex-wrap gap-3 mt-8">
             {isSold ? (

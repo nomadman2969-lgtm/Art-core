@@ -145,11 +145,31 @@ export function UploadArtwork() {
     width_in: 12, height_in: 12, price: 100,
     year: new Date().getFullYear(), category: "", tags: "",
     quantity: 1, kind: "original", shipping_info: "", coa: "",
+    section: new URLSearchParams(window.location.search).get("section") === "upcycle" ? "upcycle" : "art", furniture_type: "chair", materials: "", before_image: null, delivery: ["ships"], loc_city: "", loc_lat: "", loc_lng: "",
   });
   const [images, setImages] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [settings, setSettings] = useState(null);
   useEffect(() => { api.get("/settings").then((r) => setSettings(r.data)); }, []);
+
+  const geocodeCity = async () => {
+    if (!form.loc_city.trim()) return toast.error("Enter your city first");
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(form.loc_city)}`, { headers: { Accept: "application/json" } });
+      const d = await r.json();
+      if (d?.[0]) { setForm((x) => ({ ...x, loc_lat: parseFloat(d[0].lat).toFixed(5), loc_lng: parseFloat(d[0].lon).toFixed(5) })); toast.success("Location set"); }
+      else toast.error("City not found");
+    } catch { toast.error("Lookup failed"); }
+  };
+  const toggleDelivery = (k) => setForm((x) => { const has = x.delivery.includes(k); const next = has ? x.delivery.filter((d) => d !== k) : [...x.delivery, k]; return { ...x, delivery: next.length ? next : x.delivery }; });
+
+  const uploadBefore = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const fd = new FormData(); fd.append("file", f);
+    try { const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } }); setForm((x) => ({ ...x, before_image: r.data.path })); }
+    catch { toast.error("Upload failed"); }
+  };
 
   const upload = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -177,6 +197,11 @@ export function UploadArtwork() {
         year: form.year ? Number(form.year) : null,
         quantity: Number(form.quantity) || 1,
         tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        furniture_type: form.section === "upcycle" ? form.furniture_type : null,
+        materials: form.section === "upcycle" ? form.materials || null : null,
+        before_image: form.section === "upcycle" ? form.before_image : null,
+        delivery: form.delivery,
+        location: form.loc_lat && form.loc_lng ? { lat: Number(form.loc_lat), lng: Number(form.loc_lng), city: form.loc_city || null } : null,
       };
       const r = await api.post("/artworks", payload);
       toast.success("Artwork saved");
@@ -204,6 +229,12 @@ export function UploadArtwork() {
               {["Oil", "Acrylic", "Watercolor", "Mixed Media", "Digital", "Photography", "Sculpture", "Print"].map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </Field>
+          <Field label="Section">
+            <select data-testid="art-section" value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm py-3 px-3">
+              <option value="art">Art</option>
+              <option value="upcycle">Upcycle (furniture as art)</option>
+            </select>
+          </Field>
           <Field label="Type">
             <select data-testid="art-kind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm py-3 px-3">
               <option value="original">Original</option>
@@ -212,6 +243,35 @@ export function UploadArtwork() {
             </select>
           </Field>
         </div>
+        {form.section === "upcycle" && (
+          <div className="grid md:grid-cols-3 gap-4 border border-[#34D399]/30 rounded-sm p-4" data-testid="upcycle-fields">
+            <Field label="Furniture type">
+              <select data-testid="art-furniture-type" value={form.furniture_type} onChange={(e) => setForm({ ...form, furniture_type: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm py-3 px-3">
+                {["chair", "table", "dresser", "cabinet", "lamp", "mirror", "shelf", "bench", "other"].map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
+              </select>
+            </Field>
+            <Field label="Materials & finish">
+              <input data-testid="art-materials" value={form.materials} onChange={(e) => setForm({ ...form, materials: e.target.value })} placeholder="Reclaimed oak, spray paint, 2K clear coat" className="w-full bg-white/[0.03] border border-white/12 rounded-sm py-3 px-3" />
+            </Field>
+            <Field label="Delivery (eBay-style — you handle shipping)">
+              <div className="flex gap-2">
+                {[["ships", "I'll ship it"], ["local_pickup", "Local pickup"]].map(([k, l]) => (
+                  <button type="button" key={k} data-testid={`art-delivery-${k}`} onClick={() => toggleDelivery(k)} className={`flex-1 label-caps text-[10px] px-2 py-3 rounded-sm border ${form.delivery.includes(k) ? "border-[#34D399] text-[#34D399] bg-[#34D399]/10" : "border-white/12 text-zinc-500"}`}>{l}</button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Piece location (for 'near me')">
+              <div className="flex gap-2">
+                <input data-testid="art-loc-city" value={form.loc_city} onChange={(e) => setForm({ ...form, loc_city: e.target.value })} placeholder="City, State" className="flex-1 min-w-0 bg-white/[0.03] border border-white/12 rounded-sm py-3 px-3" />
+                <button type="button" data-testid="art-loc-find" onClick={geocodeCity} className="btn-ghost !py-2 !px-3 text-xs">{form.loc_lat ? "✓" : "Find"}</button>
+              </div>
+            </Field>
+            <Field label="Before photo (optional)">
+              <label className="btn-ghost !py-3 cursor-pointer flex items-center justify-center text-xs">{form.before_image ? "Before photo added ✓" : "Upload the 'before'"}
+                <input data-testid="art-before-image" type="file" accept="image/*" className="hidden" onChange={uploadBefore} /></label>
+            </Field>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <Field label="Style (optional)"><input data-testid="art-style" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>
           <Field label="Category (optional)"><input data-testid="art-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Portrait, Landscape..." className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none" /></Field>

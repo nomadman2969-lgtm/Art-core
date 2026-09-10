@@ -3,7 +3,7 @@ import os
 import uuid
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from db import db, new_id, now_iso, strip_mongo
 from auth import get_current_user, get_optional_user, require_role, public_user
 from storage import put_object, get_object, compress_image, APP_NAME
@@ -119,6 +119,9 @@ async def download(path: str, w: Optional[int] = None):
 
 
 # ---------- Artwork models ----------
+FURNITURE_TYPES = ["chair", "table", "dresser", "cabinet", "lamp", "mirror", "shelf", "bench", "other"]
+
+
 class ArtworkCreate(BaseModel):
     title: str
     description: str
@@ -135,6 +138,33 @@ class ArtworkCreate(BaseModel):
     tags: List[str] = Field(default_factory=list)
     quantity: int = Field(default=1, ge=1)
     kind: str = "original"  # original | print | digital
+    section: str = "art"  # art | upcycle
+    furniture_type: Optional[str] = None  # chair | table | dresser | cabinet | lamp | mirror | shelf | bench | other
+    before_image: Optional[str] = None  # storage path — the piece before it became art
+    materials: Optional[str] = Field(default=None, max_length=200)
+    # eBay-style fulfilment: seller ships their own way or offers local pickup
+    delivery: List[str] = Field(default_factory=lambda: ["ships"])  # ships | local_pickup
+    location: Optional[dict] = None  # {lat, lng, city}
+
+    @field_validator("delivery")
+    @classmethod
+    def _delivery(cls, v):
+        v = [x for x in v if x in ("ships", "local_pickup")]
+        return v or ["ships"]
+
+    @field_validator("section")
+    @classmethod
+    def _section(cls, v):
+        if v not in ("art", "upcycle"):
+            raise ValueError("section must be art or upcycle")
+        return v
+
+    @field_validator("furniture_type")
+    @classmethod
+    def _furn(cls, v):
+        if v is not None and v not in FURNITURE_TYPES:
+            raise ValueError(f"furniture_type must be one of {FURNITURE_TYPES}")
+        return v
     shipping_info: Optional[str] = None
     coa: Optional[str] = None  # Certificate of authenticity notes
 
@@ -166,6 +196,17 @@ async def _enrich(art: dict) -> dict:
     if artist:
         art["artist"] = {"id": artist["id"], "name": artist["name"], "bio": artist.get("bio")}
     return art
+
+
+FURNITURE_LABELS = {"chair": "Chairs", "table": "Tables", "dresser": "Dressers", "cabinet": "Cabinets", "lamp": "Lamps", "mirror": "Mirrors", "shelf": "Shelves", "bench": "Benches", "other": "Other"}
+
+
+@router.get("/upcycle/meta")
+async def upcycle_meta():
+    counts = {}
+    async for row in db.artworks.aggregate([{"$match": {"section": "upcycle", "status": {"$in": ["live", "sold"]}}}, {"$group": {"_id": "$furniture_type", "n": {"$sum": 1}}}]):
+        counts[row["_id"] or "other"] = row["n"]
+    return {"types": [{"key": k, "label": FURNITURE_LABELS[k], "count": counts.get(k, 0)} for k in FURNITURE_TYPES], "total": sum(counts.values())}
 
 
 # ---------- Artist endpoints ----------
@@ -251,8 +292,21 @@ async def list_artworks(
     featured: Optional[bool] = None,
     sort: str = "recent",
     limit: int = 60,
+    section: Optional[str] = None,
+    furniture_type: Optional[str] = None,
+    near_lat: Optional[float] = None,
+    near_lng: Optional[float] = None,
+    radius_km: float = 50,
+    pickup_only: bool = False,
 ):
     q: dict = {"status": {"$in": ["live", "sold"]}}
+    if section == "upcycle":
+        q["section"] = "upcycle"
+    elif section == "art":
+        q["section"] = {"$ne": "upcycle"}
+    if furniture_type: q["furniture_type"] = furniture_type
+    if pickup_only: q["delivery"] = "local_pickup"
+    if near_lat is not None and near_lng is not None: q["location.lat"] = {"$exists": True}
     if medium: q["medium"] = medium
     if style: q["style"] = style
     if color: q["color"] = color
@@ -266,8 +320,19 @@ async def list_artworks(
     sort_key = [("price", 1)] if sort == "price_asc" else \
                [("price", -1)] if sort == "price_desc" else \
                [("created_at", -1)]
-    cursor = db.artworks.find(q).sort(sort_key).limit(limit)
-    return [await _enrich(a) for a in await cursor.to_list(limit)]
+    cursor = db.artworks.find(q).sort(sort_key).limit(limit if near_lat is None else 400)
+    out = [await _enrich(a) for a in await cursor.to_list(limit if near_lat is None else 400)]
+    if near_lat is not None and near_lng is not None:
+        from math import radians, sin, cos, asin, sqrt
+        def dist_km(a, b):
+            la1, lo1, la2, lo2 = map(radians, [a[0], a[1], b[0], b[1]])
+            h = sin((la2 - la1) / 2) ** 2 + cos(la1) * cos(la2) * sin((lo2 - lo1) / 2) ** 2
+            return 2 * 6371 * asin(sqrt(h))
+        for a in out:
+            loc = a.get("location") or {}
+            a["distance_km"] = round(dist_km((near_lat, near_lng), (loc.get("lat"), loc.get("lng"))), 1) if loc.get("lat") is not None else None
+        out = sorted([a for a in out if a["distance_km"] is not None and a["distance_km"] <= radius_km], key=lambda a: a["distance_km"])[:limit]
+    return out
 
 
 @router.get("/artworks/aotw")

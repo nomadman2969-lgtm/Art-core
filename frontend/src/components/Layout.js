@@ -29,6 +29,7 @@ export default function Layout({ children }) {
   const links = [
     { to: "/explore", label: "Explore", testid: "nav-explore" },
     { to: "/marketplace", label: "Marketplace", testid: "nav-marketplace" },
+    { to: "/upcycle", label: "Upcycle", testid: "nav-upcycle" },
     { to: "/artists", label: "Artists", testid: "nav-artists" },
     { to: "/auctions", label: "Auctions", testid: "nav-auctions" },
     { to: "/rankings", label: "Rankings", testid: "nav-rankings" },

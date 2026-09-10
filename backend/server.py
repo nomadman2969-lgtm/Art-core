@@ -77,9 +77,9 @@ async def root():
 async def public_settings():
     s = await db.settings.find_one({"id": "global"})
     if not s:
-        s = {"id": "global", "commission_percent": 15.0, "upload_fee": 5.0, "currency": "usd"}
+        s = {"id": "global", "commission_percent": 3.0, "upload_fee": 5.0, "currency": "usd"}
     return {
-        "commission_percent": s.get("commission_percent", 15.0),
+        "commission_percent": s.get("commission_percent", 3.0),
         "upload_fee": s.get("upload_fee", 5.0),
         "currency": s.get("currency", "usd"),
     }
@@ -173,7 +173,7 @@ async def startup():
     if not await db.settings.find_one({"id": "global"}):
         await db.settings.insert_one({
             "id": "global",
-            "commission_percent": 15.0,
+            "commission_percent": 3.0,
             "upload_fee": 5.0,
             "currency": "usd",
             "aotw_artwork_id": None,
