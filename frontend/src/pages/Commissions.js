@@ -159,6 +159,17 @@ export function CommissionDetail() {
   const { user } = useAuth();
   const [c, setC] = useState(null);
   const [counter, setCounter] = useState("");
+  const [quoteNote, setQuoteNote] = useState("");
+  const [quoteDays, setQuoteDays] = useState("");
+  const [sketch, setSketch] = useState(null);
+  const [sketchBusy, setSketchBusy] = useState(false);
+  const uploadSketch = async (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    setSketchBusy(true);
+    try { const fd = new FormData(); fd.append("file", f); const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } }); setSketch(r.data.path); }
+    catch { toast.error("Upload failed"); }
+    setSketchBusy(false);
+  };
   const [progressMsg, setProgressMsg] = useState("");
   const [deliverFiles, setDeliverFiles] = useState([]);
   const [deliverMsg, setDeliverMsg] = useState("");
@@ -282,21 +293,44 @@ export function CommissionDetail() {
             <button data-testid="respond-decline" onClick={() => respond("decline")} className="btn-ghost"><X size={14} className="mr-2" /> Decline</button>
           </div>
           <div className="border-t border-white/8 pt-4">
-            <div className="label-caps mb-2">Counter offer</div>
+            <div className="label-caps mb-2">{c.kind === "flip" ? "Send a firm quote" : "Counter offer"}</div>
+            {c.kind === "flip" && <div className="text-xs text-zinc-500 mb-3">Price the job before the collector pays the deposit. A quick concept sketch closes flips faster.</div>}
             <div className="flex gap-2">
               <input data-testid="counter-input" type="number" min="1" value={counter} onChange={(e) => setCounter(e.target.value)} placeholder="Amount" className="flex-1 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none" />
-              <button data-testid="respond-counter" disabled={!counter} onClick={() => respond("counter", { counter_amount: Number(counter) })} className="btn-violet"><RefreshCw size={14} className="mr-2" /> Send Counter</button>
+              {c.kind === "flip" && <input data-testid="quote-days" type="number" min="1" max="365" value={quoteDays} onChange={(e) => setQuoteDays(e.target.value)} placeholder="Days" className="w-24 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2 outline-none" />}
             </div>
+            {c.kind === "flip" && (
+              <div className="mt-3 space-y-3" data-testid="quote-fields">
+                <textarea data-testid="quote-note" rows={2} value={quoteNote} onChange={(e) => setQuoteNote(e.target.value)} placeholder="What's included — prep, paint, sealing, hardware..." className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 text-sm outline-none" />
+                <div className="flex items-center gap-3">
+                  <label className="btn-ghost !py-2 !px-3 text-xs cursor-pointer flex items-center gap-1"><Upload size={12} /> {sketch ? "Replace sketch" : "Attach concept sketch"}
+                    <input data-testid="quote-sketch-input" type="file" accept="image/*" className="hidden" onChange={uploadSketch} /></label>
+                  {sketchBusy && <span className="text-xs text-[#CCFF00]">Uploading...</span>}
+                  {sketch && <img src={resolveImg(sketch)} alt="" className="w-14 h-14 object-cover rounded-sm border border-white/10" data-testid="quote-sketch-preview" />}
+                </div>
+              </div>
+            )}
+            <button data-testid="respond-counter" disabled={!counter} onClick={() => respond("counter", { counter_amount: Number(counter), message: quoteNote || null, sketch_image: sketch || null, timeline_days: quoteDays ? Number(quoteDays) : null })} className="btn-violet mt-3"><RefreshCw size={14} className="mr-2" /> {c.kind === "flip" ? "Send Quote" : "Send Counter"}</button>
           </div>
         </div>
       )}
 
       {isBuyer && c.status === "counter" && (
         <div className="mt-8 glass-card p-6 rounded-sm" data-testid="buyer-counter-panel">
-          <div className="label-caps text-[#F5A623]">Counter offer received</div>
+          <div className="label-caps text-[#F5A623]">{c.kind === "flip" ? "Quote received" : "Counter offer received"}</div>
           <div className="font-anton text-3xl text-[#CCFF00] mt-2">${Number(c.counter_amount).toLocaleString()}</div>
+          {c.quote && (
+            <div className="mt-4 flex flex-col sm:flex-row gap-4" data-testid="quote-details">
+              {c.quote.sketch_image && <img src={resolveImg(c.quote.sketch_image)} alt="Concept sketch" className="w-40 h-40 object-cover rounded-sm border border-white/10" data-testid="quote-sketch" />}
+              <div className="text-sm text-zinc-300 space-y-1">
+                {c.quote.timeline_days && <div className="label-caps text-zinc-500 text-[10px]">Turnaround · <span className="text-white">{c.quote.timeline_days} days</span></div>}
+                {c.quote.note && <p className="whitespace-pre-wrap">{c.quote.note}</p>}
+                <div className="text-xs text-zinc-500 pt-2">Accepting locks this price. You'll then pay the deposit into escrow.</div>
+              </div>
+            </div>
+          )}
           <div className="flex gap-3 mt-4">
-            <button data-testid="accept-counter" onClick={() => buyerAction("accept_counter")} className="btn-lime">Accept Counter</button>
+            <button data-testid="accept-counter" onClick={() => buyerAction("accept_counter")} className="btn-lime">{c.kind === "flip" ? "Accept Quote" : "Accept Counter"}</button>
             <button data-testid="cancel-commission" onClick={() => buyerAction("cancel")} className="btn-ghost">Cancel</button>
           </div>
         </div>

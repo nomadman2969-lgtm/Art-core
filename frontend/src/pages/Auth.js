@@ -15,12 +15,13 @@ export function Login() {
   const nav = useNavigate();
   const [challenge, setChallenge] = useState(null);
   const [code, setCode] = useState("");
+  const [remember, setRemember] = useState(false);
 
   const submitCode = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
-      const u = await verifyTwoFactor(challenge.challenge_token, code);
+      const u = await verifyTwoFactor(challenge.challenge_token, code, remember);
       toast.success(t("auth.welcome_back"));
       routeByRole(u);
     } catch (er) { toast.error(er?.response?.data?.detail || "Wrong code"); }
@@ -73,6 +74,10 @@ export function Login() {
         <form onSubmit={submitCode} className="space-y-5">
           <input data-testid="twofa-login-code" autoFocus required value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" maxLength={16}
             className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none focus:border-[#CCFF00] font-mono tracking-widest text-center text-xl" />
+          <label className="flex items-center gap-3 text-sm text-zinc-300 cursor-pointer select-none">
+            <input data-testid="twofa-remember-device" type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-[#CCFF00] w-4 h-4" />
+            Trust this device for 30 days
+          </label>
           <button data-testid="twofa-login-submit" disabled={busy} className="btn-lime w-full">{busy ? t("auth.signing_in") : "Verify"}</button>
         </form>
         <div className="mt-6 flex justify-between text-xs text-zinc-500">

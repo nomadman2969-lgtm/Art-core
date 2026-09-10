@@ -198,9 +198,26 @@ async def resend(req: ChallengeReq):
     return {"sent": True}
 
 
+TRUSTED_DAYS = 30
+
+
+async def is_trusted_device(user: dict, device_token: Optional[str]) -> bool:
+    if not device_token:
+        return False
+    h = _hash(device_token)
+    now = datetime.now(timezone.utc).isoformat()
+    for d in user.get("trusted_devices") or []:
+        if hmac.compare_digest(d.get("hash", ""), h) and d.get("expires_at", "") > now:
+            await db.users.update_one({"id": user["id"], "trusted_devices.id": d["id"]}, {"$set": {"trusted_devices.$.last_used_at": now}})
+            return True
+    return False
+
+
 class VerifyLoginReq(BaseModel):
     challenge_token: str
     code: str = Field(min_length=4, max_length=16)
+    remember_device: bool = False
+    device_label: Optional[str] = Field(default=None, max_length=120)
 
 
 @router.post("/verify-login")
@@ -216,4 +233,31 @@ async def verify_login(req: VerifyLoginReq):
         await db.users.update_one({"id": uid}, {"$inc": {"twofa_fail_count": 1}})
         raise HTTPException(401, "Wrong code")
     await db.users.update_one({"id": uid}, {"$unset": {"twofa_fail_count": ""}})
-    return {"token": make_token(user["id"], user["role"]), "user": public_user(user)}
+    out = {"token": make_token(user["id"], user["role"]), "user": public_user(user)}
+    if req.remember_device:
+        raw = secrets.token_urlsafe(32)
+        now = datetime.now(timezone.utc)
+        device = {"id": new_id(), "hash": _hash(raw), "label": (req.device_label or "This device")[:120],
+                  "created_at": now.isoformat(), "last_used_at": now.isoformat(), "expires_at": (now + timedelta(days=TRUSTED_DAYS)).isoformat()}
+        await db.users.update_one({"id": uid}, {"$push": {"trusted_devices": {"$each": [device], "$slice": -10}}})
+        out["device_token"] = raw
+        out["device_expires_at"] = device["expires_at"]
+    return out
+
+
+@router.get("/devices")
+async def list_devices(user: dict = Depends(get_current_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    return [{k: d[k] for k in ("id", "label", "created_at", "last_used_at", "expires_at")} for d in user.get("trusted_devices") or [] if d.get("expires_at", "") > now]
+
+
+@router.delete("/devices/{device_id}")
+async def revoke_device(device_id: str, user: dict = Depends(get_current_user)):
+    await db.users.update_one({"id": user["id"]}, {"$pull": {"trusted_devices": {"id": device_id}}})
+    return {"ok": True}
+
+
+@router.delete("/devices")
+async def revoke_all_devices(user: dict = Depends(get_current_user)):
+    await db.users.update_one({"id": user["id"]}, {"$set": {"trusted_devices": []}})
+    return {"ok": True}

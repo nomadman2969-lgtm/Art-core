@@ -19,14 +19,16 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    const r = await api.post("/auth/login", { email, password });
+    const r = await api.post("/auth/login", { email, password, device_token: localStorage.getItem("hom_device") || null });
     if (r.data.requires_2fa) return { requires_2fa: true, method: r.data.method, challenge_token: r.data.challenge_token };
     localStorage.setItem("hom_token", r.data.token);
     setUser(r.data.user);
     return r.data.user;
   };
-  const verifyTwoFactor = async (challenge_token, code) => {
-    const r = await api.post("/auth/2fa/verify-login", { challenge_token, code });
+  const verifyTwoFactor = async (challenge_token, code, rememberDevice = false) => {
+    const device_label = `${navigator.platform || "Device"} · ${/Mobile|Android|iPhone/i.test(navigator.userAgent) ? "Mobile" : "Desktop"} browser`;
+    const r = await api.post("/auth/2fa/verify-login", { challenge_token, code, remember_device: rememberDevice, device_label });
+    if (r.data.device_token) localStorage.setItem("hom_device", r.data.device_token);
     localStorage.setItem("hom_token", r.data.token);
     setUser(r.data.user);
     return r.data.user;

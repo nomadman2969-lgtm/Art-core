@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck, Smartphone, Mail, Loader2, KeyRound, Copy } from "lucide-react";
+import { ShieldCheck, Smartphone, Mail, Loader2, KeyRound, Copy, MonitorSmartphone, X } from "lucide-react";
 import { api, copyText } from "../api";
 import { useAuth } from "../context/AuthContext";
 
@@ -27,8 +27,16 @@ export default function Security() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [recovery, setRecovery] = useState(null);
+  const [devices, setDevices] = useState([]);
 
-  const load = () => api.get("/auth/2fa/status").then((r) => setStatus(r.data)).catch(() => {});
+  const load = () => {
+    api.get("/auth/2fa/status").then((r) => setStatus(r.data)).catch(() => {});
+    api.get("/auth/2fa/devices").then((r) => setDevices(r.data)).catch(() => {});
+  };
+  const revoke = async (id) => {
+    try { await (id ? api.delete(`/auth/2fa/devices/${id}`) : api.delete("/auth/2fa/devices")); if (!id) localStorage.removeItem("hom_device"); toast.success("Device trust removed"); load(); }
+    catch { toast.error("Couldn't revoke"); }
+  };
   useEffect(() => { load(); }, []);
 
   const start = async (method) => {
@@ -119,6 +127,29 @@ export default function Security() {
             <button type="button" data-testid="twofa-cancel-btn" onClick={() => setSetup(null)} className="btn-ghost">Cancel</button>
           </div>
         </form>
+      )}
+
+      {status.enabled && (
+        <div className="mt-8 glass-card rounded-sm p-6" data-testid="trusted-devices-card">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="label-caps text-zinc-400 flex items-center gap-2"><MonitorSmartphone size={12} /> Trusted devices</div>
+            {devices.length > 0 && <button data-testid="revoke-all-devices-btn" onClick={() => revoke(null)} className="text-xs text-[#FF4D4D] hover:underline">Sign out all</button>}
+          </div>
+          <div className="text-xs text-zinc-500 mt-2">Devices you ticked "trust for 30 days" skip the code at sign-in.</div>
+          {devices.length === 0 ? <div className="text-xs text-zinc-600 mt-4" data-testid="no-trusted-devices">No trusted devices.</div> : (
+            <ul className="mt-4 divide-y divide-white/8">
+              {devices.map((d) => (
+                <li key={d.id} className="py-3 flex items-center justify-between gap-3 text-sm" data-testid={`trusted-device-${d.id}`}>
+                  <div className="min-w-0">
+                    <div className="truncate">{d.label}</div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">Last used {new Date(d.last_used_at).toLocaleDateString()} · expires {new Date(d.expires_at).toLocaleDateString()}</div>
+                  </div>
+                  <button data-testid={`revoke-device-${d.id}`} onClick={() => revoke(d.id)} className="text-zinc-500 hover:text-[#FF4D4D] p-1" aria-label="Revoke"><X size={14} /></button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {status.enabled && (

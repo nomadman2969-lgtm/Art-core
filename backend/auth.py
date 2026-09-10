@@ -78,6 +78,7 @@ class RegisterReq(BaseModel):
 class LoginReq(BaseModel):
     email: EmailStr
     password: str
+    device_token: Optional[str] = Field(default=None, max_length=200)
 
 
 class UserPublic(BaseModel):
@@ -140,7 +141,9 @@ async def login(req: LoginReq):
     if not user or not verify_password(req.password, user["password_hash"]):
         raise HTTPException(401, "Invalid credentials")
     if user.get("twofa_enabled"):
-        from twofa import make_challenge_token, send_email_code
+        from twofa import make_challenge_token, send_email_code, is_trusted_device
+        if await is_trusted_device(user, req.device_token):
+            return {"token": make_token(user["id"], user["role"]), "user": public_user(user)}
         if user.get("twofa_method") == "email":
             await send_email_code(user)
         return {"requires_2fa": True, "method": user.get("twofa_method"), "challenge_token": make_challenge_token(user["id"])}

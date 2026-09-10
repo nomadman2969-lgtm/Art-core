@@ -146,6 +146,8 @@ class RespondReq(BaseModel):
     action: str  # accept | decline | counter
     counter_amount: Optional[float] = None
     message: Optional[str] = None
+    sketch_image: Optional[str] = None  # storage path — flip quotes attach a concept sketch
+    timeline_days: Optional[int] = Field(default=None, ge=1, le=365)
 
 
 @router.post("/{cid}/respond")
@@ -168,10 +170,13 @@ async def respond(cid: str, req: RespondReq, me: dict = Depends(get_current_user
         counter = req.counter_amount
     else:
         raise HTTPException(400, "Invalid action")
+    updates = {"status": new_status, "counter_amount": counter, "updated_at": now_iso()}
+    if req.action == "counter":
+        updates["quote"] = {"amount": counter, "sketch_image": req.sketch_image, "note": req.message, "timeline_days": req.timeline_days, "at": now_iso()}
     await db.commissions.update_one(
         {"id": cid},
-        {"$set": {"status": new_status, "counter_amount": counter, "updated_at": now_iso()},
-         "$push": {"progress": {"kind": f"artist_{req.action}", "message": req.message, "at": now_iso()}}},
+        {"$set": updates,
+         "$push": {"progress": {"kind": f"artist_{req.action}", "message": req.message, "image": req.sketch_image, "at": now_iso()}}},
     )
     await db.notifications.insert_one({
         "id": new_id(), "user_id": c["buyer_id"], "kind": f"commission_{req.action}",
