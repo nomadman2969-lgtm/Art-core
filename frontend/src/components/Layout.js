@@ -5,9 +5,12 @@ import { useCart } from "../context/CartContext";
 import { useState, useEffect } from "react";
 import { api } from "../api";
 import { ShoppingBag, User2, Menu, X, Search, MessageSquare, Bell, Compass } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { LanguagePicker } from "./LanguagePicker";
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const { items } = useCart();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
@@ -27,13 +30,13 @@ export default function Layout({ children }) {
   }, [user]);
 
   const links = [
-    { to: "/explore", label: "Explore", testid: "nav-explore" },
-    { to: "/marketplace", label: "Marketplace", testid: "nav-marketplace" },
-    { to: "/upcycle", label: "Upcycle", testid: "nav-upcycle" },
-    { to: "/artists", label: "Artists", testid: "nav-artists" },
-    { to: "/auctions", label: "Auctions", testid: "nav-auctions" },
-    { to: "/rankings", label: "Rankings", testid: "nav-rankings" },
-    { to: "/events", label: "Events", testid: "nav-events" },
+    { to: "/explore", label: t("nav.explore"), testid: "nav-explore" },
+    { to: "/marketplace", label: t("nav.marketplace"), testid: "nav-marketplace" },
+    { to: "/upcycle", label: t("nav.upcycle"), testid: "nav-upcycle" },
+    { to: "/artists", label: t("nav.artists"), testid: "nav-artists" },
+    { to: "/auctions", label: t("nav.auctions"), testid: "nav-auctions" },
+    { to: "/rankings", label: t("nav.rankings"), testid: "nav-rankings" },
+    { to: "/events", label: t("nav.events"), testid: "nav-events" },
   ];
 
   const submitSearch = (e) => {
@@ -63,12 +66,13 @@ export default function Layout({ children }) {
             <div className="relative w-full">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input data-testid="nav-search" value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder="Search art, artists..."
+                placeholder={t("nav.search_placeholder")}
                 className="w-full bg-white/[0.03] border border-white/10 pl-9 pr-4 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm" />
             </div>
           </form>
 
           <div className="flex items-center gap-1 md:gap-3 ml-auto lg:ml-0">
+            <LanguagePicker />
             <Link to="/cart" data-testid="nav-cart" className="relative p-2 hover:text-[#CCFF00] transition-colors">
               <ShoppingBag size={18} />
               {items.length > 0 && (
@@ -91,22 +95,23 @@ export default function Layout({ children }) {
             )}
             {user ? (
               <div className="hidden md:flex items-center gap-3 ml-2">
-                {user.role === "admin" && <Link to="/admin" data-testid="nav-admin" className="label-caps hover:text-[#CCFF00]">Admin</Link>}
-                {(user.role === "artist" || user.role === "admin") && <Link to="/studio" data-testid="nav-studio" className="label-caps hover:text-[#CCFF00]">Studio</Link>}
-                {(user.role === "artist" || user.role === "admin") && <Link to="/selling" data-testid="nav-selling" className="label-caps hover:text-[#CCFF00]">Selling</Link>}
-                {user.role === "buyer" && <Link to="/dashboard" data-testid="nav-dashboard" className="label-caps hover:text-[#CCFF00]">Dashboard</Link>}
-                <Link to="/orders" data-testid="nav-orders" className="label-caps hover:text-[#CCFF00]">Orders</Link>
-                <Link to="/tickets" data-testid="nav-tickets" className="label-caps hover:text-[#CCFF00]">Tickets</Link>
-                <Link to="/feed" data-testid="nav-feed" className="label-caps hover:text-[#CCFF00]">Feed</Link>
-                <Link to="/saved" data-testid="nav-saved" className="label-caps hover:text-[#CCFF00]">Saved</Link>
-                <Link to="/offers" data-testid="nav-offers" className="label-caps hover:text-[#CCFF00]">Offers</Link>
-                <Link to="/commissions" data-testid="nav-commissions" className="label-caps hover:text-[#CCFF00]">Commissions</Link>
-                <button data-testid="logout-btn" onClick={() => { logout(); nav("/"); }} className="label-caps hover:text-[#FF4D4D]">Logout</button>
+                {user.role === "admin" && <Link to="/admin" data-testid="nav-admin" className="label-caps hover:text-[#CCFF00]">{t("nav.admin")}</Link>}
+                {(user.role === "artist" || user.role === "admin") && <Link to="/studio" data-testid="nav-studio" className="label-caps hover:text-[#CCFF00]">{t("nav.studio")}</Link>}
+                {(user.role === "artist" || user.role === "admin") && <Link to="/selling" data-testid="nav-selling" className="label-caps hover:text-[#CCFF00]">{t("nav.selling")}</Link>}
+                {user.role === "buyer" && <Link to="/dashboard" data-testid="nav-dashboard" className="label-caps hover:text-[#CCFF00]">{t("nav.dashboard")}</Link>}
+                <Link to="/orders" data-testid="nav-orders" className="label-caps hover:text-[#CCFF00]">{t("nav.orders")}</Link>
+                <Link to="/tickets" data-testid="nav-tickets" className="label-caps hover:text-[#CCFF00]">{t("nav.tickets")}</Link>
+                <Link to="/feed" data-testid="nav-feed" className="label-caps hover:text-[#CCFF00]">{t("nav.feed")}</Link>
+                <Link to="/saved" data-testid="nav-saved" className="label-caps hover:text-[#CCFF00]">{t("nav.saved")}</Link>
+                <Link to="/offers" data-testid="nav-offers" className="label-caps hover:text-[#CCFF00]">{t("nav.offers")}</Link>
+                <Link to="/commissions" data-testid="nav-commissions" className="label-caps hover:text-[#CCFF00]">{t("nav.commissions")}</Link>
+                <Link to="/security" data-testid="nav-security" className="label-caps hover:text-[#CCFF00]" title="Account security">{t("nav.security")}</Link>
+                <button data-testid="logout-btn" onClick={() => { logout(); nav("/"); }} className="label-caps hover:text-[#FF4D4D]">{t("nav.logout")}</button>
               </div>
             ) : (
               <div className="hidden md:flex items-center gap-2 ml-2">
-                <Link to="/login" data-testid="nav-login" className="label-caps px-3 py-1.5 hover:text-[#CCFF00]">Sign In</Link>
-                <Link to="/register" data-testid="nav-register" className="btn-lime !py-2 !text-xs">Join</Link>
+                <Link to="/login" data-testid="nav-login" className="label-caps px-3 py-1.5 hover:text-[#CCFF00]">{t("nav.sign_in")}</Link>
+                <Link to="/register" data-testid="nav-register" className="btn-lime !py-2 !text-xs">{t("nav.join")}</Link>
               </div>
             )}
             <button className="lg:hidden p-2" onClick={() => setOpen(!open)} data-testid="mobile-menu-btn">
@@ -119,19 +124,20 @@ export default function Layout({ children }) {
             <div className="px-6 py-6 flex flex-col gap-4">
               {links.map((l) => <Link key={l.to} to={l.to} onClick={() => setOpen(false)} className="label-caps">{l.label} {l.badge && <span className="text-[#7C3AED] ml-2">· soon</span>}</Link>)}
               <form onSubmit={(e) => { submitSearch(e); setOpen(false); }} className="flex">
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search..." className="flex-1 bg-white/5 border border-white/10 px-3 py-2 text-sm rounded-sm" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("nav.search_short")} className="flex-1 bg-white/5 border border-white/10 px-3 py-2 text-sm rounded-sm" />
               </form>
               {user ? (
                 <>
-                  {user.role === "admin" && <Link to="/admin" onClick={() => setOpen(false)} className="label-caps">Admin</Link>}
-                  {(user.role === "artist" || user.role === "admin") && <Link to="/studio" onClick={() => setOpen(false)} className="label-caps">Studio</Link>}
-                  <Link to="/messages" onClick={() => setOpen(false)} className="label-caps">Messages</Link>
-                  <button onClick={() => { logout(); setOpen(false); nav("/"); }} className="label-caps text-left text-[#FF4D4D]">Logout</button>
+                  {user.role === "admin" && <Link to="/admin" onClick={() => setOpen(false)} className="label-caps">{t("nav.admin")}</Link>}
+                  {(user.role === "artist" || user.role === "admin") && <Link to="/studio" onClick={() => setOpen(false)} className="label-caps">{t("nav.studio")}</Link>}
+                  <Link to="/messages" onClick={() => setOpen(false)} className="label-caps">{t("nav.messages")}</Link>
+                  <Link to="/security" onClick={() => setOpen(false)} className="label-caps">{t("nav.security")}</Link>
+                  <button onClick={() => { logout(); setOpen(false); nav("/"); }} className="label-caps text-left text-[#FF4D4D]">{t("nav.logout")}</button>
                 </>
               ) : (
                 <>
-                  <Link to="/login" onClick={() => setOpen(false)} className="label-caps">Sign In</Link>
-                  <Link to="/register" onClick={() => setOpen(false)} className="btn-lime !py-2 !text-xs w-fit">Join Art Core</Link>
+                  <Link to="/login" onClick={() => setOpen(false)} className="label-caps">{t("nav.sign_in")}</Link>
+                  <Link to="/register" onClick={() => setOpen(false)} className="btn-lime !py-2 !text-xs w-fit">{t("nav.join_full")}</Link>
                 </>
               )}
             </div>
@@ -145,38 +151,39 @@ export default function Layout({ children }) {
         <div className="max-w-[1600px] mx-auto px-6 md:px-12 py-16 grid md:grid-cols-5 gap-12">
           <div className="md:col-span-2">
             <div className="font-anton text-4xl uppercase">Art<span className="text-[#CCFF00]">Core</span></div>
-            <p className="text-zinc-500 text-sm mt-4 max-w-sm leading-relaxed">The social marketplace for painters, illustrators, sculptors, graffiti artists, digital creators & photographers.</p>
+            <p className="text-zinc-500 text-sm mt-4 max-w-sm leading-relaxed">{t("footer.tagline")}</p>
           </div>
           <div>
-            <div className="label-caps mb-4">Discover</div>
+            <div className="label-caps mb-4">{t("footer.discover")}</div>
             <ul className="space-y-2 text-sm text-zinc-300">
-              <li><Link to="/explore">Explore</Link></li>
-              <li><Link to="/marketplace">Marketplace</Link></li>
-              <li><Link to="/artists">Artists</Link></li>
-              <li><Link to="/auctions">Auctions</Link></li>
+              <li><Link to="/explore">{t("nav.explore")}</Link></li>
+              <li><Link to="/marketplace">{t("nav.marketplace")}</Link></li>
+              <li><Link to="/artists">{t("nav.artists")}</Link></li>
+              <li><Link to="/auctions">{t("nav.auctions")}</Link></li>
             </ul>
           </div>
           <div>
-            <div className="label-caps mb-4">For Artists</div>
+            <div className="label-caps mb-4">{t("footer.for_artists")}</div>
             <ul className="space-y-2 text-sm text-zinc-300">
-              <li><Link to="/register?role=artist">Sell Your Work</Link></li>
-              <li><Link to="/studio">Studio</Link></li>
-              <li><Link to="/commissions">Commissions</Link></li>
-              <li><Link to="/rankings">Rankings</Link></li>
+              <li><Link to="/register?role=artist">{t("footer.sell_your_work")}</Link></li>
+              <li><Link to="/studio">{t("nav.studio")}</Link></li>
+              <li><Link to="/commissions">{t("nav.commissions")}</Link></li>
+              <li><Link to="/rankings">{t("nav.rankings")}</Link></li>
             </ul>
           </div>
           <div>
-            <div className="label-caps mb-4">Newsletter</div>
+            <div className="label-caps mb-4">{t("footer.newsletter")}</div>
             <NewsletterForm />
           </div>
         </div>
-        <div className="border-t border-white/5 py-6 text-center text-xs text-zinc-500 font-unbounded">© {new Date().getFullYear()} Art Core — Made for artists.</div>
+        <div className="border-t border-white/5 py-6 text-center text-xs text-zinc-500 font-unbounded">© {new Date().getFullYear()} Art Core — {t("footer.made_for_artists")}</div>
       </footer>
     </div>
   );
 }
 
 function NewsletterForm() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [ok, setOk] = useState(false);
   const submit = async (e) => {
@@ -191,8 +198,8 @@ function NewsletterForm() {
       <input data-testid="newsletter-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
         placeholder="you@studio.com"
         className="bg-white/[0.03] border border-white/10 rounded-sm py-2 px-3 text-sm outline-none focus:border-[#CCFF00]" />
-      <button data-testid="newsletter-submit" className="btn-ghost self-start !py-2 !px-4 !text-xs">Get updates</button>
-      {ok && <div data-testid="newsletter-ok" className="text-xs text-[#CCFF00]">On the list.</div>}
+      <button data-testid="newsletter-submit" className="btn-ghost self-start !py-2 !px-4 !text-xs">{t("footer.get_updates")}</button>
+      {ok && <div data-testid="newsletter-ok" className="text-xs text-[#CCFF00]">{t("footer.on_the_list")}</div>}
     </form>
   );
 }

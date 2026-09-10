@@ -294,3 +294,47 @@ def gift_sent_html(gifter_name: str, recipient_email: str, event_title: str, amo
 <div style="font-size:11px;color:#71717a;margin-top:20px">Their QR ticket is attached to that email and also available from their Tickets page if they join Art Core.</div>
 """
     return _wrap(body, "Gift sent")
+
+
+def gift_reminder_html(recipient_name: str, event_title: str, event_when: str, event_where: str, ticket_url: str, qr_url: str) -> str:
+    body = f"""
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  See you tomorrow
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:20px">
+  Hey {recipient_name}, quick reminder — <strong style="color:#fff">{event_title}</strong> is tomorrow. Here's your ticket so you're not hunting for it at the door.
+</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+  style="background:rgba(204,255,0,0.06);border:1px solid rgba(204,255,0,0.3);border-radius:4px;margin-bottom:24px">
+  <tr><td style="padding:20px">
+    <div style="font-size:11px;color:#CCFF00;letter-spacing:2px;text-transform:uppercase">Your ticket</div>
+    <div style="font-family:Impact,Arial Black,sans-serif;font-size:24px;color:#fff;margin-top:6px">{event_title}</div>
+    <div style="font-size:12px;color:#a1a1aa;margin-top:10px">📅 {event_when}</div>
+    <div style="font-size:12px;color:#a1a1aa">📍 {event_where}</div>
+  </td></tr>
+  <tr><td align="center" style="padding:0 20px 20px">
+    <img src="{qr_url}" width="180" height="180" alt="Your ticket QR" style="display:block;background:#fff;padding:8px;border-radius:4px" />
+    <div style="font-size:11px;color:#71717a;margin-top:8px">Show this QR at the door</div>
+  </td></tr>
+</table>
+<div>
+  <a href="{ticket_url}" style="display:inline-block;background:#CCFF00;color:#000;
+     padding:12px 22px;text-decoration:none;font-family:Impact,Arial Black,sans-serif;
+     letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:2px">
+    Open your ticket →
+  </a>
+</div>
+"""
+    return _wrap(body, "See you tomorrow")
+
+
+def otp_email_html(user_name: str, code: str, minutes: int) -> str:
+    body = f"""
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  Your sign-in code
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:24px">Hey {user_name}, use this code to finish signing in. It expires in {minutes} minutes.</div>
+<div style="font-family:Courier New,monospace;font-size:40px;letter-spacing:10px;color:#CCFF00;background:rgba(204,255,0,0.06);border:1px solid rgba(204,255,0,0.3);border-radius:4px;padding:20px;text-align:center">{code}</div>
+<div style="font-size:11px;color:#71717a;margin-top:20px">If you didn't try to sign in, change your password now — someone has it.</div>
+"""
+    return _wrap(body, "Your sign-in code")

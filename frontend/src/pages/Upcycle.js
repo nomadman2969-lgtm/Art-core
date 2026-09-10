@@ -4,6 +4,7 @@ import { Recycle, Hammer, Sparkles, ArrowRight, Navigation, X, MapPin, Truck } f
 import { toast } from "sonner";
 import { api, thumbUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { FlipMyFurniture } from "../components/upcycle/FlipMyFurniture";
 
 export function BeforeAfter({ before, after, title, className = "" }) {
   const [showBefore, setShowBefore] = useState(false);
@@ -114,6 +115,8 @@ export default function Upcycle() {
           ))}
         </div>
       )}
+
+      <FlipMyFurniture />
     </div>
   );
 }

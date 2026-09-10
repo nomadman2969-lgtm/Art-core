@@ -21,6 +21,14 @@ async def _enrich(c: dict) -> dict:
     return c
 
 
+class FurnitureDetails(BaseModel):
+    furniture_type: str = Field(min_length=2, max_length=40)
+    dimensions: Optional[str] = Field(default=None, max_length=80)
+    condition: Optional[str] = Field(default=None, max_length=40)
+    handoff: str = Field(default="dropoff", pattern="^(dropoff|ship|pickup)$")
+    city: Optional[str] = Field(default=None, max_length=80)
+
+
 class CommissionCreate(BaseModel):
     artist_id: str
     subject: str
@@ -30,6 +38,32 @@ class CommissionCreate(BaseModel):
     deadline: Optional[str] = None  # ISO date
     instructions: str
     reference_images: List[str] = Field(default_factory=list)  # storage paths
+    kind: str = Field(default="art", pattern="^(art|flip)$")
+    furniture: Optional[FurnitureDetails] = None
+
+
+@router.get("/flip/artists")
+async def flip_artists(limit: int = 24):
+    """Artists with live/sold Upcycle work — the ones who take furniture flips."""
+    rows = await db.artworks.aggregate([
+        {"$match": {"section": "upcycle", "status": {"$in": ["live", "sold"]}}},
+        {"$group": {"_id": "$artist_id", "pieces": {"$sum": 1}, "types": {"$addToSet": "$furniture_type"}, "sample": {"$first": "$images"}, "before": {"$first": "$before_image"}}},
+        {"$sort": {"pieces": -1}}, {"$limit": limit},
+    ]).to_list(limit)
+    out = []
+    for r in rows:
+        u = await db.users.find_one({"id": r["_id"]})
+        if not u:
+            continue
+        done = await db.commissions.count_documents({"artist_id": u["id"], "kind": "flip", "status": "approved"})
+        loc = u.get("location") or {}
+        out.append({
+            "id": u["id"], "name": u["name"], "avatar": u.get("avatar"), "bio": (u.get("bio") or "")[:140],
+            "city": loc.get("city") if isinstance(loc, dict) else None,
+            "pieces": r["pieces"], "types": [t for t in r["types"] if t], "flips_done": done,
+            "sample": (r.get("sample") or [None])[0], "before": r.get("before"),
+        })
+    return out
 
 
 @router.post("")
@@ -39,7 +73,14 @@ async def create_commission(req: CommissionCreate, me: dict = Depends(get_curren
         raise HTTPException(404, "Artist not found")
     if req.artist_id == me["id"]:
         raise HTTPException(400, "Cannot commission yourself")
+    if req.kind == "flip":
+        if not req.furniture:
+            raise HTTPException(400, "Tell the artist about the piece (type, size, hand-off)")
+        if not req.reference_images:
+            raise HTTPException(400, "Add at least one photo of the furniture")
     c = {
+        "kind": req.kind,
+        "furniture": req.furniture.model_dump() if req.furniture else None,
         "id": new_id(),
         "buyer_id": me["id"], "artist_id": req.artist_id,
         "subject": req.subject, "style": req.style, "size": req.size,

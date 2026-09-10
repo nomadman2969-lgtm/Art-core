@@ -59,7 +59,7 @@ export function CommissionsInbox() {
               <Link key={c.id} to={`/commissions/${c.id}`} data-testid={`commission-row-${c.id}`}
                 className="p-5 flex flex-wrap items-center gap-4 hover:bg-white/[0.03] transition-colors">
                 <div className="flex-1 min-w-[200px]">
-                  <div className="font-unbounded font-semibold text-lg">{c.subject}</div>
+                  <div className="font-unbounded font-semibold text-lg">{c.kind === "flip" && <span className="label-caps text-[10px] text-[#34D399] mr-2">Flip</span>}{c.subject}</div>
                   <div className="text-sm text-zinc-400 mt-1 line-clamp-1">{c.instructions}</div>
                   <div className="label-caps mt-2">
                     {tab === "buyer" ? `To ${c.artist?.name}` : `From ${c.buyer?.name}`} · {new Date(c.created_at).toLocaleDateString()}
@@ -238,6 +238,18 @@ export function CommissionDetail() {
           <div className="font-anton text-4xl text-[#CCFF00]">${Number(c.counter_amount || c.budget).toLocaleString()}</div>
         </div>
       </div>
+
+      {c.kind === "flip" && c.furniture && (
+        <div className="mt-8 border border-[#34D399]/30 bg-[#34D399]/5 rounded-sm p-5" data-testid="flip-details">
+          <div className="label-caps text-[#34D399] mb-3">Furniture flip · collector's own piece</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div><div className="label-caps text-zinc-500 text-[10px]">Piece</div><div className="capitalize mt-1">{c.furniture.furniture_type}</div></div>
+            <div><div className="label-caps text-zinc-500 text-[10px]">Condition</div><div className="capitalize mt-1">{c.furniture.condition || "—"}</div></div>
+            <div><div className="label-caps text-zinc-500 text-[10px]">Dimensions</div><div className="mt-1">{c.furniture.dimensions || "—"}</div></div>
+            <div><div className="label-caps text-zinc-500 text-[10px]">Hand-off</div><div className="mt-1">{{ dropoff: "Collector drops off", pickup: "Artist picks up", ship: "Collector ships" }[c.furniture.handoff] || c.furniture.handoff}{c.furniture.city ? ` · ${c.furniture.city}` : ""}</div></div>
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-4 mt-10">
         <Meta label="Style" value={c.style || "—"} />

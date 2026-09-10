@@ -140,6 +140,7 @@ export function ArtistStudioPage() {
       {commissionOpen && (
         <CommissionRequestModal
           artist={artist}
+          allowFlip={(artworks?.all || []).some((a) => a.section === "upcycle")}
           onClose={() => setCommissionOpen(false)}
           onSubmitted={() => setCommissionOpen(false)}
         />

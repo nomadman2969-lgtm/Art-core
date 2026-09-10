@@ -6,7 +6,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../../api";
 import { toast } from "sonner";
-import { Sparkles, GripVertical, Trash2, ExternalLink } from "lucide-react";
+import { Sparkles, GripVertical, Trash2, ExternalLink, ShieldCheck } from "lucide-react";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -727,6 +727,9 @@ export function PayoutsPanel({ dashboard, refresh, refreshUser }) {
               Art Core uses Stripe Connect Express to route your share of each sale directly to your bank. On every sale you keep everything except Art Core's platform fee and Stripe's standard card processing (~2.9% + 30¢) — no listing fees, no subscriptions.
             </div>
             <FeePreview />
+            <Link to="/security" data-testid="payouts-2fa-link" className="mt-4 inline-flex items-center gap-2 text-xs text-[#F5A623] hover:text-white transition-colors">
+              <ShieldCheck size={12} /> Protect your payouts — turn on two-factor login →
+            </Link>
           </div>
           <div className="flex flex-col gap-2">
             {(!status?.connected || !chargesOn) && (

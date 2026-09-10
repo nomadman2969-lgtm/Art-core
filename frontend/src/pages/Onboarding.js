@@ -5,11 +5,13 @@ import { toast } from "sonner";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { KeepMoreStrip } from "../components/KeepMoreStrip";
+import { useTranslation } from "react-i18next";
 
 const inputCls = "w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2.5 text-sm outline-none focus:border-[#CCFF00]";
-const STEPS = [["Pick a theme", Palette], ["Upload your first piece", Upload], ["Publish your studio", Rocket]];
+const STEPS = [["onboarding.pick_theme", Palette], ["onboarding.upload_first", Upload], ["onboarding.publish", Rocket]];
 
 export default function Onboarding() {
+  const { t } = useTranslation();
   const { user, refresh } = useAuth();
   const nav = useNavigate();
   const [step, setStep] = useState(0);
@@ -82,13 +84,13 @@ export default function Onboarding() {
 
   return (
     <div data-testid="onboarding" className="max-w-4xl mx-auto px-4 md:px-8 pt-10 md:pt-16 pb-32">
-      <div className="label-caps text-[#CCFF00] mb-3">Welcome, {user?.name?.split(" ")[0]}</div>
-      <h1 className="font-anton text-4xl sm:text-5xl lg:text-6xl uppercase leading-[0.9]">Open your studio<br />in three steps</h1>
+      <div className="label-caps text-[#CCFF00] mb-3">{t("onboarding.welcome", { name: user?.name?.split(" ")[0] })}</div>
+      <h1 className="font-anton text-4xl sm:text-5xl lg:text-6xl uppercase leading-[0.9]">{t("onboarding.title_1")}<br />{t("onboarding.title_2")}</h1>
       <div className="flex gap-2 mt-8 mb-10">
         {STEPS.map(([label, Icon], i) => (
           <div key={label} data-testid={`onboarding-step-${i}`} className={`flex-1 border-t-2 pt-3 ${i <= step ? "border-[#CCFF00]" : "border-white/10"}`}>
             <div className={`flex items-center gap-2 text-xs ${i <= step ? "text-white" : "text-zinc-600"}`}>
-              {i < step ? <Check size={12} className="text-[#CCFF00]" /> : <Icon size={12} />} <span className="hidden sm:inline">{label}</span><span className="sm:hidden">Step {i + 1}</span>
+              {i < step ? <Check size={12} className="text-[#CCFF00]" /> : <Icon size={12} />} <span className="hidden sm:inline">{t(label)}</span><span className="sm:hidden">{t("onboarding.step", { n: i + 1 })}</span>
             </div>
           </div>
         ))}
@@ -139,7 +141,7 @@ export default function Onboarding() {
               <input data-testid="onboarding-height" type="number" step="0.5" value={art.height_in} onChange={(e) => setArt({ ...art, height_in: e.target.value })} placeholder="Height (in)" className={inputCls} />
             </div>
             <div className="flex justify-between items-center pt-2">
-              <button type="button" data-testid="onboarding-skip-art" onClick={() => setStep(2)} className="label-caps text-zinc-500 hover:text-white">I'll upload later</button>
+              <button type="button" data-testid="onboarding-skip-art" onClick={() => setStep(2)} className="label-caps text-zinc-500 hover:text-white">{t("onboarding.upload_later")}</button>
               <button data-testid="onboarding-next-1" type="submit" disabled={busy} className="btn-lime flex items-center gap-2">
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />} Continue
               </button>

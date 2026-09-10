@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, fileUrl } from "../api";
@@ -12,6 +13,7 @@ import MentionInput from "../components/MentionInput";
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
 export default function ArtworkDetail() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const [art, setArt] = useState(null);
   const [idx, setIdx] = useState(0);
@@ -31,7 +33,7 @@ export default function ArtworkDetail() {
 
   const submitOffer = async (e) => {
     e.preventDefault();
-    if (!user) { toast("Sign in to make an offer"); return; }
+    if (!user) { toast(t("artwork.sign_in_offer")); return; }
     setOfferBusy(true);
     try {
       await api.post("/offers", { artwork_id: id, amount: Number(offerAmt), message: offerMsg || undefined });
@@ -134,29 +136,29 @@ export default function ArtworkDetail() {
 
           <div className="flex flex-wrap gap-3 mt-8">
             {isSold ? (
-              <div data-testid="sold-badge" className="badge-coral !px-4 !py-2">Sold</div>
+              <div data-testid="sold-badge" className="badge-coral !px-4 !py-2">{t("artwork.sold")}</div>
             ) : inCart ? (
-              <button data-testid="in-cart" onClick={() => nav("/cart")} className="btn-lime">In Cart → Checkout</button>
+              <button data-testid="in-cart" onClick={() => nav("/cart")} className="btn-lime">{t("artwork.in_cart")}</button>
             ) : (
-              <button data-testid="add-to-cart" onClick={() => { add(art); toast.success("Added to cart"); }} className="btn-lime">Add to Cart</button>
+              <button data-testid="add-to-cart" onClick={() => { add(art); toast.success(t("artwork.added")); }} className="btn-lime">{t("artwork.add_to_cart")}</button>
             )}
             {!isSold && user && art.artist?.id !== user.id && (
-              <button data-testid="make-offer-btn" onClick={() => { if (!user) { toast("Sign in to make an offer"); return; } setShowOffer(true); }} className="btn-violet">
-                <Tag size={14} className="mr-2" /> Make Offer
+              <button data-testid="make-offer-btn" onClick={() => { if (!user) { toast(t("artwork.sign_in_offer")); return; } setShowOffer(true); }} className="btn-violet">
+                <Tag size={14} className="mr-2" /> {t("artwork.make_offer")}
               </button>
             )}
             <button data-testid="like-btn" onClick={toggleLike} className="btn-ghost">
               <Heart size={14} className="mr-2" fill={likes.liked ? "#FF4D4D" : "none"} color={likes.liked ? "#FF4D4D" : undefined} />
               <span>{likes.count}</span>
             </button>
-            <button data-testid="share-btn" onClick={share} className="btn-ghost"><Share2 size={14} className="mr-2" /> Share</button>
+            <button data-testid="share-btn" onClick={share} className="btn-ghost"><Share2 size={14} className="mr-2" /> {t("artwork.share")}</button>
             <ReportButton targetType="artwork" targetId={art.id} ownerId={art.artist?.id} />
             <button data-testid="save-btn" onClick={toggleSave} className="btn-ghost">
               <Bookmark size={14} className="mr-2" fill={saved ? "#CCFF00" : "none"} color={saved ? "#CCFF00" : undefined} />
-              {saved ? "Saved" : "Save"}
+              {saved ? t("artwork.saved") : t("artwork.save")}
             </button>
             {user && art.artist?.id && user.id !== art.artist.id && (
-              <Link to={`/messages/${art.artist.id}`} data-testid="msg-artist" className="btn-ghost"><MessageCircle size={14} className="mr-2" /> Message</Link>
+              <Link to={`/messages/${art.artist.id}`} data-testid="msg-artist" className="btn-ghost"><MessageCircle size={14} className="mr-2" /> {t("artwork.message")}</Link>
             )}
             {user && (user.id === art.artist_id || user.role === "admin") && art.status === "live" && !art.aotw_submitted && (
               <button data-testid="submit-aotw" onClick={submitAotw} className="btn-violet">Submit AOTW</button>

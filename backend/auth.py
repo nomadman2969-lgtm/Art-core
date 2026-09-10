@@ -102,6 +102,8 @@ def public_user(u: dict) -> dict:
         "avatar": u.get("avatar"),
         "onboarded": bool(u.get("onboarded")),
         "approved": u.get("approved", True),
+        "language": u.get("language"),
+        "twofa_enabled": bool(u.get("twofa_enabled")),
     }
 
 
@@ -137,6 +139,11 @@ async def login(req: LoginReq):
     user = await db.users.find_one({"email": req.email.lower()})
     if not user or not verify_password(req.password, user["password_hash"]):
         raise HTTPException(401, "Invalid credentials")
+    if user.get("twofa_enabled"):
+        from twofa import make_challenge_token, send_email_code
+        if user.get("twofa_method") == "email":
+            await send_email_code(user)
+        return {"requires_2fa": True, "method": user.get("twofa_method"), "challenge_token": make_challenge_token(user["id"])}
     token = make_token(user["id"], user["role"])
     return {"token": token, "user": public_user(user)}
 
@@ -151,6 +158,7 @@ class UpdateProfileReq(BaseModel):
     bio: Optional[str] = None
     cover_image: Optional[str] = None
     avatar: Optional[str] = None
+    language: Optional[str] = Field(default=None, max_length=8)
 
 
 @router.patch("/me")

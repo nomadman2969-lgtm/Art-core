@@ -12,6 +12,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from db import db, now_iso, new_id
 from auth import router as auth_router, hash_password
+from twofa import router as twofa_router
 from artworks import router as art_router
 from payments import router as payments_router
 from admin import router as admin_router, newsletter_router
@@ -40,6 +41,7 @@ from storage import init_storage
 app = FastAPI(title="Art Core")
 
 app.include_router(auth_router)
+app.include_router(twofa_router)
 app.include_router(art_router)
 app.include_router(payments_router)
 app.include_router(admin_router)
@@ -107,13 +109,26 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
+async def _reminder_loop():
+    import asyncio
+    from events import check_event_reminders
+    while True:
+        try:
+            await check_event_reminders()
+        except Exception as e:
+            logger.error(f"Reminder sweep failed: {e}")
+        await asyncio.sleep(600)
+
+
 @app.on_event("startup")
 async def startup():
+    import asyncio
     from stripe_config import apply_stripe_keys
     try:
         await apply_stripe_keys()
     except Exception as e:
         logger.error(f"Stripe key apply failed: {e}")
+    asyncio.get_running_loop().create_task(_reminder_loop())
     # Init storage
     try:
         init_storage()

@@ -6,6 +6,7 @@ import { LiveAuctionRail, SignatureStudio } from "../components/HomeExtras";
 import { StaffPicks } from "../components/home/StaffPicks";
 import { ArrowUpRight, TrendingUp, Zap, Users, Gavel, Trophy } from "lucide-react";
 import { KeepMoreStrip } from "../components/KeepMoreStrip";
+import { useTranslation } from "react-i18next";
 
 const HERO_BG = "https://images.unsplash.com/photo-1611063158871-7dd3ed4a2ac8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwzfHxncmFmZml0aSUyMHN0cmVldCUyMGFydHxlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85";
 const STUDIO_IMG = "https://images.unsplash.com/photo-1541753866388-0b3c701627d3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxhcnRpc3QlMjBwYWludGluZyUyMHN0dWRpb3xlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85";
@@ -27,6 +28,7 @@ const TESTIMONIALS = [
 ];
 
 export default function Home() {
+  const { t } = useTranslation();
   const [feed, setFeed] = useState([]);
   const [artists, setArtists] = useState([]);
   const [stats, setStats] = useState({ artworks_live: 0, artists: 0, revenue: 0 });
@@ -47,23 +49,23 @@ export default function Home() {
         <img src={HERO_BG} className="absolute inset-0 w-full h-full object-cover opacity-45" alt="" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0A0A0C]/60 to-[#0A0A0C]" />
         <div className="relative max-w-[1600px] mx-auto px-6 md:px-12 pt-40 md:pt-56 pb-32">
-          <div className="badge-lime mb-8" data-testid="hero-badge">Est. 2026 · Made for artists</div>
+          <div className="badge-lime mb-8" data-testid="hero-badge">{t("home.badge")}</div>
           <h1 className="font-anton text-7xl md:text-[10rem] leading-[0.82] uppercase tracking-tighter">
-            Where art<br />
-            <span className="text-[#CCFF00]">hits</span> the<br />
-            street.
+            {t("home.hero_1")}<br />
+            <span className="text-[#CCFF00]">{t("home.hero_2")}</span> {t("home.hero_3")}<br />
+            {t("home.hero_4")}
           </h1>
           <p className="text-lg md:text-xl text-zinc-300 mt-10 max-w-2xl leading-relaxed">
-            The social marketplace for painters, illustrators, sculptors, graffiti artists, and every kind of visual creator. Share the work. Sell the work. Build the room.
+            {t("home.hero_sub")}
           </p>
           <div className="flex flex-wrap items-center gap-4 mt-12">
-            <Link to="/explore" data-testid="hero-cta-explore" className="btn-lime">Explore Art</Link>
-            <Link to="/register?role=artist" data-testid="hero-cta-sell" className="btn-ghost">Become an Artist</Link>
+            <Link to="/explore" data-testid="hero-cta-explore" className="btn-lime">{t("home.explore_art")}</Link>
+            <Link to="/register?role=artist" data-testid="hero-cta-sell" className="btn-ghost">{t("home.become_artist")}</Link>
           </div>
           <div className="grid grid-cols-3 gap-8 mt-20 max-w-2xl">
-            <Stat label="Artists" value={stats.artists ?? 0} />
-            <Stat label="Live Works" value={stats.artworks_live ?? 0} />
-            <Stat label="Categories" value={CATEGORIES.length} />
+            <Stat label={t("home.stat_artists")} value={stats.artists ?? 0} />
+            <Stat label={t("home.stat_live_works")} value={stats.artworks_live ?? 0} />
+            <Stat label={t("home.stat_categories")} value={CATEGORIES.length} />
           </div>
         </div>
       </section>
@@ -86,7 +88,7 @@ export default function Home() {
 
       {/* CATEGORIES */}
       <section className="max-w-[1600px] mx-auto px-6 md:px-12 py-24">
-        <SectionHeader kicker="Browse" title="Popular Categories" testid="section-categories" />
+        <SectionHeader kicker={t("home.browse")} title={t("home.popular_categories")} testid="section-categories" />
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-12">
           {CATEGORIES.map((c) => (
             <Link key={c.name} to={`/marketplace?medium=${encodeURIComponent(c.medium)}`}
@@ -95,7 +97,7 @@ export default function Home() {
               <div className="w-3 h-3 rounded-full" style={{ background: c.color, boxShadow: `0 0 16px ${c.color}` }} />
               <div>
                 <div className="font-unbounded text-lg uppercase font-bold">{c.name}</div>
-                <div className="label-caps mt-2 group-hover:text-[#CCFF00] transition-colors flex items-center gap-1">Enter <ArrowUpRight size={12} /></div>
+                <div className="label-caps mt-2 group-hover:text-[#CCFF00] transition-colors flex items-center gap-1">{t("home.enter")} <ArrowUpRight size={12} /></div>
               </div>
             </Link>
           ))}
@@ -104,8 +106,8 @@ export default function Home() {
 
       {/* TRENDING FEED */}
       <section className="max-w-[1600px] mx-auto px-6 md:px-12 py-24">
-        <SectionHeader kicker="Trending" title="Fresh from the studio" testid="section-trending"
-          right={<Link to="/explore" data-testid="trending-see-all" className="label-caps hover:text-[#CCFF00] flex items-center gap-1">See all <ArrowUpRight size={12} /></Link>}
+        <SectionHeader kicker={t("home.trending")} title={t("home.fresh")} testid="section-trending"
+          right={<Link to="/explore" data-testid="trending-see-all" className="label-caps hover:text-[#CCFF00] flex items-center gap-1">{t("home.see_all")} <ArrowUpRight size={12} /></Link>}
         />
         {feed.length === 0 ? (
           <EmptySlot label="Artists — your work goes here." />
@@ -117,10 +119,10 @@ export default function Home() {
       {/* FEATURED ARTISTS */}
       <section className="bg-[#121214] border-y border-white/5 py-24">
         <div className="max-w-[1600px] mx-auto px-6 md:px-12">
-          <SectionHeader kicker="The Roster" title="Featured Artists" testid="section-artists"
-            right={<Link to="/artists" className="label-caps hover:text-[#CCFF00] flex items-center gap-1">All artists <ArrowUpRight size={12} /></Link>}
+          <SectionHeader kicker={t("home.roster")} title={t("home.featured_artists")} testid="section-artists"
+            right={<Link to="/artists" className="label-caps hover:text-[#CCFF00] flex items-center gap-1">{t("home.all_artists")} <ArrowUpRight size={12} /></Link>}
           />
-          {artists.length === 0 ? <EmptySlot label="No artists yet." /> : (
+          {artists.length === 0 ? <EmptySlot label={t("home.no_artists")} /> : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mt-12">
               {artists.map((a) => (
                 <Link key={a.id} to={`/artist/${a.id}`} data-testid={`featured-artist-${a.id}`}
@@ -144,8 +146,8 @@ export default function Home() {
         <div className="grid md:grid-cols-2 gap-8">
           <PromoBlock
             testid="promo-auctions"
-            kicker="Live Now"
-            title="Live Auctions"
+            kicker={t("home.live_now")}
+            title={t("home.live_auctions")}
             desc="Real-time bidding. Live countdowns. Watch pieces you love — win the ones you can't live without."
             to="/auctions"
             icon={<Gavel />}
@@ -154,8 +156,8 @@ export default function Home() {
           />
           <PromoBlock
             testid="promo-commissions"
-            kicker="Live Now"
-            title="Commissions"
+            kicker={t("home.live_now")}
+            title={t("home.commissions")}
             desc="Request custom work. Set a budget, a deadline, a vibe. Chat with artists as they build it."
             to="/commissions"
             icon={<Zap />}
@@ -170,7 +172,7 @@ export default function Home() {
 
       {/* TESTIMONIALS */}
       <section className="max-w-[1600px] mx-auto px-6 md:px-12 py-24">
-        <SectionHeader kicker="Word on the street" title="What people say" testid="section-testimonials" />
+        <SectionHeader kicker={t("home.word")} title={t("home.what_people_say")} testid="section-testimonials" />
         <div className="grid md:grid-cols-3 gap-6 mt-12">
           {TESTIMONIALS.map((t, i) => (
             <div key={i} data-testid={`testimonial-${i}`} className="glass-card p-8 rounded-sm">
@@ -193,12 +195,12 @@ export default function Home() {
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#CCFF00] rounded-full opacity-10 blur-3xl" />
           <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#7C3AED] rounded-full opacity-15 blur-3xl" />
           <div className="relative">
-            <div className="label-caps text-[#CCFF00]">For creators</div>
-            <h2 className="font-anton text-5xl md:text-8xl uppercase mt-4 leading-[0.9]">Bring your <span className="text-[#CCFF00]">work</span><br />to the world.</h2>
-            <p className="text-zinc-300 mt-8 max-w-2xl">Portfolio. Sales. Commissions. Community. All in one place. Built for artists — by an artist.</p>
+            <div className="label-caps text-[#CCFF00]">{t("home.for_creators")}</div>
+            <h2 className="font-anton text-5xl md:text-8xl uppercase mt-4 leading-[0.9]">{t("home.bring_1")} <span className="text-[#CCFF00]">{t("home.bring_2")}</span><br />{t("home.bring_3")}</h2>
+            <p className="text-zinc-300 mt-8 max-w-2xl">{t("home.cta_sub")}</p>
             <div className="flex flex-wrap gap-4 mt-10">
-              <Link to="/register?role=artist" data-testid="cta-signup" className="btn-lime">Apply to Sell</Link>
-              <Link to="/explore" data-testid="cta-explore" className="btn-ghost">Browse First</Link>
+              <Link to="/register?role=artist" data-testid="cta-signup" className="btn-lime">{t("home.apply_to_sell")}</Link>
+              <Link to="/explore" data-testid="cta-explore" className="btn-ghost">{t("home.browse_first")}</Link>
             </div>
           </div>
         </div>

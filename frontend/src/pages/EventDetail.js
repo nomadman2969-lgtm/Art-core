@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -28,6 +29,7 @@ export default function EventDetail() {
   const { id } = useParams();
   const nav = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [ev, setEv] = useState(null);
   const [loading, setLoading] = useState(true);
   const [attendees, setAttendees] = useState([]);
@@ -81,7 +83,7 @@ export default function EventDetail() {
       }
       const r = await api.post(`/events/${id}/rsvp`, {});
       setEv((e) => ({ ...e, rsvped: r.data.rsvped, rsvp_count: r.data.count }));
-      toast.success(r.data.rsvped ? "You're going" : "RSVP removed");
+      toast.success(r.data.rsvped ? t("event.going") : t("event.rsvp_removed"));
       load();
     } catch (er) {
       toast.error(er?.response?.data?.detail || "Failed");
@@ -152,8 +154,8 @@ export default function EventDetail() {
               <button data-testid="save-event-btn" onClick={() => toggleSaveEvent(ev, user, load)} className={`btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1 ${ev.saved ? "!text-[#FF6EC7] !border-[#FF6EC7]/40" : ""}`}>
                 <Bookmark size={12} fill={ev.saved ? "currentColor" : "none"} /> {ev.saved ? "Saved" : "Save"}
               </button>
-              <button data-testid="share-event-btn" onClick={() => shareEvent(ev)} className="btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1"><Share2 size={12} /> Share</button>
-              <button data-testid="calendar-event-btn" onClick={() => downloadIcs(ev)} className="btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1"><CalendarPlus size={12} /> Calendar</button>
+              <button data-testid="share-event-btn" onClick={() => shareEvent(ev)} className="btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1"><Share2 size={12} /> {t("event.share")}</button>
+              <button data-testid="calendar-event-btn" onClick={() => downloadIcs(ev)} className="btn-ghost !py-1.5 !px-2.5 !text-xs flex items-center gap-1"><CalendarPlus size={12} /> {t("event.calendar")}</button>
               <ReportButton targetType="event" targetId={ev.id} ownerId={ev.host?.id} compact />
             </div>
           </div>
@@ -203,7 +205,7 @@ export default function EventDetail() {
         <aside className="space-y-4">
           <div className="border border-white/8 rounded-sm p-4 bg-[#121214]">
             <div className="label-caps text-zinc-500 mb-2">Price</div>
-            <div className="font-anton text-3xl">{ev.is_free ? "FREE" : `$${ev.ticket_price}`}</div>
+            <div className="font-anton text-3xl">{ev.is_free ? t("event.free") : `$${ev.ticket_price}`}</div>
             {ev.ticket_info && <div className="text-xs text-zinc-400 mt-1" data-testid="event-ticket-info">{ev.ticket_info}</div>}
             {ev.ticket_url && <a data-testid="event-ticket-url" href={ev.ticket_url} target="_blank" rel="noreferrer" className="text-xs text-[#CCFF00] hover:underline inline-flex items-center gap-1 mt-1"><ExternalLink size={10} /> External tickets</a>}
             {ev.series_id && (
@@ -229,14 +231,14 @@ export default function EventDetail() {
                   <button data-testid="rsvp-btn" onClick={toggleRsvp} disabled={busy}
                     className={`w-full mt-4 !py-3 ${ev.rsvped ? "btn-ghost" : "btn-lime"}`}>
                     {busy ? <Loader2 size={14} className="animate-spin inline" /> :
-                      ev.rsvped ? "Cancel RSVP" :
-                      ev.is_free ? "RSVP" : `Get Ticket · $${ev.ticket_price}`}
+                      ev.rsvped ? t("event.cancel_rsvp") :
+                      ev.is_free ? t("event.rsvp") : t("event.get_ticket", { price: ev.ticket_price })}
                   </button>
                 )}
                 {!ev.is_free && user && !(ev.max_capacity && ev.rsvp_count >= ev.max_capacity) && (
                   <button data-testid="gift-ticket-btn" onClick={() => setShowGift(true)}
                     className="w-full mt-2 label-caps text-xs text-zinc-400 hover:text-[#CCFF00] py-2 flex items-center justify-center gap-2 transition-colors">
-                    <Gift size={12} /> Gift a ticket to a friend
+                    <Gift size={12} /> {t("event.gift")}
                   </button>
                 )}
               </>
@@ -292,7 +294,7 @@ export default function EventDetail() {
             <div className="border border-white/8 rounded-sm p-4 bg-[#121214]" data-testid="my-ticket-card">
               <div className="flex items-center justify-between mb-2">
                 <div className="label-caps text-[#CCFF00] flex items-center gap-1">
-                  <QrCode size={12} /> Your Ticket
+                  <QrCode size={12} /> {t("event.your_ticket")}
                 </div>
                 {ticket.checked_in && (
                   <div className="label-caps text-[#CCFF00] flex items-center gap-1 text-xs">
@@ -316,12 +318,12 @@ export default function EventDetail() {
                     ID {ticket.rsvp_id.slice(0, 8)}
                   </div>
                   <button data-testid="hide-ticket-btn" onClick={() => setShowTicket(false)}
-                    className="btn-ghost w-full mt-3 !py-2 text-xs">Hide QR</button>
+                    className="btn-ghost w-full mt-3 !py-2 text-xs">{t("event.hide_qr")}</button>
                 </>
               ) : (
                 <button data-testid="show-ticket-btn" onClick={() => setShowTicket(true)}
                   className="btn-lime w-full !py-2 flex items-center justify-center gap-2 text-xs">
-                  <QrCode size={14} /> Show ticket QR
+                  <QrCode size={14} /> {t("event.show_qr")}
                 </button>
               )}
             </div>

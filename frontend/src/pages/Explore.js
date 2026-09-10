@@ -4,8 +4,10 @@ import { ArtCard } from "../components/ArtCard";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Heart } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function Explore() {
+  const { t } = useTranslation();
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -30,15 +32,15 @@ export default function Explore() {
   return (
     <div data-testid="explore-page" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-16 pb-32">
       <div className="mb-12">
-        <div className="label-caps text-[#CCFF00]">The Feed</div>
-        <h1 className="font-anton text-6xl md:text-9xl uppercase mt-4 leading-[0.85]">Explore</h1>
-        <p className="text-zinc-400 mt-4 max-w-xl">Everything fresh from artists across Art Core.</p>
+        <div className="label-caps text-[#CCFF00]">{t("explore.kicker")}</div>
+        <h1 className="font-anton text-6xl md:text-9xl uppercase mt-4 leading-[0.85]">{t("explore.title")}</h1>
+        <p className="text-zinc-400 mt-4 max-w-xl">{t("explore.sub")}</p>
       </div>
 
       {loading ? (
-        <div className="text-zinc-500 py-24 text-center label-caps">Loading...</div>
+        <div className="text-zinc-500 py-24 text-center label-caps">{t("common.loading")}</div>
       ) : feed.length === 0 ? (
-        <div className="border border-dashed border-white/10 py-24 text-center label-caps text-zinc-500 rounded-sm">No artworks yet.</div>
+        <div className="border border-dashed border-white/10 py-24 text-center label-caps text-zinc-500 rounded-sm">{t("explore.empty")}</div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {feed.map((a, i) => (

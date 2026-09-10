@@ -1290,8 +1290,12 @@ async def check_event_reminders():
 async def _blast_reminder(e: dict, tail: str, marker: str):
     """Notify every RSVP'd user + set the marker on the event."""
     await db.events.update_one({"id": e["id"]}, {"$set": {f"reminder_{marker}_sent": now_iso()}})
-    rsvps = await db.event_rsvps.find({"event_id": e["id"]}).to_list(2000)
+    rsvps = await db.event_rsvps.find({"event_id": e["id"], "refunded": {"$ne": True}}).to_list(2000)
     for r in rsvps:
+        if r.get("gift") and r.get("gift_email") and marker == "24h" and not r.get("gift_reminder_sent"):
+            await _email_gift_reminder(e, r)
+        if not r.get("user_id"):
+            continue
         await db.notifications.insert_one({
             "id": new_id(), "user_id": r["user_id"], "kind": "event_reminder",
             "event_id": e["id"], "event_title": e["title"],
@@ -1309,3 +1313,22 @@ async def _blast_reminder(e: dict, tail: str, marker: str):
             ))
         except Exception:
             pass
+
+
+async def _email_gift_reminder(e: dict, r: dict):
+    """Day-before email to a gift-ticket recipient with their QR — idempotent via rsvp marker."""
+    import os as _os
+    await db.event_rsvps.update_one({"id": r["id"]}, {"$set": {"gift_reminder_sent": now_iso()}})
+    try:
+        from emails import send_email, gift_reminder_html, _fmt_when
+        origin = _os.environ.get("PUBLIC_APP_URL", "https://artcorestudio.net")
+        loc = e.get("location") or {}
+        html = gift_reminder_html(
+            r.get("user_name") or "there", e["title"], _fmt_when(e.get("start_at", "")),
+            loc.get("city") or loc.get("address") or "TBA",
+            f"{origin}/gift/{r['gift_token']}", f"{origin}/api/events/gift/{r['gift_token']}/qr.png",
+        )
+        import asyncio as _a
+        _a.create_task(send_email(r["gift_email"], f"Tomorrow: {e['title']} — your ticket", html))
+    except Exception:
+        pass

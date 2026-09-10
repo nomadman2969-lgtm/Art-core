@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
@@ -66,6 +67,7 @@ const KIND_META = {
 };
 
 export default function Notifications() {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [prefs, setPrefs] = useState(null);
@@ -106,14 +108,14 @@ export default function Notifications() {
       <div className="flex items-end justify-between flex-wrap gap-4 mb-10">
         <div>
           <div className="label-caps text-[#CCFF00]"><Bell size={12} className="inline mr-2" /> Inbox</div>
-          <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4">Notifications</h1>
+          <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4">{t("notif.title")}</h1>
           <div className="label-caps text-zinc-500 mt-2">{unread} unread</div>
         </div>
         {unread > 0 && (
           <button data-testid="mark-all-read" onClick={markAll} className="btn-ghost !py-2 !text-xs">Mark all read</button>
         )}
         <button data-testid="toggle-prefs" onClick={() => setShowPrefs(!showPrefs)} className="btn-ghost !py-2 !text-xs flex items-center gap-1">
-          <Settings2 size={12} /> {showPrefs ? "Hide prefs" : "Preferences"}
+          <Settings2 size={12} /> {showPrefs ? t("notif.hide_prefs") : t("notif.prefs")}
         </button>
       </div>
 
@@ -193,13 +195,14 @@ export default function Notifications() {
       {loading ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
         items.length === 0 ? (
           <div className="border border-dashed border-white/10 py-20 text-center rounded-sm">
-            <div className="label-caps text-zinc-500">Nothing here yet.</div>
-            <div className="text-sm text-zinc-400 mt-4">Bid on an auction, follow an artist, or request a commission — updates will land here.</div>
+            <div className="label-caps text-zinc-500">{t("notif.empty")}</div>
+            <div className="text-sm text-zinc-400 mt-4">{t("notif.empty_sub")}</div>
           </div>
         ) : (
           <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
             {items.map((n) => {
-              const meta = KIND_META[n.kind] || { label: n.kind, icon: <Bell size={14} />, color: "#A1A1AA" };
+              const base = KIND_META[n.kind] || { label: n.kind, icon: <Bell size={14} />, color: "#A1A1AA" };
+              const meta = { ...base, label: t(`notif.${n.kind}`, { defaultValue: base.label }) };
               const to = n.commission?.id ? `/commissions/${n.commission.id}` :
                          n.auction?.id ? `/auctions/${n.auction.id}` :
                          n.offer?.id ? "/offers" :

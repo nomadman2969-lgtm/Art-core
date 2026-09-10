@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, fileUrl, ORIGIN } from "../api";
@@ -8,6 +9,7 @@ import { Trash2 } from "lucide-react";
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
 export function Cart() {
+  const { t } = useTranslation();
   const { items, remove, total } = useCart();
   const [busy, setBusy] = useState(false);
   const checkout = async () => {
@@ -16,16 +18,16 @@ export function Cart() {
     try {
       const r = await api.post("/payments/checkout", { items: items.map((i) => ({ artwork_id: i.id, quantity: 1 })), origin_url: ORIGIN });
       window.location.href = r.data.checkout_url;
-    } catch (e) { toast.error(e?.response?.data?.detail || "Checkout failed"); setBusy(false); }
+    } catch (e) { toast.error(e?.response?.data?.detail || t("cart.failed")); setBusy(false); }
   };
   return (
     <div data-testid="cart-page" className="max-w-[1200px] mx-auto px-6 md:px-12 pt-16 pb-32">
-      <div className="label-caps text-[#CCFF00]">Your selection</div>
-      <h1 className="font-anton text-6xl md:text-8xl uppercase mt-4 mb-12">The Cart</h1>
+      <div className="label-caps text-[#CCFF00]">{t("cart.kicker")}</div>
+      <h1 className="font-anton text-6xl md:text-8xl uppercase mt-4 mb-12">{t("cart.title")}</h1>
       {items.length === 0 ? (
         <div className="border border-dashed border-white/10 py-24 text-center rounded-sm">
-          <div className="label-caps text-zinc-500">Empty — for now.</div>
-          <Link to="/explore" className="btn-lime mt-8 inline-flex">Explore Art</Link>
+          <div className="label-caps text-zinc-500">{t("cart.empty")}</div>
+          <Link to="/explore" className="btn-lime mt-8 inline-flex">{t("cart.explore")}</Link>
         </div>
       ) : (
         <div className="grid md:grid-cols-3 gap-8">
@@ -44,11 +46,11 @@ export function Cart() {
           </div>
           <div className="md:col-span-1">
             <div className="glass-card p-6 sticky top-24 rounded-sm">
-              <div className="label-caps">Total</div>
+              <div className="label-caps">{t("cart.total")}</div>
               <div className="font-anton text-5xl mt-2 text-[#CCFF00]" data-testid="cart-total">${Number(total).toLocaleString()}</div>
-              <div className="text-xs text-zinc-500 mt-3">Shipping calculated at checkout.</div>
+              <div className="text-xs text-zinc-500 mt-3">{t("cart.shipping")}</div>
               <button data-testid="checkout-btn" onClick={checkout} disabled={busy} className="btn-lime w-full mt-6">
-                {busy ? "Redirecting..." : "Secure Checkout"}
+                {busy ? t("cart.redirecting") : t("cart.checkout")}
               </button>
               <div className="label-caps mt-4 text-zinc-600 text-center">Stripe · Test card 4242 4242 4242 4242</div>
             </div>

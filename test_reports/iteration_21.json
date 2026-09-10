@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 21 — Full backend + frontend coverage of the four new features (i18n language picker, Flip Commissions, Optional 2FA TOTP+email + login challenge, Gift day-before reminder sweep). All 15 pytest cases pass. All Playwright UI checks pass. No functional bugs found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter21_i18n_flip_2fa_reminders.py",
+    "/app/test_reports/pytest/iter21.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "twofa.verify_login uses a soft rate-limit of 8 failures with no window reset — good; once cleared on successful verify. Consider also resetting fail_count on new /auth/login (new challenge) so a legit user isn't blocked for hours if an attacker started blasting; today reset only happens after a *successful* code.",
+    "twofa.send_email_code uses asyncio.create_task(send_email(...)) inside another awaited flow; if the FastAPI worker terminates the request before the task completes email may drop. Fine for test env (Resend anyway blocks example.com), but consider awaiting or using a proper background queue.",
+    "commissions.create_commission stores furniture as an object — good. Note the FurnitureDetails.furniture_type has no whitelist; any string 2–40 chars is accepted. Frontend restricts to a fixed list, but API allows arbitrary values. Consider adding a pattern/enum.",
+    "commissions.flip/artists aggregation groups by artist and uses $first for sample/before — deterministic-ish but ordering not guaranteed; fine for a card rail.",
+    "events._blast_reminder does update event marker BEFORE looping RSVPs — protects idempotency against reentry, but if _email_gift_reminder or a per-rsvp step later throws, some rsvps may never be marked. Current per-rsvp gift_reminder_sent write is set before send, so at-least-once semantics still hold for gift emails.",
+    "server._reminder_loop swallows exceptions with a bare `logger.warning('Reminder sweep failed', exc_info=True)`; verified no such warning in current backend logs.",
+    "LanguagePicker saves to localStorage on languageChanged event; api.patch('/auth/me') is fire-and-forget — silent failures acceptable for a preference. Good.",
+    "CommissionRequestModal validates photos client-side only via `Add at least one photo of your furniture` toast — backend also enforces the same rule (400). Good defense in depth."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter21_i18n_flip_2fa_reminders.py"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100%"},
+  "test_credentials": "admin monster@houseofmonster.com / MonsterAdmin2026!; artist demo.artist@artcorestudio.net / DemoArtist2026!; buyer demo.collector@artcorestudio.net / DemoCollector2026!. Throwaway 2FA test users are created and deleted-2FA/cleaned per run.",
+  "seed_data_creation": "Backend test creates: 2 flip commissions + 1 art commission by demo.collector against demo.artist; 4 throwaway users (twofa_*@example.com) each with 2FA lifecycle exercised (setup→enable→disable or left as email-only). Reminder test inserts one TEST_reminder event + one TEST_rsvp then deletes both. UI test creates a throwaway twofa_ui2_*@example.com user and disables 2FA on cleanup. Demo accounts are NOT enrolled in 2FA. Any lingering flip commissions/art commissions on demo.artist can be pruned via db.commissions.delete_many({'subject': /^TEST_/}).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run backend suite: `cd /app/backend && pytest tests/test_iter21_i18n_flip_2fa_reminders.py -v -o addopts='' --junitxml=/app/test_reports/pytest/iter21.xml`. The test file self-loads /app/backend/.env (MONGO_URL, DB_NAME) since pytest doesn't inherit uvicorn env. Deposit endpoint requires JSON body {origin_url}. Modal submit testid is `modal-submit` (not `commission-submit`). login form uses data-testid login-email/login-password/login-submit (avoid generic input[type=email] because Layout footer newsletter shares that type). i18n verified: en→es→ja→de round-trip, localStorage persistence, /login DE 'Anmelden', /marketplace DE filter-sort 'Neueste'. 2FA verified: TOTP full lifecycle + recovery codes single-use + rate-limit fail counter + disable password/code guard + login challenge UI wrong-code toast 'Wrong code'. Gift reminder sweep sets both event.reminder_24h_sent and event_rsvps.gift_reminder_sent, idempotent on second run. Resend still fails for @example.com — not a bug (expected)."
+}
