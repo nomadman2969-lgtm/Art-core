@@ -19,7 +19,7 @@ async def get_settings() -> dict:
     if not s:
         default = {
             "id": "global",
-            "commission_percent": 3.0,
+            "commission_percent": 4.0,
             "upload_fee": 5.0,
             "currency": "usd",
             "deposit_percent": 50.0,

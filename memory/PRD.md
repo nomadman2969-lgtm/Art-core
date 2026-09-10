@@ -586,3 +586,7 @@ Then click Verify in Resend → Domains.
 - Frontend screenshots: login page with green Artist + violet Collector one-tap buttons; auto-navigated Studio Editor showing "HEY, DEMO ARTIST."
 
 
+
+## 2026-06 — Fee change
+- Global commission changed 3% → 4% (backend defaults in admin.py/payments.py/server.py/events.py, DB settings.global, Upcycle copy). Verified via GET /api/settings.
+- Answered user: 4% application fee stays in platform Stripe balance; remainder routed to artist Connect Express account via destination charge. Platform Stripe account claim URL lives in backend/.env STRIPE_ONBOARDING_URL; artists connect at /studio → Payouts.

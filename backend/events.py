@@ -548,7 +548,7 @@ async def event_analytics(event_id: str, user: dict = Depends(get_current_user))
     # Fee estimate: use platform settings if available
     try:
         settings = await db.settings.find_one({"id": "platform"}) or {}
-        commission_pct = float(settings.get("commission_percent", 3)) / 100.0
+        commission_pct = float(settings.get("commission_percent", 4)) / 100.0
     except Exception:
         commission_pct = 0.03
     est_platform_fee = revenue_gross * commission_pct
