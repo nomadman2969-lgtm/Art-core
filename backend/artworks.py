@@ -344,10 +344,13 @@ async def get_aotw():
 
 
 @router.get("/artworks/{artwork_id}")
-async def get_artwork(artwork_id: str):
+async def get_artwork(artwork_id: str, viewer: Optional[dict] = Depends(get_optional_user)):
     art = await db.artworks.find_one({"id": artwork_id})
     if not art:
         raise HTTPException(404, "Not found")
+    if not viewer or viewer["id"] != art.get("artist_id"):
+        await db.artwork_views.insert_one({"id": new_id(), "artwork_id": artwork_id, "artist_id": art.get("artist_id"), "viewer_id": viewer["id"] if viewer else None, "created_at": now_iso()})
+        await db.artworks.update_one({"id": artwork_id}, {"$inc": {"views": 1}})
     return await _enrich(art)
 
 

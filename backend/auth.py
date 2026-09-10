@@ -127,6 +127,7 @@ async def register(req: RegisterReq):
         "created_at": now_iso(),
     }
     await db.users.insert_one(user)
+    await db.event_rsvps.update_many({"gift_email": user["email"], "user_id": None}, {"$set": {"user_id": user["id"]}})
     token = make_token(user["id"], user["role"])
     return {"token": token, "user": public_user(user)}
 

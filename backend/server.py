@@ -109,6 +109,11 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def startup():
+    from stripe_config import apply_stripe_keys
+    try:
+        await apply_stripe_keys()
+    except Exception as e:
+        logger.error(f"Stripe key apply failed: {e}")
     # Init storage
     try:
         init_storage()

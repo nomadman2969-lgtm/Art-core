@@ -597,3 +597,11 @@ Then click Verify in Resend → Domains.
 - Settings: processing_percent (2.9), processing_fixed (0.30) editable in /admin; GET /api/settings/fee-preview?gross=X.
 - Studio Payouts tab: FeePreview calculator. $100 sale → platform $4.00, Stripe $3.20, artist $92.80.
 - Tested: iteration_19.json all pass.
+
+## 2026-06 — Batch: Stripe Setup Card, Artist Analytics, Keep-More strip, Gift Tickets (iteration_20 all pass)
+- Admin → Stripe tab: platform account status, claim link (STRIPE_ONBOARDING_URL), save live keys (validated against Stripe, stored in settings.global), test/live switch. stripe_config.apply_stripe_keys() runs at startup + on save; webhook secret resolved at runtime.
+- Analytics: artwork_views + studio_visits collections; /studio/analytics/me now returns total_views, total_saves, top_viewed, follower_growth(8wk), visit_series(14d). AnalyticsPanel.js.
+- KeepMoreStrip.js on Home (before CTA) and Onboarding step 0 (compact).
+- Gift tickets: POST /api/payments/events/{id}/gift → Stripe checkout kind event_ticket_gift; _apply_gift_ticket creates rsvp {gift, gift_token, gift_email, user_id or null}, emails recipient QR (gift_ticket_html) + gifter receipt; public GET /api/events/gift/{token} + /qr.png; /gift/:token page; register() auto-claims rsvps by email.
+
+## NEXT (user-approved): i18n core surfaces — react-i18next, navbar picker saved to profile, 8 languages (es, fr, de, pt, it, ja, ko, zh-CN). Scope: nav, home, auth, onboarding, explore filters, artwork/event CTAs, checkout, notification labels.

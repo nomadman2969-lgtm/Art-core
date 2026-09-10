@@ -323,6 +323,7 @@ async def get_studio(artist_id: str, preview: bool = False, viewer: Optional[dic
     # Increment visit (skip self-views)
     if not viewer or viewer["id"] != artist_id:
         await db.studio_configs.update_one({"artist_id": artist_id}, {"$inc": {"visits": 1}})
+        await db.studio_visits.insert_one({"id": new_id(), "artist_id": artist_id, "viewer_id": viewer["id"] if viewer else None, "created_at": now_iso()})
     return {
         "artist": {
             "id": artist["id"], "name": artist["name"], "bio": artist.get("bio"),
@@ -517,6 +518,7 @@ async def analytics(user: dict = Depends(require_role("artist", "admin"))):
             art = await db.artworks.find_one({"id": aid})
             tops.append({"id": aid, "title": art["title"], "images": art.get("images", []), "likes": lk})
     tops.sort(key=lambda x: x["likes"], reverse=True)
+    extra = await _analytics_extra(user["id"], art_ids)
     return {
         "visits": cfg.get("visits", 0),
         "total_likes": total_likes,
@@ -526,6 +528,62 @@ async def analytics(user: dict = Depends(require_role("artist", "admin"))):
         "revenue": round(revenue, 2),
         "artworks_count": len(art_ids),
         "top_artworks": tops[:8],
+        **extra,
+    }
+
+
+async def _analytics_extra(artist_id: str, art_ids: list) -> dict:
+    """Saves, views, most-viewed pieces, follower growth and visit series."""
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    total_saves = await db.saves.count_documents({"artwork_id": {"$in": art_ids}})
+    total_views = await db.artwork_views.count_documents({"artist_id": artist_id})
+    # Most viewed pieces (with saves + likes per piece)
+    pipeline = [{"$match": {"artist_id": artist_id}}, {"$group": {"_id": "$artwork_id", "views": {"$sum": 1}}}, {"$sort": {"views": -1}}, {"$limit": 8}]
+    grouped = await db.artwork_views.aggregate(pipeline).to_list(8)
+    top_viewed = []
+    for g in grouped:
+        art = await db.artworks.find_one({"id": g["_id"]}, {"id": 1, "title": 1, "images": 1, "status": 1})
+        if not art:
+            continue
+        top_viewed.append({
+            "id": art["id"], "title": art["title"], "images": art.get("images", []), "status": art.get("status"),
+            "views": g["views"],
+            "saves": await db.saves.count_documents({"artwork_id": art["id"]}),
+            "likes": await db.likes.count_documents({"artwork_id": art["id"]}),
+        })
+    # Follower growth: cumulative followers at end of each of the last 8 weeks
+    follows = await db.follows.find({"followed_id": artist_id}, {"created_at": 1}).to_list(5000)
+    def _parse(ts):
+        try:
+            return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        except Exception:
+            return now
+    f_dates = sorted(_parse(f.get("created_at")) for f in follows)
+    growth = []
+    for w in range(7, -1, -1):
+        end = now - timedelta(weeks=w)
+        growth.append({"label": end.strftime("%b %d"), "followers": sum(1 for d in f_dates if d <= end)})
+    # Visits per day, last 14 days
+    since = (now - timedelta(days=13)).replace(hour=0, minute=0, second=0, microsecond=0)
+    visits = await db.studio_visits.find({"artist_id": artist_id, "created_at": {"$gte": since.isoformat()}}, {"created_at": 1}).to_list(20000)
+    by_day = {}
+    for v in visits:
+        by_day[_parse(v["created_at"]).strftime("%Y-%m-%d")] = by_day.get(_parse(v["created_at"]).strftime("%Y-%m-%d"), 0) + 1
+    visit_series = []
+    for i in range(13, -1, -1):
+        d = now - timedelta(days=i)
+        key = d.strftime("%Y-%m-%d")
+        visit_series.append({"label": d.strftime("%b %d"), "visits": by_day.get(key, 0)})
+    new_followers_30d = sum(1 for d in f_dates if d >= now - timedelta(days=30))
+    return {
+        "total_saves": total_saves,
+        "total_views": total_views,
+        "top_viewed": top_viewed,
+        "follower_growth": growth,
+        "visit_series": visit_series,
+        "new_followers_30d": new_followers_30d,
+        "visits_14d": len(visits),
     }
 
 

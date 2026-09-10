@@ -5,6 +5,7 @@ import { ArtCard, resolveImg } from "../components/ArtCard";
 import { LiveAuctionRail, SignatureStudio } from "../components/HomeExtras";
 import { StaffPicks } from "../components/home/StaffPicks";
 import { ArrowUpRight, TrendingUp, Zap, Users, Gavel, Trophy } from "lucide-react";
+import { KeepMoreStrip } from "../components/KeepMoreStrip";
 
 const HERO_BG = "https://images.unsplash.com/photo-1611063158871-7dd3ed4a2ac8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwzfHxncmFmZml0aSUyMHN0cmVldCUyMGFydHxlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85";
 const STUDIO_IMG = "https://images.unsplash.com/photo-1541753866388-0b3c701627d3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxhcnRpc3QlMjBwYWludGluZyUyMHN0dWRpb3xlbnwwfHx8fDE3ODYzOTAwMzl8MA&ixlib=rb-4.1.0&q=85";
@@ -183,6 +184,8 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <KeepMoreStrip />
 
       {/* CTA */}
       <section className="max-w-[1600px] mx-auto px-6 md:px-12 py-32">

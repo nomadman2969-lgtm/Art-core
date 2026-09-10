@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { AnalyticsPanel } from "../components/studio/AnalyticsPanel";
 import { toast } from "sonner";
 import { Plus, Gavel, Sparkles, Eye, Palette as PaletteIcon } from "lucide-react";
 import {
@@ -277,35 +278,7 @@ export function StudioEditor() {
         </div>
       )}
 
-      {tab === "analytics" && analytics && (
-        <div className="space-y-8">
-          <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <Stat label="Studio visits" value={analytics.visits} accent="#CCFF00" />
-            <Stat label="Followers" value={analytics.followers} accent="#7C3AED" />
-            <Stat label="Total likes" value={analytics.total_likes} accent="#FF4D4D" />
-            <Stat label="Sales" value={analytics.sales} accent="#00E5FF" />
-            <Stat label="Revenue" value={`$${analytics.revenue.toLocaleString()}`} accent="#F5A623" />
-            <Stat label="Artworks" value={analytics.artworks_count} accent="#FFFFFF" />
-          </div>
-          <SectionH title="Top artworks by likes">
-            {analytics.top_artworks.length === 0 ? (
-              <div className="text-zinc-500 label-caps py-8 text-center">No liked artworks yet.</div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {analytics.top_artworks.map((a) => (
-                  <Link key={a.id} to={`/artwork/${a.id}`} className="border border-white/8 rounded-sm hover-lift-card block">
-                    <img src={resolveImg(a.images?.[0])} className="w-full aspect-square object-cover" alt="" />
-                    <div className="p-3">
-                      <div className="font-unbounded text-sm truncate">{a.title}</div>
-                      <div className="label-caps mt-1 text-[#FF4D4D]">♥ {a.likes}</div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </SectionH>
-        </div>
-      )}
+      {tab === "analytics" && analytics && <AnalyticsPanel analytics={analytics} />}
 
       {tab === "payouts" && <PayoutsPanel dashboard={dashboard} refresh={loadAll} refreshUser={refresh} />}
       {tab === "requests" && <CommissionRequestsPanel />}

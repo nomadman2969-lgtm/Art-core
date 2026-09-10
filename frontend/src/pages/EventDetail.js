@@ -7,9 +7,10 @@ import { toast } from "sonner";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { BroadcastModal } from "../components/events/BroadcastModal";
+import { GiftTicketDialog } from "../components/events/GiftTicketDialog";
 import { shareEvent, toggleSaveEvent } from "./Events";
 import { ReportButton } from "../components/ReportButton";
-import { Bookmark, Share2, Globe, ExternalLink, CalendarPlus, Building2 } from "lucide-react";
+import { Bookmark, Share2, Globe, ExternalLink, CalendarPlus, Building2, Gift } from "lucide-react";
 
 const catColor = { exhibition: "#F4F4F5", gallery_opening: "#D4AF37", festival: "#FF6EC7", street_art: "#CCFF00", pop_up: "#FF4D4D", art_class: "#00E5FF", workshop: "#00B8CC", auction: "#7C3AED", meetup: "#A78BFA", live_painting: "#F5A623", museum: "#E4E4E7", market: "#34D399", virtual: "#CCFF00" };
 
@@ -33,6 +34,7 @@ export default function EventDetail() {
   const [busy, setBusy] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [showTicket, setShowTicket] = useState(false);
+  const [showGift, setShowGift] = useState(false);
   const [waitlistPos, setWaitlistPos] = useState(null); // {on_waitlist, position}
   const [analytics, setAnalytics] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -231,9 +233,16 @@ export default function EventDetail() {
                       ev.is_free ? "RSVP" : `Get Ticket · $${ev.ticket_price}`}
                   </button>
                 )}
+                {!ev.is_free && user && !(ev.max_capacity && ev.rsvp_count >= ev.max_capacity) && (
+                  <button data-testid="gift-ticket-btn" onClick={() => setShowGift(true)}
+                    className="w-full mt-2 label-caps text-xs text-zinc-400 hover:text-[#CCFF00] py-2 flex items-center justify-center gap-2 transition-colors">
+                    <Gift size={12} /> Gift a ticket to a friend
+                  </button>
+                )}
               </>
             )}
           </div>
+          {showGift && <GiftTicketDialog ev={ev} onClose={() => setShowGift(false)} />}
 
           <div className="border border-white/8 rounded-sm overflow-hidden h-64">
             <MapContainer center={[ev.location.lat, ev.location.lng]} zoom={13} scrollWheelZoom={false} style={{ height: "100%", width: "100%", background: "#0A0A0C" }}>

@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { DisputesPanel } from "../components/admin/DisputesPanel";
 import { ReportsPanel } from "../components/admin/ReportsPanel";
 import { StaffPicksPanel } from "../components/admin/StaffPicksPanel";
+import { StripeSetupCard } from "../components/admin/StripeSetupCard";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -65,6 +66,7 @@ export default function AdminDashboard() {
   const tabs = [
     ["overview", "Overview"],
     ["settings", "Settings"],
+    ["stripe", "Stripe"],
     ["curation", "Curation"],
     ["aotw", "Featured"],
     ["orders", "Orders"],
@@ -219,6 +221,7 @@ export default function AdminDashboard() {
       {tab === "refunds" && (
         <RefundsPanel items={refundables} onReload={load} />
       )}
+      {tab === "stripe" && <StripeSetupCard />}
       {tab === "disputes" && <DisputesPanel />}
       {tab === "reports" && <ReportsPanel />}
       {tab === "picks" && <StaffPicksPanel />}

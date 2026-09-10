@@ -242,3 +242,55 @@ def event_broadcast_html(user_name: str, host_name: str, event: dict, subject: s
 </div>
 """
     return _wrap(body, "Event Update")
+
+
+def gift_ticket_html(recipient_name: str, gifter_name: str, event_title: str, event_when: str, event_where: str,
+                     message: Optional[str], ticket_url: str, qr_url: str) -> str:
+    note = f'<div style="margin:16px 0;padding:14px;border-left:3px solid #CCFF00;color:#e5e7eb;font-size:14px;font-style:italic">“{message}”<div style="font-size:11px;color:#71717a;margin-top:6px">— {gifter_name}</div></div>' if message else ""
+    body = f"""
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  You've got a ticket
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:20px">
+  Hey {recipient_name}, <strong style="color:#fff">{gifter_name}</strong> bought you a ticket to <strong style="color:#fff">{event_title}</strong>.
+</div>
+{note}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+  style="background:rgba(204,255,0,0.06);border:1px solid rgba(204,255,0,0.3);border-radius:4px;margin-bottom:24px">
+  <tr><td style="padding:20px">
+    <div style="font-size:11px;color:#CCFF00;letter-spacing:2px;text-transform:uppercase">Gift Ticket</div>
+    <div style="font-family:Impact,Arial Black,sans-serif;font-size:24px;color:#fff;margin-top:6px">{event_title}</div>
+    <div style="font-size:12px;color:#a1a1aa;margin-top:10px">📅 {event_when}</div>
+    <div style="font-size:12px;color:#a1a1aa">📍 {event_where}</div>
+  </td></tr>
+  <tr><td align="center" style="padding:0 20px 20px">
+    <img src="{qr_url}" width="180" height="180" alt="Your ticket QR" style="display:block;background:#fff;padding:8px;border-radius:4px" />
+    <div style="font-size:11px;color:#71717a;margin-top:8px">Show this QR at the door</div>
+  </td></tr>
+</table>
+<div style="margin-top:8px">
+  <a href="{ticket_url}" style="display:inline-block;background:#CCFF00;color:#000;
+     padding:12px 22px;text-decoration:none;font-family:Impact,Arial Black,sans-serif;
+     letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:2px">
+    Open your ticket →
+  </a>
+</div>
+<div style="font-size:11px;color:#71717a;margin-top:20px">
+  No account needed. If you sign up to Art Core with this email, the ticket appears in your Tickets page automatically.
+</div>
+"""
+    return _wrap(body, "You've got a ticket")
+
+
+def gift_sent_html(gifter_name: str, recipient_email: str, event_title: str, amount: float, event_when: str) -> str:
+    body = f"""
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  Gift sent
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:24px">
+  Hey {gifter_name}, we've emailed a ticket for <strong style="color:#fff">{event_title}</strong> ({event_when}) to <strong style="color:#fff">{recipient_email}</strong>.
+</div>
+<div style="font-size:12px;color:#CCFF00">Paid: ${amount:,.2f}</div>
+<div style="font-size:11px;color:#71717a;margin-top:20px">Their QR ticket is attached to that email and also available from their Tickets page if they join Art Core.</div>
+"""
+    return _wrap(body, "Gift sent")

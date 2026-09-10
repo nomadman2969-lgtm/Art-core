@@ -9,7 +9,6 @@ from db import db, new_id, now_iso, strip_mongo
 from auth import get_current_user, get_optional_user, require_role
 
 stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 router = APIRouter(prefix="/api", tags=["payments"])
 
@@ -386,6 +385,62 @@ async def buy_event_ticket(event_id: str, req: EventTicketReq, user: dict = Depe
     return {"checkout_url": session.url, "session_id": session.id, "amount": price}
 
 
+class GiftTicketReq(BaseModel):
+    origin_url: str
+    recipient_email: str = Field(min_length=5, max_length=200)
+    recipient_name: Optional[str] = Field(default=None, max_length=80)
+    message: Optional[str] = Field(default=None, max_length=400)
+
+
+@router.post("/payments/events/{event_id}/gift")
+async def gift_event_ticket(event_id: str, req: GiftTicketReq, user: dict = Depends(get_current_user)):
+    ev = await db.events.find_one({"id": event_id})
+    if not ev:
+        raise HTTPException(404, "Event not found")
+    if ev.get("cancelled"):
+        raise HTTPException(400, "Event was cancelled")
+    if ev.get("is_free"):
+        raise HTTPException(400, "Free events don't need a gifted ticket — just share the link")
+    email = req.recipient_email.strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(400, "Enter a valid email for your friend")
+    if ev.get("max_capacity"):
+        count = await db.event_rsvps.count_documents({"event_id": event_id})
+        if count >= ev["max_capacity"]:
+            raise HTTPException(400, "Event is sold out")
+    price = float(ev["ticket_price"])
+    settings = await get_settings()
+    from connect import build_transfer_options
+    transfer_kwargs = await build_transfer_options(ev["host_id"], price)
+    session = stripe.checkout.Session.create(
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": settings["currency"],
+                "product_data": {"name": f"Gift ticket: {ev['title']}", "description": f"For {req.recipient_name or email}"},
+                "unit_amount": int(round(price * 100)),
+            },
+            "quantity": 1,
+        }],
+        success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{req.origin_url}/events/{event_id}",
+        customer_email=user["email"],
+        metadata={"kind": "event_ticket_gift", "event_id": event_id, "user_id": user["id"], "recipient_email": email},
+        **transfer_kwargs,
+    )
+    await db.payment_transactions.insert_one({
+        "id": new_id(), "session_id": session.id,
+        "kind": "event_ticket_gift", "user_id": user["id"],
+        "event_id": event_id, "host_id": ev["host_id"],
+        "recipient_email": email, "recipient_name": (req.recipient_name or "").strip() or None,
+        "gift_message": (req.message or "").strip() or None, "origin_url": req.origin_url.rstrip("/"),
+        "amount": price, "currency": settings["currency"],
+        "status": "initiated", "payment_status": "pending",
+        "created_at": now_iso(), "updated_at": now_iso(),
+    })
+    return {"checkout_url": session.url, "session_id": session.id, "amount": price}
+
+
 @router.post("/payments/offers/{offer_id}/pay")
 async def pay_offer(offer_id: str, req: OfferPayReq, user: dict = Depends(get_current_user)):
     o = await db.offers.find_one({"id": offer_id})
@@ -435,6 +490,72 @@ async def pay_offer(offer_id: str, req: OfferPayReq, user: dict = Depends(get_cu
 
 
 # ---------- Status ----------
+async def _apply_gift_ticket(tx: dict, session_id: str):
+    """Create the recipient's RSVP, email them the QR ticket, and receipt the gifter."""
+    try:
+        s = stripe.checkout.Session.retrieve(session_id)
+        pi = getattr(s, "payment_intent", None)
+        if pi:
+            await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"payment_intent": pi}})
+    except Exception:
+        pass
+    if await db.event_rsvps.find_one({"session_id": session_id}):
+        return
+    ev = await db.events.find_one({"id": tx["event_id"]}) or {}
+    gifter = await db.users.find_one({"id": tx["user_id"]}) or {}
+    recipient = await db.users.find_one({"email": tx["recipient_email"]})
+    token = new_id()
+    rsvp = {
+        "id": new_id(), "event_id": tx["event_id"],
+        "user_id": recipient["id"] if recipient else None,
+        "user_name": tx.get("recipient_name") or (recipient or {}).get("name") or tx["recipient_email"].split("@")[0],
+        "paid": True, "amount": float(tx["amount"]),
+        "session_id": session_id, "created_at": now_iso(),
+        "gift": True, "gifted_by": tx["user_id"], "gifted_by_name": gifter.get("name"),
+        "gift_email": tx["recipient_email"], "gift_token": token, "gift_message": tx.get("gift_message"),
+    }
+    await db.event_rsvps.insert_one(rsvp)
+    origin = tx.get("origin_url") or "https://artcorestudio.net"
+    ticket_url = f"{origin}/gift/{token}"
+    qr_url = f"{origin}/api/events/gift/{token}/qr.png"
+    await db.notifications.insert_one({
+        "id": new_id(), "user_id": tx["user_id"], "kind": "gift_ticket_sent",
+        "event_id": tx["event_id"], "event_title": ev.get("title"), "recipient_email": tx["recipient_email"],
+        "amount": float(tx["amount"]), "read": False, "created_at": now_iso(),
+    })
+    if recipient:
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": recipient["id"], "kind": "gift_ticket_received",
+            "event_id": tx["event_id"], "event_title": ev.get("title"), "from_user_name": gifter.get("name"),
+            "read": False, "created_at": now_iso(),
+        })
+    try:
+        from emails import send_email, gift_ticket_html, gift_sent_html, _fmt_when
+        when = _fmt_when(ev.get("start_at", ""))
+        loc = ev.get("location") or {}
+        where = loc.get("city") or loc.get("address") or "TBA"
+        import asyncio as _a
+        _a.create_task(send_email(
+            tx["recipient_email"], f"{gifter.get('name', 'A friend')} sent you a ticket: {ev.get('title')}",
+            gift_ticket_html(rsvp["user_name"], gifter.get("name") or "A friend", ev.get("title") or "an event", when, where, tx.get("gift_message"), ticket_url, qr_url),
+        ))
+        if gifter.get("email"):
+            _a.create_task(send_email(
+                gifter["email"], f"Gift sent: {ev.get('title')}",
+                gift_sent_html(gifter.get("name") or "there", tx["recipient_email"], ev.get("title") or "an event", float(tx["amount"]), when),
+            ))
+    except Exception:
+        pass
+    if tx.get("host_id") and tx["host_id"] != tx["user_id"]:
+        await db.notifications.insert_one({
+            "id": new_id(), "user_id": tx["host_id"], "kind": "event_rsvp",
+            "event_id": tx["event_id"], "event_title": ev.get("title"),
+            "from_user_id": tx["user_id"], "from_user_name": f"{gifter.get('name', 'Someone')} (gift for {rsvp['user_name']})",
+            "amount": float(tx["amount"]), "read": False, "created_at": now_iso(),
+        })
+
+
+
 async def _apply_paid(session_id: str):
     """Idempotent post-payment side effects."""
     tx = await db.payment_transactions.find_one({"session_id": session_id})
@@ -614,6 +735,8 @@ async def _apply_paid(session_id: str):
             "commission_id": tx["commission_id"], "amount": gross,
             "read": False, "created_at": now_iso(),
         })
+    elif tx["kind"] == "event_ticket_gift":
+        await _apply_gift_ticket(tx, session_id)
     elif tx["kind"] == "event_ticket":
         # Persist payment_intent for future refunds
         try:
@@ -723,7 +846,8 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
     try:
-        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+        from stripe_config import webhook_secret
+        event = stripe.Webhook.construct_event(payload, sig, webhook_secret())
     except Exception:
         raise HTTPException(400, "Invalid signature")
     obj, t = event["data"]["object"], event["type"]

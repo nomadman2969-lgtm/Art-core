@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 20 — Full backend+frontend coverage of the four new features (Admin Stripe Setup, Analytics upgrade, Landing/Onboarding Keep-More Strip, Gift Tickets). All 13 pytest cases pass and all Playwright UI checks pass. No functional bugs found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter20_stripe_analytics_gift.py",
+    "/app/test_reports/pytest/iter20.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin.stripe_config correctly validates sk_live_/rk_live_ prefix AND does a live Stripe.Account.retrieve to confirm the key is real before persisting — solid defense.",
+    "stripe_config.apply_stripe_keys falls back to test env keys unless BOTH mode==live AND a live secret is saved — good safe default. Consider logging when a live-mode is attempted without a saved key.",
+    "studio._analytics_extra: nested per-piece counts loop (saves + likes count_documents per top-viewed item) is O(N*queries). Fine for top 8, but if the limit is raised later, batch into a $lookup or $facet aggregate.",
+    "artworks.get_artwork correctly skips view logging when viewer is the artist. Note: any authenticated non-artist view is logged, including admin — expected but consider whether admin views should count for analytics.",
+    "payments.gift_event_ticket relies on Field(min_length=5) for email but does its own '@'/'.' sanity check — good. Consider EmailStr for consistency with other endpoints.",
+    "events.gift_ticket (public) reveals event id/title/location and refunded/checked_in booleans without auth. Given the token is a random new_id() this is acceptable, but note gift_token is not currently expired. Consider adding an expiry after event.end_at + N days.",
+    "KeepMoreStrip: 5 competitor rows + 1 fine-print div means '[data-testid=keep-more-table] > div' returns 6 children; not a bug but tests need to filter the note.",
+    "auth.register claims gift RSVPs with unset user_id by email match — good UX. Consider also updating user_name to the newly-registered name, currently retains the tx recipient_name."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter20_stripe_analytics_gift.py"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100%"},
+  "test_credentials": "admin monster@houseofmonster.com / MonsterAdmin2026!; artist demo.artist@artcorestudio.net / DemoArtist2026!; buyer demo.collector@artcorestudio.net / DemoCollector2026!",
+  "seed_data_creation": "Test inserted one gift RSVP (ui_gift_test_*) + one gift RSVP via pytest (testtoken_*), one paid event (if not present), and a temporary friend.test@example.com user + test_onboard_* artist for onboarding page verification. ALL cleaned up post-test. Mode restored to 'test'; any temporary stripe_live_* keys cleared from settings.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend suite: run `pytest /app/backend/tests/test_iter20_stripe_analytics_gift.py -o addopts=''` (pytest.ini enables xdist, but session-scoped mongo cleanup fixture is safe under xdist). Frontend flows verified: admin /admin tab-stripe (mode label, claim link, disabled switch-live-btn, empty save toast), studio tab-analytics (visits-chart, followers-chart, follower-delta, top-viewed-grid), landing keep-more-strip (5 rows Art Core/Etsy/Chairish/Saatchi/Singulart + CTA to /register?role=artist), onboarding compact strip (no CTA), paid event EventDetail gift-ticket-btn + full dialog + navigation to stripe checkout, free event has no gift button, /gift/{token} valid + /gift/badtoken error state. NOTE for cleanup: session_id 'cs_test_fake_*' RSVPs must be manually removed if left behind. Landing marquee overflow at 390px was 0 (no marquee-only overflow observed this run).",
+  "rca of the issue": "N/A — no bugs found. Minor test-side fixes: (1) /api/events POST requires Location.lat/lng, (2) /api/events/mine/tickets nests event under .event, (3) demo artist artworks list is at /api/artists/{id} not /artworks. Updated test to reflect actual API contracts."
+}

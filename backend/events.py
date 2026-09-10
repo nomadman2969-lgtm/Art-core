@@ -388,8 +388,7 @@ async def _cancel_single_event(e: dict, user: dict) -> dict:
     refund_summary = {"refunded": 0, "failed": 0, "amount": 0.0}
     if not e.get("is_free"):
         try:
-            import os as _os, stripe as _stripe
-            _stripe.api_key = _os.environ["STRIPE_SECRET_KEY"]
+            import stripe as _stripe
             paid_txs = await db.payment_transactions.find({
                 "kind": "event_ticket", "event_id": event_id,
                 "payment_status": "paid", "refunded": {"$ne": True},
@@ -765,10 +764,10 @@ async def _promote_from_waitlist(e: dict) -> Optional[dict]:
     if not e.get("is_free"):
         # Create a 15-minute-expiring Stripe checkout session for this reserved seat
         try:
-            import os as _os, stripe as _stripe
+            import stripe as _stripe
+            import os as _os
             from datetime import timedelta as _td
-            _stripe.api_key = _os.environ["STRIPE_SECRET_KEY"]
-            settings_row = await db.settings.find_one({"id": "platform"}) or {}
+            settings_row = await db.settings.find_one({"id": "global"}) or {}
             currency = settings_row.get("currency", "usd")
             from connect import build_transfer_options
             transfer_kwargs = await build_transfer_options(e["host_id"], float(e["ticket_price"]))
@@ -1059,6 +1058,56 @@ async def trending_events(
 
 
 # ---------- Ticket QR ----------
+def _qr_png(payload: str) -> Optional[bytes]:
+    try:
+        import qrcode as _qr
+        import io as _io
+        img = _qr.make(payload, box_size=10, border=2)
+        buf = _io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
+@router.get("/gift/{token}")
+async def gift_ticket(token: str):
+    """Public gift ticket view (no auth) — the recipient opens this from their email."""
+    rsvp = await db.event_rsvps.find_one({"gift_token": token})
+    if not rsvp:
+        raise HTTPException(404, "Gift ticket not found")
+    ev = await db.events.find_one({"id": rsvp["event_id"]})
+    if not ev:
+        raise HTTPException(404, "Event not found")
+    payload = f"artcore:ticket:{rsvp['id']}:{rsvp['event_id']}"
+    png = _qr_png(payload)
+    import base64 as _b64
+    return {
+        "rsvp_id": rsvp["id"],
+        "event": {"id": ev["id"], "title": ev["title"], "start_at": ev.get("start_at"), "location": ev.get("location"), "cover_image": ev.get("cover_image"), "cancelled": bool(ev.get("cancelled"))},
+        "user_name": rsvp.get("user_name"),
+        "gifted_by_name": rsvp.get("gifted_by_name"),
+        "gift_message": rsvp.get("gift_message"),
+        "refunded": bool(rsvp.get("refunded")),
+        "checked_in": bool(rsvp.get("checked_in")),
+        "claimed": bool(rsvp.get("user_id")),
+        "qr_payload": payload,
+        "qr_image": f"data:image/png;base64,{_b64.b64encode(png).decode()}" if png else None,
+    }
+
+
+@router.get("/gift/{token}/qr.png")
+async def gift_ticket_qr(token: str):
+    from fastapi.responses import Response
+    rsvp = await db.event_rsvps.find_one({"gift_token": token})
+    if not rsvp:
+        raise HTTPException(404, "Gift ticket not found")
+    png = _qr_png(f"artcore:ticket:{rsvp['id']}:{rsvp['event_id']}")
+    if not png:
+        raise HTTPException(500, "QR unavailable")
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
 @router.get("/{event_id}/my-ticket")
 async def my_ticket(event_id: str, user: dict = Depends(get_current_user)):
     """Returns a scannable QR code + ticket metadata for the current user."""

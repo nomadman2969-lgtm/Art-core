@@ -4,6 +4,7 @@ import { Check, Loader2, Palette, Upload, Rocket, ArrowRight } from "lucide-reac
 import { toast } from "sonner";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { KeepMoreStrip } from "../components/KeepMoreStrip";
 
 const inputCls = "w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2.5 text-sm outline-none focus:border-[#CCFF00]";
 const STEPS = [["Pick a theme", Palette], ["Upload your first piece", Upload], ["Publish your studio", Rocket]];
@@ -92,6 +93,8 @@ export default function Onboarding() {
           </div>
         ))}
       </div>
+
+      {step === 0 && <div className="mb-10"><KeepMoreStrip compact cta={false} /></div>}
 
       {step === 0 && (
         <div>

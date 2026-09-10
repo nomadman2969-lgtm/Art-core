@@ -35,6 +35,82 @@ async def get_settings(user=Depends(require_role("admin"))):
     return await _get_settings()
 
 
+# --- Stripe platform setup ---
+class StripeConfigReq(BaseModel):
+    mode: Optional[str] = None
+    live_secret_key: Optional[str] = None
+    live_publishable_key: Optional[str] = None
+    live_webhook_secret: Optional[str] = None
+
+
+@router.get("/stripe/status")
+async def stripe_status(user=Depends(require_role("admin"))):
+    from stripe_config import current_mode, ONBOARDING_URL, ENV_MODE, mask, _state
+    s = await _get_settings()
+    account = None
+    error = None
+    try:
+        acct = stripe.Account.retrieve()
+        account = {
+            "id": acct.id,
+            "business_name": (getattr(acct, "business_profile", None) or {}).get("name") or (getattr(acct, "settings", None) or {}).get("dashboard", {}).get("display_name"),
+            "email": getattr(acct, "email", None),
+            "country": getattr(acct, "country", None),
+            "charges_enabled": bool(getattr(acct, "charges_enabled", False)),
+            "payouts_enabled": bool(getattr(acct, "payouts_enabled", False)),
+            "details_submitted": bool(getattr(acct, "details_submitted", False)),
+            "default_currency": getattr(acct, "default_currency", None),
+        }
+    except stripe.error.StripeError as e:
+        error = (e.user_message or str(e))[:200]
+    connected_artists = await db.users.count_documents({"stripe_charges_enabled": True})
+    return {
+        "mode": current_mode(),
+        "env_mode": ENV_MODE,
+        "onboarding_url": ONBOARDING_URL,
+        "account": account,
+        "error": error,
+        "live_keys_saved": bool(s.get("stripe_live_secret_key")),
+        "live_secret_masked": mask(s.get("stripe_live_secret_key") or ""),
+        "live_publishable_masked": mask(s.get("stripe_live_publishable_key") or ""),
+        "webhook_configured": bool(_state["webhook_secret"]),
+        "connected_artists": connected_artists,
+    }
+
+
+@router.patch("/stripe/config")
+async def stripe_config(req: StripeConfigReq, user=Depends(require_role("admin"))):
+    from stripe_config import apply_stripe_keys
+    updates = {}
+    if req.live_secret_key:
+        key = req.live_secret_key.strip()
+        if not key.startswith("sk_live_") and not key.startswith("rk_live_"):
+            raise HTTPException(400, "Live secret key must start with sk_live_")
+        try:
+            stripe.Account.retrieve(api_key=key)
+        except stripe.error.StripeError as e:
+            raise HTTPException(400, f"Stripe rejected that key: {(e.user_message or str(e))[:160]}")
+        updates["stripe_live_secret_key"] = key
+    if req.live_publishable_key:
+        pk = req.live_publishable_key.strip()
+        if not pk.startswith("pk_live_"):
+            raise HTTPException(400, "Publishable key must start with pk_live_")
+        updates["stripe_live_publishable_key"] = pk
+    if req.live_webhook_secret:
+        updates["stripe_live_webhook_secret"] = req.live_webhook_secret.strip()
+    if req.mode:
+        if req.mode not in ("test", "live"):
+            raise HTTPException(400, "mode must be test or live")
+        s = await _get_settings()
+        if req.mode == "live" and not (updates.get("stripe_live_secret_key") or s.get("stripe_live_secret_key")):
+            raise HTTPException(400, "Save a live secret key before switching to live mode")
+        updates["stripe_mode"] = req.mode
+    if updates:
+        await db.settings.update_one({"id": "global"}, {"$set": updates}, upsert=True)
+    state = await apply_stripe_keys()
+    return {"ok": True, "mode": state["mode"]}
+
+
 @router.patch("/settings")
 async def update_settings(req: SettingsUpdate, user=Depends(require_role("admin"))):
     updates = {k: v for k, v in req.model_dump(exclude_none=True).items()}
