@@ -32,7 +32,11 @@ async def dashboard(user: dict = Depends(require_role("artist", "admin"))):
                     "status": p["status"],
                     "created_at": o["created_at"],
                 })
+    from payouts import upcoming_for_artist
+    upcoming = await upcoming_for_artist(user["id"])
     return {
+        "upcoming_payouts": upcoming,
+        "payout_policy": {"delivery_delay_days": 2, "hold_business_days": 10, "pro_hold_business_days": 5},
         "listings": {"live": live, "sold": sold, "pending_fee": pending},
         "total_gross": round(total_gross, 2),
         "total_net": round(total_net, 2),

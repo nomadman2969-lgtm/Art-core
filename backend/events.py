@@ -398,7 +398,10 @@ async def _cancel_single_event(e: dict, user: dict) -> dict:
                     pi = tx.get("payment_intent")
                     if not pi:
                         pi = _stripe.checkout.Session.retrieve(tx["session_id"]).payment_intent
-                    _stripe.Refund.create(payment_intent=pi, reverse_transfer=True, refund_application_fee=True)
+                    try:
+                        _stripe.Refund.create(payment_intent=pi, reverse_transfer=True, refund_application_fee=True)
+                    except _stripe.error.InvalidRequestError:
+                        _stripe.Refund.create(payment_intent=pi)
                     await db.payment_transactions.update_one(
                         {"id": tx["id"]},
                         {"$set": {"refunded": True, "refunded_at": now_iso(), "payment_status": "refunded"}},

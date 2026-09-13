@@ -129,6 +129,11 @@ async def _reminder_loop():
         except Exception as e:
             logger.error(f"Reminder sweep failed: {e}")
         try:
+            from payouts import release_due_payouts
+            await release_due_payouts()
+        except Exception as e:
+            logger.error(f"Payout release sweep failed: {e}")
+        try:
             from waiver import check_waiver_reminders
             await check_waiver_reminders()
         except Exception as e:

@@ -1,0 +1,44 @@
+{
+  "summary": "Iter24: Art Core Pro subscription + Depop-style payouts. Backend 21/21 passed (pro plans/status/checkout, theme gating 402, boosted placement, payouts module: add_business_days/hold/release/upcoming, ship+mark-delivered flow, dashboard payout_policy, connect.build_transfer_options={}). Frontend: /pro logged-out shows $12 + 'Sign in to go Pro'; demo artist shows $6/$49.5 + founder note; subscribe → checkout.stripe.com; nav-pro visible; /studio Theme lock redirects to /pro; Payouts tab shows upcoming-payouts w/ tracking mention; /marketplace renders 72 founding-badge instances via /api/artworks enrich. BUGS: /api/feed (Explore) and /api/studio/{id} do NOT include founding_member/pro_active on the returned artist object → founding-badge missing on /explore and on artist studio header.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/feed", "issue": "artist object lacks founding_member/pro_active fields → ArtCard cannot render founding-badge on /explore. Fix: enrich artist like artworks._enrich_badges does."},
+      {"endpoint": "GET /api/studio/{artist_id}", "issue": "returned artist has only {id,name,bio,cover_image,avatar}; missing founding_member/founding_number/pro_active → ArtistBadges shows nothing on studio header."},
+      {"endpoint": "POST /api/orders/{oid}/mark-delivered", "issue": "Emits 'payout_released' notifications on delivery confirmation even though payout status stays 'held' with release_at=now+2d. Consider a distinct kind like 'payout_scheduled' or wait until release_due_payouts fires."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Explore.js", "issue": "No founding-badge rendered because /api/feed doesn't ship founding_member. Depends on backend fix.", "selector": "[data-testid='founding-badge']", "priority": "MEDIUM"},
+      {"component": "ArtistStudio.js header", "issue": "Founding badge does not appear; /api/studio/{id} strips founding_member from artist. Depends on backend fix.", "selector": "[data-testid='founding-badge']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter24_pro_payouts.py",
+    "/app/test_reports/pytest/iter24.xml"
+  ],
+  "action_items": [
+    "Enrich /api/feed (social.py explore_feed) artist object with founding_member, founding_number, pro_active (reuse artworks._enrich_badges pattern).",
+    "Enrich /api/studio/{id} artist projection with founding_member, founding_number, pro_active.",
+    "Consider changing mark-delivered notification kind so it doesn't misleadingly say 'payout_released' while the payout is still on a 2-day hold."
+  ],
+  "critical_code_review_comments": [
+    "orders.mark_delivered inserts kind='payout_released' notifications even though payout is still held (release_at = now+2d). This double-notifies (release_due_payouts also inserts 'payout_released' when actually transferring). Rename or gate.",
+    "pro.plans returns founder_amount=null when unauthenticated (correct), but math on line 108 uses 'v[amount] / 200' — brittle if amount ever isn't cleanly divisible. Currently 1200/200=6.0, 9900/200=49.5 → fine.",
+    "payouts.release_due_payouts idempotency depends solely on status filter; second sweep correctly no-ops (verified).",
+    "connect.build_transfer_options returns {} — hold-then-transfer semantics verified in test."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter24_pro_payouts.py (new)"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "~85% (Pro flow, theme gate, payouts tab, marketplace badges verified; 2 badge locations broken due to backend enrichment gap)"},
+  "test_credentials": "demo.artist@artcorestudio.net / DemoArtist2026!, demo.collector@artcorestudio.net / DemoCollector2026!",
+  "seed_data_creation": "Throwaway artist created and cleaned up (throw_*@throwaway.artcorestudio.net). TEST_ prefixed orders inserted/deleted during payouts module tests. Demo artist pro is never modified.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend test file /app/backend/tests/test_iter24_pro_payouts.py uses a module-level asyncio loop bound to motor for direct DB assertions; runs cleanly with xdist loadscope. After main agent fixes the /api/feed and /api/studio/{id} artist enrichment, re-run only the frontend badge checks. Demo artist has 5 live listings, 2 sold, and no pending unfulfilled orders → /selling shows no ship-form (expected). Pro subscription checkout works — created a real Stripe test-mode subscription session (but not completed) with kind=pro_subscription in payment_transactions.",
+  "rca of the issue": "Founding-badge invisible on /explore and studio header: backend enrichment functions in social.explore_feed and studio.get_studio strip the artist dict down to a whitelist of fields (id,name,bio,cover_image,avatar / id,name) and never include founding_member, founding_number, or pro_active. The frontend Badges.ArtistBadges is a pure function of artist.founding_member/pro_active, so the missing fields directly cause the missing UI. Fix: extend the projected fields in both endpoints. Reference: artworks._enrich adds founding_member and pro_active — mirror that logic."
+}

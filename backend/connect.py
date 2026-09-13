@@ -110,27 +110,9 @@ async def dashboard_link(user: dict = Depends(get_current_user)):
 
 # ---------- Helper for payments.py ----------
 async def build_transfer_options(seller_id: str, gross_amount: float) -> dict:
-    """If the seller has an active Connect account, return kwargs for stripe.checkout.Session.create
-    that route the seller's cut to them and take an application_fee. If not, return {}."""
-    seller = await db.users.find_one({"id": seller_id})
-    if not seller:
-        return {}
-    account_id = seller.get("stripe_account_id")
-    if not account_id or not seller.get("stripe_charges_enabled"):
-        return {}
-    from waiver import settings_for_seller
-    settings = await settings_for_seller(seller_id, await _get_settings())
-    fee_pct = float(settings["commission_percent"]) / 100.0
-    application_fee_cents = int(round(gross_amount * fee_pct * 100))
-    # on_behalf_of makes the seller the settlement merchant: Stripe's processing fee is
-    # debited from the seller's side, so the platform keeps the full application fee.
-    return {
-        "payment_intent_data": {
-            "application_fee_amount": application_fee_cents,
-            "transfer_data": {"destination": account_id},
-            "on_behalf_of": account_id,
-        },
-    }
+    """Funds are held on the platform (separate charges & transfers) and released by payouts.release_due_payouts
+    once delivery is confirmed or the safety hold lapses. No destination charge at checkout."""
+    return {}
 
 
 async def transfer_manual(seller_id: str, amount: float, source_reference: str, description: str = "") -> Optional[dict]:

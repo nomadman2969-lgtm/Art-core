@@ -744,6 +744,27 @@ export function PayoutsPanel({ dashboard, refresh, refreshUser }) {
         </div>
       </div>
 
+      <div className="mb-10" data-testid="upcoming-payouts">
+        <div className="label-caps text-zinc-400 mb-3">Upcoming payouts</div>
+        <div className="text-xs text-zinc-500 mb-4 max-w-2xl">
+          Money is released <span className="text-zinc-300">{dashboard.payout_policy?.delivery_delay_days ?? 2} days after the collector confirms delivery</span>, or automatically {dashboard.payout_policy?.hold_business_days ?? 10} business days after the sale if they never confirm.
+          Ship with tracking — it's required — so buyers can confirm fast.{dashboard.payout_policy && <> Pro members release same-day on delivery with a {dashboard.payout_policy.pro_hold_business_days}-day hold.</>}
+        </div>
+        {(dashboard.upcoming_payouts || []).length === 0 ? <div className="text-zinc-600 text-xs" data-testid="no-upcoming-payouts">Nothing in the pipeline right now.</div> : (
+          <div className="border border-white/8 rounded-sm divide-y divide-white/8">
+            {dashboard.upcoming_payouts.map((u) => (
+              <div key={u.order_id} className="p-3 flex items-center justify-between gap-3 text-sm" data-testid={`upcoming-payout-${u.order_id}`}>
+                <div className="min-w-0">
+                  <div className="font-unbounded text-[#CCFF00]">${Number(u.net).toFixed(2)}</div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">Order {u.order_id.slice(0, 8)} · {u.hold_reason === "delivered" ? "Delivery confirmed" : u.fulfillment === "shipped" ? "Shipped · awaiting confirmation" : "Awaiting shipment"}</div>
+                </div>
+                <div className="text-right"><div className="label-caps text-[10px] text-zinc-400">Releases</div><div className="text-xs" data-testid="upcoming-release-date">{u.release_at ? new Date(u.release_at).toLocaleDateString() : "—"}</div></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div>
         <div className="label-caps mb-3">Recent Payouts</div>
         {dashboard.payouts.length === 0 ? <div className="text-zinc-500 label-caps">No payouts yet.</div> : (

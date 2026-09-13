@@ -17,7 +17,7 @@ FOUNDER_COUPON = "founding50"
 PERKS = [
     ("Boosted placement", "Your pieces rank first in Explore and the Marketplace, with a Pro tag."),
     ("Premium studio themes", "Unlock the Pro theme set and custom accent colors for your studio."),
-    ("Daily payouts", "Connected Stripe payouts switch from weekly to daily."),
+    ("Faster payouts", "Same-day release when the collector confirms delivery (standard: 2 days), and a 5-day safety hold instead of 10."),
     ("Pro badge", "A Pro mark on your profile and every artwork card."),
 ]
 

@@ -601,6 +601,8 @@ async def _apply_paid(session_id: str):
             "fulfillment": {"status": "pending", "shipped_at": None, "delivered_at": None, "tracking": None, "carrier": None},
             "created_at": now_iso(),
         }
+        from payouts import hold_payouts
+        order["artist_payouts"] = await hold_payouts(order["artist_payouts"])
         await db.orders.insert_one(order)
         # Mark artworks sold
         for it in tx["items"]:
@@ -637,10 +639,7 @@ async def _apply_paid(session_id: str):
         sp = split_amount(gross, settings)
         if settings.get("fee_waived"):
             await consume_waiver_sale(tx["seller_id"])
-        # Detect if Stripe already routed funds via destination charge
-        seller = await db.users.find_one({"id": tx["seller_id"]})
-        auto_paid = bool(seller and seller.get("stripe_charges_enabled") and seller.get("stripe_account_id"))
-        payout_status = "auto_transferred" if auto_paid else "pending"
+        payout_status = "pending"  # → held by hold_payouts()
         order = {
             "id": new_id(),
             "session_id": session_id,
@@ -660,6 +659,8 @@ async def _apply_paid(session_id: str):
             "auction_id": tx["auction_id"],
             "created_at": now_iso(),
         }
+        from payouts import hold_payouts
+        order["artist_payouts"] = await hold_payouts(order["artist_payouts"])
         await db.orders.insert_one(order)
         await db.auctions.update_one({"id": tx["auction_id"]}, {"$set": {"paid": True, "order_id": order["id"], "paid_at": now_iso()}})
         # notify seller of settled payment
@@ -690,9 +691,7 @@ async def _apply_paid(session_id: str):
         sp = split_amount(gross, settings)
         if settings.get("fee_waived"):
             await consume_waiver_sale(tx["seller_id"])
-        seller = await db.users.find_one({"id": tx["seller_id"]})
-        auto_paid = bool(seller and seller.get("stripe_charges_enabled") and seller.get("stripe_account_id"))
-        payout_status = "auto_transferred" if auto_paid else "pending"
+        payout_status = "pending"  # → held by hold_payouts()
         order = {
             "id": new_id(),
             "session_id": session_id,
@@ -712,6 +711,8 @@ async def _apply_paid(session_id: str):
             "offer_id": tx["offer_id"],
             "created_at": now_iso(),
         }
+        from payouts import hold_payouts
+        order["artist_payouts"] = await hold_payouts(order["artist_payouts"])
         await db.orders.insert_one(order)
         await db.artworks.update_one({"id": tx["artwork_id"]}, {"$set": {"status": "sold"}})
         await db.offers.update_one({"id": tx["offer_id"]}, {"$set": {"paid": True, "status": "paid", "order_id": order["id"], "paid_at": now_iso()}})

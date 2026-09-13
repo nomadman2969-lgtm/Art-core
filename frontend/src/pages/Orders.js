@@ -193,6 +193,7 @@ export function OrderDetail() {
         </div>
         {isSeller && fulfill.status === "pending" && (
           <form onSubmit={submitShip} className="mt-4 pt-4 border-t border-white/8 space-y-3" data-testid="ship-form">
+            <div className="text-[11px] text-zinc-500" data-testid="tracking-required-note">Tracking is required. Your payout releases 2 days after the collector confirms delivery — or 10 business days after the sale if they don't.</div>
             <div className="grid md:grid-cols-2 gap-3">
               <input required placeholder="Carrier (USPS, UPS...)" value={shipForm.carrier}
                 data-testid="ship-carrier"

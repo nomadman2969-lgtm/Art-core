@@ -328,6 +328,8 @@ async def get_studio(artist_id: str, preview: bool = False, viewer: Optional[dic
         "artist": {
             "id": artist["id"], "name": artist["name"], "bio": artist.get("bio"),
             "cover_image": artist.get("cover_image"), "avatar": artist.get("avatar"),
+            "founding_member": bool(artist.get("founding_member")), "founding_number": artist.get("founding_number"),
+            "pro_active": __import__("auth")._pro_active(artist),
         },
         "config": cfg,
         "artworks": {

@@ -287,9 +287,10 @@ async def _refund_stripe_transaction(session_id: str, amount: Optional[float], r
             kwargs["amount"] = int(round(amount * 100))
         if reason in ("duplicate", "fraudulent", "requested_by_customer"):
             kwargs["reason"] = reason
-        kwargs["reverse_transfer"] = True
-        kwargs["refund_application_fee"] = True
-        r = stripe.Refund.create(**kwargs)
+        try:
+            r = stripe.Refund.create(**kwargs, reverse_transfer=True, refund_application_fee=True)
+        except stripe.error.InvalidRequestError:
+            r = stripe.Refund.create(**kwargs)  # funds were held on the platform — nothing to reverse
         return r.id, (r.amount or 0) / 100.0
     except stripe.error.StripeError as e:
         raise HTTPException(400, f"Stripe refund failed: {e.user_message or str(e)[:200]}")
@@ -351,7 +352,7 @@ async def refund_order(oid: str, req: RefundReq, user=Depends(require_role("admi
                 p["status"] = "reversed"
             elif p.get("status") == "released":
                 p["status"] = "clawback_needed"
-            elif p.get("status") == "pending":
+            elif p.get("status") in ("pending", "held"):
                 p["status"] = "cancelled"
     is_full = (req.amount is None) or (abs(refunded - float(o["total"])) < 0.01)
     await db.orders.update_one({"id": oid}, {"$set": {

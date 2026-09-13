@@ -391,7 +391,8 @@ async def home_feed(
             a = strip_mongo(a)
             artist = await db.users.find_one({"id": a["artist_id"]})
             if artist:
-                a["artist"] = {"id": artist["id"], "name": artist["name"]}
+                from auth import _pro_active
+            a["artist"] = {"id": artist["id"], "name": artist["name"], "founding_member": bool(artist.get("founding_member")), "pro_active": _pro_active(artist)}
             a["timeline_kind"] = "artwork"
             a["timeline_at"] = a["created_at"]
             a["like_count"] = await db.likes.count_documents({"artwork_id": a["id"]})
@@ -541,7 +542,8 @@ async def explore_feed(limit: int = 60, me: Optional[dict] = Depends(get_optiona
         a = strip_mongo(a)
         artist = await db.users.find_one({"id": a.get("artist_id")})
         if artist:
-            a["artist"] = {"id": artist["id"], "name": artist["name"]}
+            from auth import _pro_active
+            a["artist"] = {"id": artist["id"], "name": artist["name"], "founding_member": bool(artist.get("founding_member")), "pro_active": _pro_active(artist)}
         a["like_count"] = await db.likes.count_documents({"artwork_id": a["id"]})
         a["comment_count"] = await db.comments.count_documents({"artwork_id": a["id"]})
         a["share_count"] = await db.shares.count_documents({"artwork_id": a["id"]})

@@ -83,27 +83,8 @@ async def mark_delivered(oid: str, user: dict = Depends(get_current_user)):
     current = (o.get("fulfillment") or {}).get("status", "pending")
     if current not in ("shipped",):
         raise HTTPException(400, f"Cannot mark delivered — status is {current}")
-    # Release payouts. If payout wasn't auto-transferred at checkout AND seller has Connect,
-    # kick off a real Stripe Transfer now. Otherwise mark released (platform holds funds).
-    from connect import transfer_manual
-    payouts = o.get("artist_payouts", [])
-    for p in payouts:
-        if p.get("status") == "auto_transferred":
-            # Already sent to artist at charge time via destination charge
-            p["status"] = "auto_transferred"
-            continue
-        # Attempt live transfer if Connect is enabled
-        try:
-            result = await transfer_manual(p["artist_id"], p["net"], source_reference=f"order:{oid}", description=f"Art Core payout for order {oid[:8]}")
-            if result:
-                p["status"] = "transferred"
-                p["stripe_transfer_id"] = result["transfer_id"]
-            else:
-                p["status"] = "released"  # platform holds funds; artist paid manually
-        except Exception as e:
-            # Fallback: mark released but log the reason
-            p["status"] = "released"
-            p["transfer_error"] = str(e)[:200]
+    from payouts import release_on_delivery
+    payouts = await release_on_delivery(o)
     await db.orders.update_one({"id": oid}, {"$set": {
         "fulfillment.status": "delivered",
         "fulfillment.delivered_at": now_iso(),
