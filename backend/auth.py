@@ -107,7 +107,17 @@ def public_user(u: dict) -> dict:
         "twofa_enabled": bool(u.get("twofa_enabled")),
         "founding_member": bool(u.get("founding_member")),
         "founding_number": u.get("founding_number"),
+        "pro_active": _pro_active(u),
     }
+
+
+def _pro_active(u: dict) -> bool:
+    from datetime import datetime, timezone
+    pro = u.get("pro") or {}
+    if pro.get("status") not in ("active", "trialing", "past_due"):
+        return False
+    end = pro.get("current_period_end")
+    return not end or end > datetime.now(timezone.utc).timestamp() - 3 * 86400
 
 
 # --- endpoints ---

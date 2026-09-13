@@ -14,6 +14,7 @@ from db import db, now_iso, new_id
 from auth import router as auth_router, hash_password, get_optional_user
 from twofa import router as twofa_router
 from waiver import router as waiver_router, admin_router as waiver_admin_router, founding_stats
+from pro import router as pro_router
 from artworks import router as art_router
 from payments import router as payments_router
 from admin import router as admin_router, newsletter_router
@@ -45,6 +46,7 @@ app.include_router(auth_router)
 app.include_router(twofa_router)
 app.include_router(waiver_router)
 app.include_router(waiver_admin_router)
+app.include_router(pro_router)
 app.include_router(art_router)
 app.include_router(payments_router)
 app.include_router(admin_router)
@@ -143,6 +145,11 @@ async def startup():
     except Exception as e:
         logger.error(f"Stripe key apply failed: {e}")
     asyncio.get_running_loop().create_task(_reminder_loop())
+    try:
+        from pro import ensure_pro_catalog
+        await asyncio.to_thread(ensure_pro_catalog)
+    except Exception as e:
+        logger.error(f"Pro catalog setup failed: {e}")
     # Init storage
     try:
         init_storage()

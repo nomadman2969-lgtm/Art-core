@@ -216,7 +216,10 @@
     "gift_ticket_received": "チケットが贈られました",
     "followed_new_artwork": "フォロー中のアーティストの新作",
     "post_liked": "投稿にいいねされました",
-    "post_comment": "投稿にコメントされました"
+    "post_comment": "投稿にコメントされました",
+    "pro_activated": "Art Core Proへようこそ",
+    "pro_payment_failed": "Proの支払いに失敗しました — カードを更新してください",
+    "waiver_ending": "0%期間がまもなく終了します"
   },
   "studio": {
     "kicker": "スタジオエディター",

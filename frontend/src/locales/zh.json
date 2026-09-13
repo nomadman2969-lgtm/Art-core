@@ -216,7 +216,10 @@
     "gift_ticket_received": "有人送了你一张门票",
     "followed_new_artwork": "你关注的艺术家发布了新作",
     "post_liked": "赞了你的帖子",
-    "post_comment": "评论了你的帖子"
+    "post_comment": "评论了你的帖子",
+    "pro_activated": "欢迎加入 Art Core Pro",
+    "pro_payment_failed": "Pro 付款失败 — 请更新银行卡",
+    "waiver_ending": "你的 0% 费率期即将结束"
   },
   "studio": {
     "kicker": "工作室编辑器",

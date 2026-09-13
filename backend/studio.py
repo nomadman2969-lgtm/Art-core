@@ -197,7 +197,7 @@ DEFAULT_SECTIONS = [
 # to prevent path matching issues in FastAPI's router.
 @router.get("/themes")
 async def list_themes():
-    return [{"id": k, **v} for k, v in THEMES.items()]
+    return [{"id": k, **v, "pro_only": k in PRO_THEMES} for k, v in THEMES.items()]
 
 
 @router.get("/templates")
@@ -390,7 +390,10 @@ def _validate_section(s: dict) -> dict:
     return out
 
 
-def _sanitize_patch(patch: dict) -> dict:
+PRO_THEMES = {"luxury_gallery", "neon_digital", "custom"}
+
+
+def _sanitize_patch(patch: dict, user: dict = None) -> dict:
     if "sections" in patch and patch["sections"] is not None:
         patch["sections"] = [_validate_section(s) for s in patch["sections"]]
         # Renumber order
@@ -402,6 +405,10 @@ def _sanitize_patch(patch: dict) -> dict:
             t = THEME_ALIASES[t]
         if t not in THEMES:
             raise HTTPException(400, f"Unknown theme: {t}")
+        if t in PRO_THEMES and user is not None:
+            from auth import _pro_active
+            if not _pro_active(user):
+                raise HTTPException(402, "That theme is part of Art Core Pro")
         patch["theme"] = t
     if "background" in patch and patch["background"] is not None:
         bg = patch["background"]
@@ -416,7 +423,7 @@ async def update_studio(req: StudioUpdate, user: dict = Depends(require_role("ar
     await _get_or_create_config(user["id"])
     payload = req.model_dump(exclude_none=True)
     publish_flag = payload.pop("publish", False)
-    payload = _sanitize_patch(payload)
+    payload = _sanitize_patch(payload, user)
     now = now_iso()
     if publish_flag:
         # Apply directly to live and clear any draft

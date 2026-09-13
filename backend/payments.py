@@ -757,6 +757,9 @@ async def _apply_paid(session_id: str):
         })
     elif tx["kind"] == "event_ticket_gift":
         await _apply_gift_ticket(tx, session_id)
+    elif tx["kind"] == "pro_subscription":
+        from pro import apply_pro_checkout
+        await apply_pro_checkout(tx, session_id)
     elif tx["kind"] == "event_ticket":
         # Persist payment_intent for future refunds
         try:
@@ -877,4 +880,11 @@ async def stripe_webhook(request: Request):
             {"$set": {"status": "completed", "payment_status": obj.get("payment_status", "paid"), "updated_at": now_iso()}},
         )
         await _apply_paid(obj["id"])
+    elif t in ("customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"):
+        from pro import sync_subscription
+        await sync_subscription(obj)
+    elif t == "invoice.payment_failed":
+        user = await db.users.find_one({"stripe_customer_id": obj.get("customer")})
+        if user:
+            await db.notifications.insert_one({"id": new_id(), "user_id": user["id"], "kind": "pro_payment_failed", "read": False, "created_at": now_iso()})
     return {"ok": True}

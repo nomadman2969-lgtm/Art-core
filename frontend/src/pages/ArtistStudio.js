@@ -1,3 +1,4 @@
+import { ArtistBadges } from "../components/Badges";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, fileUrl } from "../api";
@@ -85,6 +86,7 @@ export function ArtistStudioPage() {
               {config.artist_story?.location && <span className="label-caps flex items-center gap-1"><MapPin size={12} /> {config.artist_story.location}</span>}
               {config.artist_story?.style && <span className="label-caps">· {config.artist_story.style}</span>}
               {rank && <RankBadge tier={rank.tier} color={rank.tier_color} />}
+              <ArtistBadges artist={artist} size="lg" />
             </div>
             <BadgeRow userId={artist.id} />
             <div className="flex flex-wrap gap-6 mt-6">

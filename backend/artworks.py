@@ -194,7 +194,9 @@ async def _enrich(art: dict) -> dict:
         return art
     artist = await db.users.find_one({"id": art.get("artist_id")})
     if artist:
-        art["artist"] = {"id": artist["id"], "name": artist["name"], "bio": artist.get("bio")}
+        from auth import _pro_active
+        art["artist"] = {"id": artist["id"], "name": artist["name"], "bio": artist.get("bio"),
+                         "founding_member": bool(artist.get("founding_member")), "pro_active": _pro_active(artist)}
     return art
 
 
@@ -322,6 +324,8 @@ async def list_artworks(
                [("created_at", -1)]
     cursor = db.artworks.find(q).sort(sort_key).limit(limit if near_lat is None else 400)
     out = [await _enrich(a) for a in await cursor.to_list(limit if near_lat is None else 400)]
+    if sort not in ("price_asc", "price_desc"):
+        out.sort(key=lambda a: 0 if (a.get("artist") or {}).get("pro_active") else 1)  # Pro boost, stable
     if near_lat is not None and near_lng is not None:
         from math import radians, sin, cos, asin, sqrt
         def dist_km(a, b):

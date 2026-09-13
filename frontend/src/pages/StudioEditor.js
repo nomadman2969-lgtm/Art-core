@@ -6,7 +6,7 @@ import { AnalyticsPanel } from "../components/studio/AnalyticsPanel";
 import { WaiverBadge } from "../components/FoundingWaiver";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Plus, Gavel, Sparkles, Eye, Palette as PaletteIcon } from "lucide-react";
+import { Plus, Gavel, Sparkles, Eye, Lock, Palette as PaletteIcon } from "lucide-react";
 import {
   SectionH, Stat, BackgroundEditor, TemplatesPicker,
   SectionsEditor, FeaturedEditor, StoryEditor, PostsEditor,
@@ -159,7 +159,11 @@ export function StudioEditor() {
 
       {tab === "overview" && (
         <>
-          <div className="mb-6"><WaiverBadge /></div>
+          <div className="mb-6 space-y-3"><WaiverBadge />{!user.pro_active && (
+            <Link to="/pro" data-testid="pro-upsell" className="flex items-center justify-between gap-3 border border-[#7C3AED]/30 bg-[#7C3AED]/[0.06] rounded-sm p-4 hover:border-[#7C3AED]/60 transition-colors">
+              <div className="min-w-0"><div className="font-unbounded text-sm text-[#C4B5FD]">Art Core Pro</div><div className="text-xs text-zinc-400 mt-0.5">Boosted placement, premium themes, daily payouts{user.founding_member ? " · founders pay half" : ""}.</div></div>
+              <span className="label-caps text-[10px] text-[#C4B5FD] whitespace-nowrap">Learn more →</span>
+            </Link>)}</div>
           <div className="grid md:grid-cols-4 gap-4 mb-12">
             <Stat label={t("studio.live_listings")} value={dashboard.listings.live} accent="#FFFFFF" />
             <Stat label={t("studio.sold")} value={dashboard.listings.sold} accent="#CCFF00" />
@@ -202,7 +206,7 @@ export function StudioEditor() {
           <SectionH title="Theme">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {themes.map((t) => (
-                <button key={t.id} data-testid={`theme-${t.id}`} onClick={() => saveConfig({ theme: t.id })}
+                <button key={t.id} data-testid={`theme-${t.id}`} onClick={() => (t.pro_only && !user.pro_active) ? nav("/pro") : saveConfig({ theme: t.id })}
                   className={`relative aspect-[4/3] overflow-hidden border rounded-sm text-left ${draftView.theme === t.id ? "border-[#CCFF00]" : "border-white/10"} hover:border-[#CCFF00] transition-colors`}>
                   {t.bg_url ? <img src={t.bg_url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" /> : <div className="absolute inset-0 bg-gradient-to-br from-[#0A0A0C] to-[#1A1A1E]" />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
@@ -210,6 +214,7 @@ export function StudioEditor() {
                     <div className="font-anton text-xl uppercase">{t.name}</div>
                     <div className="w-6 h-1 mt-1" style={{ background: t.accent }} />
                     {draftView.theme === t.id && <div className="badge-lime absolute top-2 right-2">Active</div>}
+                    {t.pro_only && !user.pro_active && <div className="absolute top-2 left-2 label-caps text-[9px] px-1.5 py-0.5 rounded-sm bg-[#7C3AED]/80 text-white flex items-center gap-1" data-testid={`theme-pro-lock-${t.id}`}><Lock size={9} /> Pro</div>}
                   </div>
                 </button>
               ))}

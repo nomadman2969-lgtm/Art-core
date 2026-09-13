@@ -216,7 +216,10 @@
     "gift_ticket_received": "누군가 티켓을 선물했어요",
     "followed_new_artwork": "팔로우한 아티스트의 새 작품",
     "post_liked": "게시물을 좋아합니다",
-    "post_comment": "게시물에 댓글을 남겼습니다"
+    "post_comment": "게시물에 댓글을 남겼습니다",
+    "pro_activated": "Art Core Pro에 오신 것을 환영합니다",
+    "pro_payment_failed": "Pro 결제 실패 — 카드를 업데이트하세요",
+    "waiver_ending": "0% 기간이 곧 종료됩니다"
   },
   "studio": {
     "kicker": "스튜디오 편집기",

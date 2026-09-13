@@ -216,7 +216,10 @@
     "gift_ticket_received": "On vous a offert un billet",
     "followed_new_artwork": "Nouvelle œuvre d'un artiste suivi",
     "post_liked": "A aimé votre publication",
-    "post_comment": "A commenté votre publication"
+    "post_comment": "A commenté votre publication",
+    "pro_activated": "Bienvenue dans Art Core Pro",
+    "pro_payment_failed": "Paiement Pro échoué — mettez à jour votre carte",
+    "waiver_ending": "Votre période à 0 % se termine bientôt"
   },
   "studio": {
     "kicker": "Éditeur d'atelier",

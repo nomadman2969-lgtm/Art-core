@@ -106,6 +106,7 @@ export default function Layout({ children }) {
                 <Link to="/offers" data-testid="nav-offers" className="label-caps hover:text-[#CCFF00]">{t("nav.offers")}</Link>
                 <Link to="/commissions" data-testid="nav-commissions" className="label-caps hover:text-[#CCFF00]">{t("nav.commissions")}</Link>
                 <Link to="/security" data-testid="nav-security" className="label-caps hover:text-[#CCFF00]" title="Account security">{t("nav.security")}</Link>
+                {user.role === "artist" && <Link to="/pro" data-testid="nav-pro" className={`label-caps ${user.pro_active ? "text-[#C4B5FD]" : "hover:text-[#CCFF00]"}`}>Pro</Link>}
                 <button data-testid="logout-btn" onClick={() => { logout(); nav("/"); }} className="label-caps hover:text-[#FF4D4D]">{t("nav.logout")}</button>
               </div>
             ) : (

@@ -34,6 +34,7 @@ import EventDetail from "@/pages/EventDetail";
 import Tickets from "@/pages/Tickets";
 import GiftTicket from "@/pages/GiftTicket";
 import Security from "@/pages/Security";
+import Pro from "@/pages/Pro";
 import Onboarding from "@/pages/Onboarding";
 import HostPage from "@/pages/HostPage";
 import Upcycle from "@/pages/Upcycle";
@@ -107,6 +108,7 @@ function App() {
                 <Route path="/tickets" element={<RequireAuth><Tickets /></RequireAuth>} />
                 <Route path="/gift/:token" element={<GiftTicket />} />
                 <Route path="/security" element={<RequireAuth><Security /></RequireAuth>} />
+                <Route path="/pro" element={<Pro />} />
                 <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
                 <Route path="/studio-custom" element={<ComingSoon title="Studio Themes" accent="#CCFF00"
                   tagline="Make your profile yours."
