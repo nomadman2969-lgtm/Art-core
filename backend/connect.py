@@ -118,7 +118,8 @@ async def build_transfer_options(seller_id: str, gross_amount: float) -> dict:
     account_id = seller.get("stripe_account_id")
     if not account_id or not seller.get("stripe_charges_enabled"):
         return {}
-    settings = await _get_settings()
+    from waiver import settings_for_seller
+    settings = await settings_for_seller(seller_id, await _get_settings())
     fee_pct = float(settings["commission_percent"]) / 100.0
     application_fee_cents = int(round(gross_amount * fee_pct * 100))
     # on_behalf_of makes the seller the settlement merchant: Stripe's processing fee is

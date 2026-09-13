@@ -19,6 +19,12 @@ class SettingsUpdate(BaseModel):
     currency: Optional[str] = None
     processing_percent: Optional[float] = None
     processing_fixed: Optional[float] = None
+    waiver_enabled: Optional[bool] = None
+    waiver_days: Optional[int] = Field(default=None, ge=1, le=365)
+    waiver_max_sales: Optional[int] = Field(default=None, ge=0, le=1000)
+    founding_enabled: Optional[bool] = None
+    founding_rate: Optional[float] = Field(default=None, ge=0, le=50)
+    founding_cap: Optional[int] = Field(default=None, ge=0, le=100000)
 
 
 async def _get_settings():

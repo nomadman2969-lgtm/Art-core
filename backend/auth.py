@@ -105,6 +105,8 @@ def public_user(u: dict) -> dict:
         "approved": u.get("approved", True),
         "language": u.get("language"),
         "twofa_enabled": bool(u.get("twofa_enabled")),
+        "founding_member": bool(u.get("founding_member")),
+        "founding_number": u.get("founding_number"),
     }
 
 
@@ -131,6 +133,12 @@ async def register(req: RegisterReq):
     }
     await db.users.insert_one(user)
     await db.event_rsvps.update_many({"gift_email": user["email"], "user_id": None}, {"$set": {"user_id": user["id"]}})
+    if user["role"] == "artist":
+        from waiver import grant_waiver, grant_founding
+        from payments import get_settings as _gs
+        _settings = await _gs()
+        await grant_waiver(user["id"], user["email"], _settings)
+        await grant_founding(user["id"], _settings)
     token = make_token(user["id"], user["role"])
     return {"token": token, "user": public_user(user)}
 

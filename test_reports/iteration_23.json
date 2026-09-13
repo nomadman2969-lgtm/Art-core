@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 23 — Founding-artist rate-lock feature. Backend: 12/12 pytest pass covering (a) /api/settings exposes founding_enabled=true, founding_rate=4, founding_cap=500, founding_taken>=35, founding_left=cap-taken; (b) new artist register → founding_member true, founding_number=prev+1, locked_commission_percent=4.0, effective_commission_percent=0.0 (waiver active), standard=4; new buyer not founding; (c) CORE LOCK: with global=8, demo artist auth'd fee-preview=4.0 + founding_locked true; unauth=8.0; settings_for_seller() returns 4.0 for demo artist and 8.0 for a non-founding artist created & stripped via admin DELETEs; restored to 4; global=3 → founding artist gets 3 (min); (d) admin POST founding on already-founding user → 400 'Already a founding member', on fresh non-founding → 200 + founding_number; DELETE works; backfill returns granted count; non-admin → 403; (e) cap=taken blocks new founding, restore 500; founding_enabled=false blocks new founding, restore true; (f) regression unauth fee-preview gross=100 net=92.80. Frontend: landing founding-banner shows 'N of 500 founding spots left' (462 of 500) and 'locked at 4% for life'; demo artist /studio founding-chip visible with founding-rate text 'Your Art Core fee is locked at 4% for life'; Payouts tab fee-preview label is exactly 'Art Core fee (4% · locked)  -$4.00'; Admin Artists tab shows 38 founding-tag-{id} badges and 40 founding-grant-{id} buttons, clicking founding-grant on already-founding artist toasts 'Already a founding member'; Admin Settings tab shows founding-enabled-input/founding-rate-input/founding-cap-input and Save works ('Settings saved' toast). All admin settings restored to defaults (commission_percent=4, founding_enabled=true, founding_rate=4, founding_cap=500, waiver_days=30, waiver_max_sales=5, waiver_enabled=true).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter23_founding.py",
+    "/app/test_reports/pytest/iter23.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "waiver.effective_rate mutates via **settings shallow copy — fine because callers pass fresh dicts, but a note-worthy pattern to keep in mind if settings ever contains nested mutable state.",
+    "waiver.grant_founding computes founding_number = count+1 on each call — not concurrency safe (two simultaneous registrations could both get the same number). At current low sign-up throughput this is acceptable, but consider using $inc on a counter doc under a cap check via findAndModify for strict safety.",
+    "server.public_settings returns founding_stats() which does a count_documents on every /api/settings call — cheap now (small user table) but could be cached with short TTL if traffic grows.",
+    "waiver.founding_backfill iterates all artists with .sort('created_at', 1) — good order for deterministic numbering; ignores cap by design as documented in docstring.",
+    "waiver_admin router admin_grant (fee-waiver) at path POST /api/admin/waiver/{user_id} accepts arbitrary user_id — routing must not collide with POST /api/admin/waiver/founding/{user_id} because 'founding' is a literal segment before {user_id} in the specific route; FastAPI resolves the more specific /founding/... first — verified by the 400 'Already a founding member' response in test.",
+    "FoundingChip only renders when st.founding_member true — good; StudioParts FeePreview label uses split.founding_locked flag from server so the '· locked' badge only shows when applicable.",
+    "AdminWaiverButton toast on grant failure surfaces server detail; verified end-to-end via UI + backend 400."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter23_founding.py"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100%"},
+  "test_credentials": "admin monster@houseofmonster.com / MonsterAdmin2026!; artist demo.artist@artcorestudio.net / DemoArtist2026!; buyer demo.collector@artcorestudio.net / DemoCollector2026!.",
+  "seed_data_creation": "Throwaway users TEST_iter23_*, TEST_freshgrant_*, TEST_capblock_*, TEST_fdis_*@example.com created (unique emails, harmless). Founding count 35 → 38 after test run (3 extra founding artists granted). Demo artist founding status preserved (founding #21).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run backend: `cd /app/backend && pytest tests/test_iter23_founding.py -v -o addopts='' --junitxml=/app/test_reports/pytest/iter23.xml`. Test file uses asyncio.get_event_loop().run_until_complete(...) for unit-level settings_for_seller calls — works under pytest 9 + Python 3.11 without pytest-asyncio because we don't decorate tests as async. Fixture restore_settings (autouse, module scope) restores all six admin settings after the suite. Do NOT run this against a fresh DB where founding_taken < 35 — one test asserts founding_taken >= 35. Founding count grows by ~3 per run; if it approaches 500 you'll need to increase founding_cap first.",
+  "rca of the issue": "n/a — no defects found."
+}

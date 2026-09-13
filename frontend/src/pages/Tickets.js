@@ -1,3 +1,4 @@
+import { WalletPassButton } from "../components/events/WalletPassButton";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, fileUrl } from "../api";
@@ -142,6 +143,7 @@ function TicketQRModal({ ticket, onClose }) {
         )}
         <div className="text-xs text-zinc-600 text-center">{qrData?.user_name || "Attendee"}</div>
         <div className="text-[10px] text-zinc-400 text-center font-mono mt-1">ID {ticket.rsvp_id.slice(0, 8)}</div>
+        <WalletPassButton eventId={ticket.event.id} className="w-full !py-2 !text-black !border-black/20" />
         <button data-testid="close-ticket-qr" onClick={onClose}
           className="mt-4 w-full bg-black text-white py-2 label-caps text-xs">Close</button>
       </div>

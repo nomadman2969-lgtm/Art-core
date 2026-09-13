@@ -668,7 +668,7 @@ function FeePreview() {
       </div>
       {split && (
         <div className="grid grid-cols-3 gap-3 text-xs">
-          <div><div className="text-zinc-500">Art Core fee ({split.commission_percent}%)</div><div className="font-unbounded text-zinc-300" data-testid="fee-preview-platform">-{money(split.platform_take)}</div></div>
+          <div><div className="text-zinc-500">Art Core fee ({split.commission_percent}%{split.founding_locked ? " · locked" : ""}{split.fee_waived ? " · 0% window" : ""})</div><div className="font-unbounded text-zinc-300" data-testid="fee-preview-platform">-{money(split.platform_take)}</div></div>
           <div><div className="text-zinc-500">Card processing</div><div className="font-unbounded text-zinc-300" data-testid="fee-preview-processing">-{money(split.processing_fee)}</div></div>
           <div><div className="text-zinc-500">You receive</div><div className="font-unbounded text-[#CCFF00]" data-testid="fee-preview-net">{money(split.net)}</div></div>
         </div>

@@ -24,6 +24,12 @@ async def get_settings() -> dict:
             "deposit_percent": 50.0,
             "processing_percent": 2.9,
             "processing_fixed": 0.30,
+            "waiver_enabled": True,
+            "waiver_days": 30,
+            "waiver_max_sales": 5,
+            "founding_enabled": True,
+            "founding_rate": 4.0,
+            "founding_cap": 500,
             "aotw_artwork_id": None,
             "created_at": now_iso(),
         }
@@ -565,7 +571,12 @@ async def _apply_paid(session_id: str):
         return
     if tx["kind"] == "buyer_order":
         settings = await get_settings()
-        _splits = [split_amount(it["price"] * it["quantity"], settings) for it in tx["items"]]
+        from waiver import settings_for_seller, consume_waiver_sale
+        _seller_settings = {it["artist_id"]: await settings_for_seller(it["artist_id"], settings) for it in tx["items"]}
+        _splits = [split_amount(it["price"] * it["quantity"], _seller_settings[it["artist_id"]]) for it in tx["items"]]
+        for _aid, _ss in _seller_settings.items():
+            if _ss.get("fee_waived"):
+                await consume_waiver_sale(_aid)
         order = {
             "id": new_id(),
             "session_id": session_id,
@@ -620,9 +631,12 @@ async def _apply_paid(session_id: str):
             _artist = await db.users.find_one({"id": _art["artist_id"]}) or {}
             notify_followers_soon(_art["artist_id"], "followed_new_artwork", f"New work from {_artist.get('name', 'an artist')}", _art["title"], f"/artwork/{_art['id']}", artwork_id=_art["id"])
     elif tx["kind"] == "auction_win":
-        settings = await get_settings()
+        from waiver import settings_for_seller, consume_waiver_sale
+        settings = await settings_for_seller(tx["seller_id"], await get_settings())
         gross = float(tx["amount"])
         sp = split_amount(gross, settings)
+        if settings.get("fee_waived"):
+            await consume_waiver_sale(tx["seller_id"])
         # Detect if Stripe already routed funds via destination charge
         seller = await db.users.find_one({"id": tx["seller_id"]})
         auto_paid = bool(seller and seller.get("stripe_charges_enabled") and seller.get("stripe_account_id"))
@@ -670,9 +684,12 @@ async def _apply_paid(session_id: str):
             "read": False, "created_at": now_iso(),
         })
     elif tx["kind"] == "offer_payment":
-        settings = await get_settings()
+        from waiver import settings_for_seller, consume_waiver_sale
+        settings = await settings_for_seller(tx["seller_id"], await get_settings())
         gross = float(tx["amount"])
         sp = split_amount(gross, settings)
+        if settings.get("fee_waived"):
+            await consume_waiver_sale(tx["seller_id"])
         seller = await db.users.find_one({"id": tx["seller_id"]})
         auto_paid = bool(seller and seller.get("stripe_charges_enabled") and seller.get("stripe_account_id"))
         payout_status = "auto_transferred" if auto_paid else "pending"
@@ -721,9 +738,12 @@ async def _apply_paid(session_id: str):
             "read": False, "created_at": now_iso(),
         })
     elif tx["kind"] == "commission_payment":
-        settings = await get_settings()
+        from waiver import settings_for_seller, consume_waiver_sale
+        settings = await settings_for_seller(tx["artist_id"], await get_settings())
         gross = float(tx["amount"])
         sp = split_amount(gross, settings)
+        if settings.get("fee_waived"):
+            await consume_waiver_sale(tx["artist_id"])
         await db.commissions.update_one({"id": tx["commission_id"]}, {"$set": {
             "paid": True, "paid_at": now_iso(), "status": "paid",
             "platform_take": sp["platform_take"],

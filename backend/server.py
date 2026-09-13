@@ -7,12 +7,13 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from starlette.middleware.cors import CORSMiddleware
 
 from db import db, now_iso, new_id
-from auth import router as auth_router, hash_password
+from auth import router as auth_router, hash_password, get_optional_user
 from twofa import router as twofa_router
+from waiver import router as waiver_router, admin_router as waiver_admin_router, founding_stats
 from artworks import router as art_router
 from payments import router as payments_router
 from admin import router as admin_router, newsletter_router
@@ -42,6 +43,8 @@ app = FastAPI(title="Art Core")
 
 app.include_router(auth_router)
 app.include_router(twofa_router)
+app.include_router(waiver_router)
+app.include_router(waiver_admin_router)
 app.include_router(art_router)
 app.include_router(payments_router)
 app.include_router(admin_router)
@@ -87,14 +90,20 @@ async def public_settings():
         "processing_percent": s.get("processing_percent", 2.9),
         "processing_fixed": s.get("processing_fixed", 0.30),
         "seller_pays_processing": True,
+        "waiver_enabled": s.get("waiver_enabled", True),
+        "waiver_days": s.get("waiver_days", 30),
+        "waiver_max_sales": s.get("waiver_max_sales", 5),
+        **(await founding_stats(s)),
     }
 
 
 @app.get("/api/settings/fee-preview")
-async def fee_preview(gross: float):
+async def fee_preview(gross: float, viewer=Depends(get_optional_user)):
     from payments import get_settings as _gs, split_amount
-    settings = await _gs()
-    return {"gross": round(float(gross), 2), **split_amount(gross, settings), "commission_percent": settings["commission_percent"]}
+    from waiver import effective_rate
+    settings = effective_rate(viewer, await _gs()) if viewer else await _gs()
+    return {"gross": round(float(gross), 2), **split_amount(gross, settings), "commission_percent": settings["commission_percent"],
+            "founding_locked": bool(settings.get("founding_locked")), "fee_waived": bool(settings.get("fee_waived"))}
 
 
 app.add_middleware(
@@ -117,6 +126,11 @@ async def _reminder_loop():
             await check_event_reminders()
         except Exception as e:
             logger.error(f"Reminder sweep failed: {e}")
+        try:
+            from waiver import check_waiver_reminders
+            await check_waiver_reminders()
+        except Exception as e:
+            logger.error(f"Waiver sweep failed: {e}")
         await asyncio.sleep(600)
 
 

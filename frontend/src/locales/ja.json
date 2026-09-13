@@ -217,5 +217,45 @@
     "followed_new_artwork": "フォロー中のアーティストの新作",
     "post_liked": "投稿にいいねされました",
     "post_comment": "投稿にコメントされました"
+  },
+  "studio": {
+    "kicker": "スタジオエディター",
+    "hey": "こんにちは、{{name}}さん。",
+    "overview": "概要",
+    "theme": "テーマと外観",
+    "sections": "セクション",
+    "story": "マイストーリー",
+    "posts": "投稿",
+    "artworks": "作品",
+    "featured": "注目",
+    "requests": "リクエスト",
+    "analytics": "分析",
+    "payouts": "支払い",
+    "live_listings": "出品中",
+    "sold": "売却済み",
+    "pending_fee": "手数料未払い",
+    "net_earnings": "純収益",
+    "preview": "プレビュー"
+  },
+  "orders": {
+    "kicker": "注文履歴",
+    "title": "注文",
+    "empty": "まだ注文がありません。",
+    "selling_kicker": "発送",
+    "selling_title": "発送待ちの販売",
+    "pending": "発送待ち",
+    "shipped": "発送済み",
+    "delivered": "配達済み",
+    "tracking": "追跡",
+    "tracking_number": "追跡番号"
+  },
+  "messages": {
+    "kicker": "受信箱",
+    "title": "メッセージ",
+    "search": "会話を検索...",
+    "no_matches": "該当なし",
+    "empty": "まだ会話がありません",
+    "type": "メッセージを入力...",
+    "uploading": "アップロード中..."
   }
 }

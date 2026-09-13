@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 22 — Full backend + frontend coverage for the five new features: Founding-artist fee waiver (settings, /waiver/me, re-register block, admin +30d/revoke, settings PATCH, settings_for_seller unit, reminder sweep idempotent), Flip Quotes (quote object with sketch/note/timeline, buyer accept flow), Trusted Devices (challenge → verify with remember_device → device_token skips 2FA, list/revoke/delete-all), Wallet Pass (image/png 1080x1920 attachment for /events/{id}/my-ticket/pass.png + /events/gift/{token}/pass.png + 404 unknown), i18n extension (es studio tab-overview 'Resumen', kicker 'Editor de estudio', /orders 'Tus pedidos', /messages 'Mensajes' + 'Buscar conversaciones...'). Regression pass: fee-preview net 92.8, demo login direct token, flip/artists 200, 2FA setup→enable→disable lifecycle. 14/14 pytest pass. Playwright UI flows all pass: founding banner + CTA on /, waiver-badge with correct countdown ('30 days left · 5 fee-free sales remaining') for a freshly registered artist, demo artist has no badge (0), admin Settings tab shows all three waiver inputs, Artists tab shows 34 waiver-extend-{id} buttons and clicking triggers post-extend toast, /security trusted-devices-card correctly only renders when 2FA is enabled (verified conditional in code), /tickets ticket-qr-modal + wallet-pass-btn present and Playwright expect_download successfully saves artcore-ticket.png (58KB) without JS errors, EventDetail show-ticket-btn → wallet-pass-btn visible. Language round-trip en→es→en works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter22_waiver_flip_devices_wallet_i18n.py",
+    "/app/test_reports/pytest/iter22.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "waiver.grant_waiver blocks re-grant on same email if source='signup' in waiver_grants — correct, but note db.users.delete_one during tests must NOT drop waiver_grants (verified). Consider a boolean flag on the user record for cleaner auditability.",
+    "waiver.waiver_status computes days_left with `.days + (1 if seconds > 0 else 0)` — rounds up to at least 1 when within the same day; slight over-count if until is < 60s away but harmless UX.",
+    "twofa.is_trusted_device compares hash via hmac.compare_digest but the second .get('expires_at','') > now uses lexicographic string compare on ISO datetimes — safe because ISO-8601 with tz suffix is lexicographically monotonic when timezones match; both sides use UTC isoformat() so OK.",
+    "twofa.verify_login stores raw device_token only as its sha256 hash (good). expiry 30 days stored per-device; $slice: -10 caps the trusted-devices list — reasonable.",
+    "events.my_ticket_pass returns 404 when either event or rsvp missing, but does not check event ownership beyond rsvp existence — fine because rsvp is scoped to (event_id, user_id). Cache-Control: private, max-age=3600 is appropriate.",
+    "wallet_pass.render_pass builds a 1080x1920 PIL image on the request thread — CPU-bound sync work inside async endpoint. At current scale fine; consider run_in_executor for high concurrency.",
+    "commissions.respond stores 'quote' only on counter action but doesn't validate that timeline_days/sketch_image are only sent for flip commissions; harmless (extra fields ignored downstream for 'art' kind since the frontend gates the UI).",
+    "auth.login uses lowercase email consistently. LoginReq.device_token max_length=200 — plenty for a token_urlsafe(32) which is ~43 chars.",
+    "admin_settings PATCH accepts waiver_days/waiver_enabled/waiver_max_sales — verified round-trip. Consider log entry on any settings change for audit."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter22_waiver_flip_devices_wallet_i18n.py"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100%"},
+  "test_credentials": "admin monster@houseofmonster.com / MonsterAdmin2026!; artist demo.artist@artcorestudio.net / DemoArtist2026!; buyer demo.collector@artcorestudio.net / DemoCollector2026!. Throwaway artist/buyer users TEST_*_xxxx@example.com are created per waiver/2fa test.",
+  "seed_data_creation": "Backend test creates 5 throwaway users (TEST_iter22_/TEST_admin_/TEST_reg_/TEST_unit_/TEST_rem_/TEST_td_/TEST_reg2fa_@example.com), 1 flip commission on demo.artist + 1 free TEST_wallet_pass_event with 1 collector RSVP + 1 gift RSVP (walltok_*). Wallet-pass event and its RSVPs are deleted at end of TestWalletPass. Flip commission deleted at end of TestFlipQuotes. Throwaway users left in db.users but harmless (unique random emails). Also frontend test creates TEST_uiwaiver_*@example.com artist. Admin settings temporarily set waiver_days=45 then restored to 30.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run backend: `cd /app/backend && pytest tests/test_iter22_waiver_flip_devices_wallet_i18n.py -v -o addopts='' --junitxml=/app/test_reports/pytest/iter22.xml`. Test file adds sys.path.insert(0,'/app/backend') so unit-level imports (waiver, payments) work. /security trusted-devices-card only renders when status.enabled=true — do NOT expect the card on a fresh account without 2FA. Wallet-pass download validated via page.expect_download and PIL header check (b'\\x89PNG'). Admin waiver-extend buttons currently show 34 (one per artist). Demo accounts (older than 30d) correctly have no waiver-badge. LanguagePicker persists to localStorage + /auth/me. If further iterations need to test gift-token pass, insert an event_rsvps doc with gift_token via Mongo before calling /api/events/gift/{token}/pass.png.",
+  "rca of the issue": "n/a — no defects found."
+}

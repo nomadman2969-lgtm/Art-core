@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { FoundingBanner } from "./FoundingWaiver";
 
 const ROWS = [
   { name: "Art Core", keep: 93, accent: "#CCFF00", note: "4% fee + card processing. No listing fees, no subscription." },
@@ -14,6 +15,7 @@ export function KeepMoreStrip({ compact = false, cta = true }) {
   const { t } = useTranslation();
   return (
     <section className={`${compact ? "" : "max-w-[1600px] mx-auto px-6 md:px-12 py-24"}`} data-testid="keep-more-strip">
+      <div className="mb-6"><FoundingBanner compact={compact} /></div>
       <div className="glass-card rounded-sm p-8 md:p-14 relative overflow-hidden">
         <div className="absolute -top-32 -left-32 w-80 h-80 bg-[#CCFF00] rounded-full opacity-[0.07] blur-3xl" />
         <div className="relative grid lg:grid-cols-[1fr_1.3fr] gap-10 items-start">

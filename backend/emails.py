@@ -338,3 +338,15 @@ def otp_email_html(user_name: str, code: str, minutes: int) -> str:
 <div style="font-size:11px;color:#71717a;margin-top:20px">If you didn't try to sign in, change your password now — someone has it.</div>
 """
     return _wrap(body, "Your sign-in code")
+
+
+def waiver_ending_html(user_name: str, tail: str, commission_percent: float) -> str:
+    body = f"""
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  Your 0% window {tail}
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:24px">Hey {user_name}, heads up — your founding-artist window with <strong style="color:#fff">0% Art Core fees</strong> {tail}. After that the standard {commission_percent:g}% platform fee applies (card processing is unchanged).</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:24px">Anything you sell before then is fee-free — a good moment to list the pieces you've been sitting on.</div>
+<a href="https://artcorestudio.net/studio" style="display:inline-block;background:#CCFF00;color:#000;padding:12px 22px;text-decoration:none;font-family:Impact,Arial Black,sans-serif;letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:2px">Open your studio →</a>
+"""
+    return _wrap(body, "Your 0% window is ending")

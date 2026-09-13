@@ -217,5 +217,45 @@
     "followed_new_artwork": "팔로우한 아티스트의 새 작품",
     "post_liked": "게시물을 좋아합니다",
     "post_comment": "게시물에 댓글을 남겼습니다"
+  },
+  "studio": {
+    "kicker": "스튜디오 편집기",
+    "hey": "안녕하세요, {{name}}님.",
+    "overview": "개요",
+    "theme": "테마 & 스타일",
+    "sections": "섹션",
+    "story": "내 이야기",
+    "posts": "게시물",
+    "artworks": "작품",
+    "featured": "추천",
+    "requests": "요청",
+    "analytics": "분석",
+    "payouts": "정산",
+    "live_listings": "판매 중",
+    "sold": "판매 완료",
+    "pending_fee": "수수료 대기",
+    "net_earnings": "순수익",
+    "preview": "미리보기"
+  },
+  "orders": {
+    "kicker": "주문 내역",
+    "title": "내 주문",
+    "empty": "아직 주문이 없습니다.",
+    "selling_kicker": "배송",
+    "selling_title": "배송할 판매",
+    "pending": "배송 대기",
+    "shipped": "배송됨",
+    "delivered": "배송 완료",
+    "tracking": "배송 조회",
+    "tracking_number": "운송장 번호"
+  },
+  "messages": {
+    "kicker": "받은 편지함",
+    "title": "메시지",
+    "search": "대화 검색...",
+    "no_matches": "결과 없음",
+    "empty": "아직 대화가 없습니다",
+    "type": "메시지를 입력하세요...",
+    "uploading": "업로드 중..."
   }
 }

@@ -217,5 +217,45 @@
     "followed_new_artwork": "New work from an artist you follow",
     "post_liked": "Liked your post",
     "post_comment": "Commented on your post"
+  },
+  "studio": {
+    "kicker": "Studio Editor",
+    "hey": "Hey, {{name}}.",
+    "overview": "Overview",
+    "theme": "Theme & Look",
+    "sections": "Sections",
+    "story": "My Story",
+    "posts": "Posts",
+    "artworks": "Artworks",
+    "featured": "Featured",
+    "requests": "Requests",
+    "analytics": "Analytics",
+    "payouts": "Payouts",
+    "live_listings": "Live listings",
+    "sold": "Sold",
+    "pending_fee": "Pending fee",
+    "net_earnings": "Net earnings",
+    "preview": "Preview"
+  },
+  "orders": {
+    "kicker": "Order History",
+    "title": "Your Orders",
+    "empty": "No orders yet.",
+    "selling_kicker": "Fulfillment",
+    "selling_title": "Sales to Ship",
+    "pending": "Awaiting Shipment",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "tracking": "Tracking",
+    "tracking_number": "Tracking number"
+  },
+  "messages": {
+    "kicker": "Inbox",
+    "title": "Messages",
+    "search": "Search conversations...",
+    "no_matches": "No matches",
+    "empty": "No conversations yet",
+    "type": "Type a message...",
+    "uploading": "Uploading..."
   }
 }

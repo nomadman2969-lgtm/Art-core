@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Calendar, MapPin, Gift, CheckCircle2, QrCode } from "lucide-react";
 import { api, fileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { WalletPassButton } from "../components/events/WalletPassButton";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -45,6 +46,7 @@ export default function GiftTicket() {
             <>
               <img src={t.qr_image} alt="Ticket QR" className="w-52 h-52 bg-white p-2 rounded-sm" data-testid="gift-qr-img" />
               <div className="label-caps text-zinc-500 mt-4 flex items-center gap-1"><QrCode size={11} /> Show this at the door</div>
+              <WalletPassButton giftToken={token} className="mt-4 w-full !py-2" />
               {t.checked_in && <div className="text-[#CCFF00] text-xs mt-2 flex items-center gap-1"><CheckCircle2 size={12} /> Checked in</div>}
             </>
           ) : <div className="font-mono text-xs text-zinc-400 break-all">{t.qr_payload}</div>}

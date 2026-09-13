@@ -6,6 +6,7 @@ import { DisputesPanel } from "../components/admin/DisputesPanel";
 import { ReportsPanel } from "../components/admin/ReportsPanel";
 import { StaffPicksPanel } from "../components/admin/StaffPicksPanel";
 import { StripeSetupCard } from "../components/admin/StripeSetupCard";
+import { AdminWaiverButton } from "../components/FoundingWaiver";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -39,6 +40,12 @@ export default function AdminDashboard() {
       currency: settings.currency,
       processing_percent: Number(settings.processing_percent ?? 2.9),
       processing_fixed: Number(settings.processing_fixed ?? 0.3),
+      waiver_enabled: !!(settings.waiver_enabled ?? true),
+      waiver_days: Number(settings.waiver_days ?? 30),
+      waiver_max_sales: Number(settings.waiver_max_sales ?? 5),
+      founding_enabled: !!(settings.founding_enabled ?? true),
+      founding_rate: Number(settings.founding_rate ?? 4),
+      founding_cap: Number(settings.founding_cap ?? 500),
     });
     toast.success("Settings saved");
   };
@@ -120,6 +127,32 @@ export default function AdminDashboard() {
               onChange={(e) => setSettings({ ...settings, processing_fixed: e.target.value })}
               className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
           </Row>
+          <Row label="Founding 0% window">
+            <label className="flex items-center gap-2 text-sm"><input data-testid="waiver-enabled-input" type="checkbox" checked={settings.waiver_enabled ?? true} onChange={(e) => setSettings({ ...settings, waiver_enabled: e.target.checked })} className="accent-[#CCFF00]" /> Enabled for new artists</label>
+          </Row>
+          <Row label="Window length (days)">
+            <input data-testid="waiver-days-input" type="number" min="1" max="365" value={settings.waiver_days ?? 30}
+              onChange={(e) => setSettings({ ...settings, waiver_days: e.target.value })}
+              className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
+          </Row>
+          <Row label="Max fee-free sales">
+            <input data-testid="waiver-sales-input" type="number" min="0" max="1000" value={settings.waiver_max_sales ?? 5}
+              onChange={(e) => setSettings({ ...settings, waiver_max_sales: e.target.value })}
+              className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
+          </Row>
+          <Row label="Founding rate lock">
+            <label className="flex items-center gap-2 text-sm"><input data-testid="founding-enabled-input" type="checkbox" checked={settings.founding_enabled ?? true} onChange={(e) => setSettings({ ...settings, founding_enabled: e.target.checked })} className="accent-[#CCFF00]" /> New artists lock the founding rate for life (while spots remain)</label>
+          </Row>
+          <Row label="Founding rate (%)">
+            <input data-testid="founding-rate-input" type="number" step="0.5" min="0" max="50" value={settings.founding_rate ?? 4}
+              onChange={(e) => setSettings({ ...settings, founding_rate: e.target.value })}
+              className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
+          </Row>
+          <Row label="Founding spots (cap)">
+            <input data-testid="founding-cap-input" type="number" min="0" max="100000" value={settings.founding_cap ?? 500}
+              onChange={(e) => setSettings({ ...settings, founding_cap: e.target.value })}
+              className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
+          </Row>
           <Row label="Upload fee (USD)">
             <input data-testid="fee-input" type="number" step="0.5" value={settings.upload_fee}
               onChange={(e) => setSettings({ ...settings, upload_fee: e.target.value })}
@@ -190,7 +223,8 @@ export default function AdminDashboard() {
           {artists.map((a) => (
             <div key={a.id} className="p-4 flex items-center flex-wrap gap-4">
               <div className="flex-1 min-w-[200px]">
-                <div className="font-unbounded text-lg font-semibold">{a.name}</div>
+                <div className="font-unbounded text-lg font-semibold">{a.name}{a.founding_member && <span className="ml-2 label-caps text-[9px] text-[#CCFF00] border border-[#CCFF00]/30 px-1.5 py-0.5 rounded-sm align-middle" data-testid={`founding-tag-${a.id}`}>Founding #{a.founding_number}</span>}</div>
+                <div className="mt-1"><AdminWaiverButton userId={a.id} /></div>
                 <div className="text-zinc-500 text-xs">{a.email}</div>
               </div>
               <Link to={`/artist/${a.id}`} className="label-caps hover:text-[#CCFF00]">Portfolio</Link>

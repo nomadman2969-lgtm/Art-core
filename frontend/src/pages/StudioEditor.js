@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { AnalyticsPanel } from "../components/studio/AnalyticsPanel";
+import { WaiverBadge } from "../components/FoundingWaiver";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Plus, Gavel, Sparkles, Eye, Palette as PaletteIcon } from "lucide-react";
 import {
@@ -14,6 +16,7 @@ import {
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
 export function StudioEditor() {
+  const { t } = useTranslation();
   const { user, refresh } = useAuth();
   const nav = useNavigate();
   const [tab, setTab] = useState("overview");
@@ -106,24 +109,24 @@ export function StudioEditor() {
   const hasDraft = !!config.draft;
 
   const tabs = [
-    ["overview", "Overview"],
-    ["theme", "Theme & Look"],
-    ["sections", "Sections"],
-    ["story", "My Story"],
-    ["posts", "Posts"],
-    ["artworks", "Artworks"],
-    ["featured", "Featured"],
-    ["requests", "Requests"],
-    ["analytics", "Analytics"],
-    ["payouts", "Payouts"],
+    ["overview", t("studio.overview")],
+    ["theme", t("studio.theme")],
+    ["sections", t("studio.sections")],
+    ["story", t("studio.story")],
+    ["posts", t("studio.posts")],
+    ["artworks", t("studio.artworks")],
+    ["featured", t("studio.featured")],
+    ["requests", t("studio.requests")],
+    ["analytics", t("studio.analytics")],
+    ["payouts", t("studio.payouts")],
   ];
 
   return (
     <div data-testid="studio-editor" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-14 pb-32">
       <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
         <div>
-          <div className="label-caps text-[#CCFF00]"><PaletteIcon size={12} className="inline mr-2" /> Studio Editor</div>
-          <h1 className="font-anton text-5xl md:text-7xl uppercase mt-3">Hey, {user.name}.</h1>
+          <div className="label-caps text-[#CCFF00]"><PaletteIcon size={12} className="inline mr-2" /> {t("studio.kicker")}</div>
+          <h1 className="font-anton text-5xl md:text-7xl uppercase mt-3">{t("studio.hey", { name: user.name })}</h1>
           <div className="text-zinc-500 text-sm mt-2">
             {hasDraft ? <span className="text-[#F5A623]">You have unpublished changes.</span> : "Visitors see the published version."}
             {dirty && <span className="text-[#F5A623] ml-2">saving...</span>}
@@ -156,11 +159,12 @@ export function StudioEditor() {
 
       {tab === "overview" && (
         <>
+          <div className="mb-6"><WaiverBadge /></div>
           <div className="grid md:grid-cols-4 gap-4 mb-12">
-            <Stat label="Live listings" value={dashboard.listings.live} accent="#FFFFFF" />
-            <Stat label="Sold" value={dashboard.listings.sold} accent="#CCFF00" />
-            <Stat label="Pending fee" value={dashboard.listings.pending_fee} accent="#FF4D4D" />
-            <Stat label="Net earnings" value={`$${dashboard.total_net.toLocaleString()}`} accent="#7C3AED" />
+            <Stat label={t("studio.live_listings")} value={dashboard.listings.live} accent="#FFFFFF" />
+            <Stat label={t("studio.sold")} value={dashboard.listings.sold} accent="#CCFF00" />
+            <Stat label={t("studio.pending_fee")} value={dashboard.listings.pending_fee} accent="#FF4D4D" />
+            <Stat label={t("studio.net_earnings")} value={`$${dashboard.total_net.toLocaleString()}`} accent="#7C3AED" />
           </div>
           <SectionH title="Quick Start Templates">
             <TemplatesPicker save={saveConfig} />
@@ -182,7 +186,7 @@ export function StudioEditor() {
           </SectionH>
           <div className="mt-10 grid md:grid-cols-2 gap-4">
             <Link to={`/artist/${user.id}?preview=1`} className="glass-card p-8 rounded-sm hover-lift-card block">
-              <div className="label-caps text-[#CCFF00]">Preview</div>
+              <div className="label-caps text-[#CCFF00]">{t("studio.preview")}</div>
               <div className="font-anton text-3xl mt-2">See your studio →</div>
             </Link>
             <button onClick={() => setTab("theme")} className="glass-card p-8 rounded-sm hover-lift-card text-left">

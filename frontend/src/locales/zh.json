@@ -217,5 +217,45 @@
     "followed_new_artwork": "你关注的艺术家发布了新作",
     "post_liked": "赞了你的帖子",
     "post_comment": "评论了你的帖子"
+  },
+  "studio": {
+    "kicker": "工作室编辑器",
+    "hey": "你好，{{name}}。",
+    "overview": "概览",
+    "theme": "主题与外观",
+    "sections": "板块",
+    "story": "我的故事",
+    "posts": "帖子",
+    "artworks": "作品",
+    "featured": "精选",
+    "requests": "请求",
+    "analytics": "数据分析",
+    "payouts": "结算",
+    "live_listings": "在售作品",
+    "sold": "已售出",
+    "pending_fee": "待付费用",
+    "net_earnings": "净收入",
+    "preview": "预览"
+  },
+  "orders": {
+    "kicker": "订单记录",
+    "title": "我的订单",
+    "empty": "暂无订单。",
+    "selling_kicker": "发货",
+    "selling_title": "待发货的销售",
+    "pending": "等待发货",
+    "shipped": "已发货",
+    "delivered": "已送达",
+    "tracking": "物流",
+    "tracking_number": "物流单号"
+  },
+  "messages": {
+    "kicker": "收件箱",
+    "title": "消息",
+    "search": "搜索会话...",
+    "no_matches": "无匹配结果",
+    "empty": "还没有会话",
+    "type": "输入消息...",
+    "uploading": "上传中..."
   }
 }

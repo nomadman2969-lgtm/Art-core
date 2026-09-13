@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, fileUrl } from "../api";
@@ -30,6 +31,7 @@ function fmtTime(iso) {
 }
 
 export function MessagesInbox() {
+  const { t } = useTranslation();
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -46,18 +48,18 @@ export function MessagesInbox() {
 
   return (
     <div data-testid="messages-inbox" className="max-w-3xl mx-auto px-4 md:px-6 pt-16 pb-32">
-      <div className="label-caps text-[#CCFF00]">Inbox</div>
-      <h1 className="font-anton text-5xl md:text-7xl uppercase mt-3">Messages</h1>
+      <div className="label-caps text-[#CCFF00]">{t("messages.kicker")}</div>
+      <h1 className="font-anton text-5xl md:text-7xl uppercase mt-3">{t("messages.title")}</h1>
       <div className="relative mt-8 mb-6">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
         <input data-testid="messages-search" value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder="Search conversations..."
+          placeholder={t("messages.search")}
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm pl-9 pr-3 py-3 outline-none focus:border-[#CCFF00]" />
       </div>
       {loading && threads.length === 0 ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
         threads.length === 0 ? (
           <div className="border border-dashed border-white/10 py-16 text-center rounded-sm">
-            <div className="label-caps text-zinc-500">{q ? "No matches" : "No conversations yet"}</div>
+            <div className="label-caps text-zinc-500">{q ? t("messages.no_matches") : t("messages.empty")}</div>
             {!q && <div className="text-sm text-zinc-400 mt-4">Message an artist from their Studio to start.</div>}
           </div>
         ) : (
@@ -89,6 +91,7 @@ export function MessagesInbox() {
 }
 
 export function MessageThread() {
+  const { t } = useTranslation();
   const { userId } = useParams();
   const nav = useNavigate();
   const { user } = useAuth();
@@ -276,7 +279,7 @@ export function MessageThread() {
             <Palette size={14} />
           </button>
           <input data-testid="message-input" value={text} onChange={(e) => onTextChange(e.target.value)}
-            placeholder={uploading ? "Uploading..." : "Type a message..."} disabled={uploading || sending}
+            placeholder={uploading ? t("messages.uploading") : t("messages.type")} disabled={uploading || sending}
             className="flex-1 bg-transparent border border-white/12 px-3 py-2 text-sm outline-none focus:border-[#CCFF00] rounded-sm" />
           <button data-testid="message-send" disabled={sending || uploading || (!text.trim() && !attachment)} className="btn-lime !py-2 !px-3"><Send size={14} /></button>
         </form>

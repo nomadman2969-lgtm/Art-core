@@ -217,5 +217,45 @@
     "followed_new_artwork": "Neues Werk eines Künstlers, dem du folgst",
     "post_liked": "Gefällt dein Beitrag",
     "post_comment": "Hat deinen Beitrag kommentiert"
+  },
+  "studio": {
+    "kicker": "Studio-Editor",
+    "hey": "Hey, {{name}}.",
+    "overview": "Übersicht",
+    "theme": "Thema & Look",
+    "sections": "Bereiche",
+    "story": "Meine Story",
+    "posts": "Beiträge",
+    "artworks": "Werke",
+    "featured": "Hervorgehoben",
+    "requests": "Anfragen",
+    "analytics": "Statistiken",
+    "payouts": "Auszahlungen",
+    "live_listings": "Aktive Werke",
+    "sold": "Verkauft",
+    "pending_fee": "Gebühr offen",
+    "net_earnings": "Nettoeinnahmen",
+    "preview": "Vorschau"
+  },
+  "orders": {
+    "kicker": "Bestellverlauf",
+    "title": "Deine Bestellungen",
+    "empty": "Noch keine Bestellungen.",
+    "selling_kicker": "Versand",
+    "selling_title": "Zu versendende Verkäufe",
+    "pending": "Wartet auf Versand",
+    "shipped": "Versendet",
+    "delivered": "Zugestellt",
+    "tracking": "Sendungsverfolgung",
+    "tracking_number": "Sendungsnummer"
+  },
+  "messages": {
+    "kicker": "Posteingang",
+    "title": "Nachrichten",
+    "search": "Unterhaltungen suchen...",
+    "no_matches": "Keine Treffer",
+    "empty": "Noch keine Unterhaltungen",
+    "type": "Nachricht schreiben...",
+    "uploading": "Wird hochgeladen..."
   }
 }

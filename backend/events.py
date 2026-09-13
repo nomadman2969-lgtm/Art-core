@@ -1096,6 +1096,42 @@ async def gift_ticket(token: str):
     }
 
 
+def _pass_response(png: bytes, filename: str):
+    from fastapi.responses import Response
+    return Response(content=png, media_type="image/png", headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "private, max-age=3600"})
+
+
+def _where(ev: dict) -> str:
+    loc = ev.get("location") or {}
+    return ", ".join([x for x in [loc.get("venue"), loc.get("address"), loc.get("city")] if x]) or "TBA"
+
+
+@router.get("/gift/{token}/pass.png")
+async def gift_ticket_pass(token: str):
+    from wallet_pass import render_pass
+    rsvp = await db.event_rsvps.find_one({"gift_token": token})
+    if not rsvp:
+        raise HTTPException(404, "Gift ticket not found")
+    ev = await db.events.find_one({"id": rsvp["event_id"]}) or {}
+    png = render_pass(ev.get("title", "Event"), ev.get("start_at", ""), _where(ev), rsvp.get("user_name") or "Guest",
+                      _qr_png(f"artcore:ticket:{rsvp['id']}:{rsvp['event_id']}"), rsvp["id"], subtitle="Gift ticket")
+    return _pass_response(png, f"artcore-ticket-{rsvp['id'][:8]}.png")
+
+
+@router.get("/{event_id}/my-ticket/pass.png")
+async def my_ticket_pass(event_id: str, user: dict = Depends(get_current_user)):
+    from wallet_pass import render_pass
+    ev = await db.events.find_one({"id": event_id})
+    rsvp = await db.event_rsvps.find_one({"event_id": event_id, "user_id": user["id"]})
+    if not ev or not rsvp:
+        raise HTTPException(404, "You don't have a ticket for this event")
+    if rsvp.get("refunded") or ev.get("cancelled"):
+        raise HTTPException(400, "Ticket is no longer valid")
+    png = render_pass(ev["title"], ev.get("start_at", ""), _where(ev), rsvp.get("user_name") or user["name"],
+                      _qr_png(f"artcore:ticket:{rsvp['id']}:{event_id}"), rsvp["id"])
+    return _pass_response(png, f"artcore-ticket-{rsvp['id'][:8]}.png")
+
+
 @router.get("/gift/{token}/qr.png")
 async def gift_ticket_qr(token: str):
     from fastapi.responses import Response

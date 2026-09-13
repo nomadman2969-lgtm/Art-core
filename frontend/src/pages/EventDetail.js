@@ -9,6 +9,7 @@ import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { BroadcastModal } from "../components/events/BroadcastModal";
 import { GiftTicketDialog } from "../components/events/GiftTicketDialog";
+import { WalletPassButton } from "../components/events/WalletPassButton";
 import { shareEvent, toggleSaveEvent } from "./Events";
 import { ReportButton } from "../components/ReportButton";
 import { Bookmark, Share2, Globe, ExternalLink, CalendarPlus, Building2, Gift } from "lucide-react";
@@ -319,6 +320,7 @@ export default function EventDetail() {
                   </div>
                   <button data-testid="hide-ticket-btn" onClick={() => setShowTicket(false)}
                     className="btn-ghost w-full mt-3 !py-2 text-xs">{t("event.hide_qr")}</button>
+                  <WalletPassButton eventId={ev.id} className="w-full mt-2 !py-2" />
                 </>
               ) : (
                 <button data-testid="show-ticket-btn" onClick={() => setShowTicket(true)}

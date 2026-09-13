@@ -217,5 +217,45 @@
     "followed_new_artwork": "Nuova opera da un artista che segui",
     "post_liked": "Ha messo mi piace al tuo post",
     "post_comment": "Ha commentato il tuo post"
+  },
+  "studio": {
+    "kicker": "Editor dello studio",
+    "hey": "Ciao, {{name}}.",
+    "overview": "Panoramica",
+    "theme": "Tema e stile",
+    "sections": "Sezioni",
+    "story": "La mia storia",
+    "posts": "Post",
+    "artworks": "Opere",
+    "featured": "In evidenza",
+    "requests": "Richieste",
+    "analytics": "Statistiche",
+    "payouts": "Pagamenti",
+    "live_listings": "Opere attive",
+    "sold": "Vendute",
+    "pending_fee": "Tariffa in sospeso",
+    "net_earnings": "Guadagni netti",
+    "preview": "Anteprima"
+  },
+  "orders": {
+    "kicker": "Storico ordini",
+    "title": "I tuoi ordini",
+    "empty": "Ancora nessun ordine.",
+    "selling_kicker": "Spedizioni",
+    "selling_title": "Vendite da spedire",
+    "pending": "In attesa di spedizione",
+    "shipped": "Spedito",
+    "delivered": "Consegnato",
+    "tracking": "Tracciamento",
+    "tracking_number": "Numero di tracciamento"
+  },
+  "messages": {
+    "kicker": "Posta",
+    "title": "Messaggi",
+    "search": "Cerca conversazioni...",
+    "no_matches": "Nessun risultato",
+    "empty": "Ancora nessuna conversazione",
+    "type": "Scrivi un messaggio...",
+    "uploading": "Caricamento..."
   }
 }

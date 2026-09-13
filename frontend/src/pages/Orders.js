@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, fileUrl } from "../api";
@@ -15,6 +16,7 @@ const FULFILLMENT_META = {
 };
 
 export function Orders() {
+  const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -22,12 +24,12 @@ export function Orders() {
   }, []);
   return (
     <div data-testid="orders-page" className="max-w-3xl mx-auto px-6 md:px-12 pt-16 pb-32">
-      <div className="label-caps text-[#CCFF00]"><Package size={12} className="inline mr-2" /> Order History</div>
-      <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-10">Your Orders</h1>
-      {loading ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
+      <div className="label-caps text-[#CCFF00]"><Package size={12} className="inline mr-2" /> {t("orders.kicker")}</div>
+      <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-10">{t("orders.title")}</h1>
+      {loading ? <div className="text-zinc-500 py-16 text-center label-caps">{t("common.loading")}</div> :
         orders.length === 0 ? (
           <div className="border border-dashed border-white/10 py-20 text-center rounded-sm">
-            <div className="label-caps text-zinc-500">No orders yet.</div>
+            <div className="label-caps text-zinc-500">{t("orders.empty")}</div>
             <Link to="/marketplace" className="btn-lime mt-6 inline-flex">Browse Marketplace</Link>
           </div>
         ) : (
@@ -58,6 +60,7 @@ export function Orders() {
 }
 
 export function SellingOrders() {
+  const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -65,9 +68,9 @@ export function SellingOrders() {
   }, []);
   return (
     <div data-testid="selling-orders-page" className="max-w-3xl mx-auto px-6 md:px-12 pt-16 pb-32">
-      <div className="label-caps text-[#7C3AED]"><Package size={12} className="inline mr-2" /> Fulfillment</div>
-      <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-10">Sales to Ship</h1>
-      {loading ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
+      <div className="label-caps text-[#7C3AED]"><Package size={12} className="inline mr-2" /> {t("orders.selling_kicker")}</div>
+      <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-10">{t("orders.selling_title")}</h1>
+      {loading ? <div className="text-zinc-500 py-16 text-center label-caps">{t("common.loading")}</div> :
         orders.length === 0 ? (
           <div className="border border-dashed border-white/10 py-20 text-center rounded-sm">
             <div className="label-caps text-zinc-500">No sales yet.</div>
