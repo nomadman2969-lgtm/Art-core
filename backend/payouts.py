@@ -60,6 +60,31 @@ async def release_on_delivery(order: dict) -> list:
     return payouts
 
 
+def freeze_payouts(order: dict, reason: str) -> list:
+    """Dispute / not-received → stop the release clock until an admin resolves."""
+    payouts = order.get("artist_payouts", [])
+    for p in payouts:
+        if p.get("status") == "held":
+            p["frozen_release_at"] = p.get("release_at")
+            p["release_at"] = None
+            p["hold_reason"] = reason
+    return payouts
+
+
+async def unfreeze_payouts(order: dict) -> list:
+    """Dispute rejected → treat as delivered and restart the 2-day (Pro: now) countdown."""
+    payouts = order.get("artist_payouts", [])
+    for p in payouts:
+        if p.get("status") != "held" or p.get("release_at"):
+            continue
+        artist = await db.users.find_one({"id": p["artist_id"]})
+        delay = 0 if _is_pro(artist) else DELIVERY_DELAY_DAYS
+        p["release_at"] = (_now() + timedelta(days=delay)).isoformat()
+        p["hold_reason"] = "dispute_rejected"
+        p.pop("frozen_release_at", None)
+    return payouts
+
+
 async def release_due_payouts() -> int:
     """Sweep: transfer every held payout whose release_at has passed."""
     from connect import transfer_manual

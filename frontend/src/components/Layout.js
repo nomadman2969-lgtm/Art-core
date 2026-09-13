@@ -7,6 +7,7 @@ import { api } from "../api";
 import { ShoppingBag, User2, Menu, X, Search, MessageSquare, Bell, Compass } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { LanguagePicker } from "./LanguagePicker";
+import DeliveryConfirmModal from "./orders/DeliveryConfirmModal";
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -147,6 +148,7 @@ export default function Layout({ children }) {
       </header>
 
       <main className="fade-up">{children}</main>
+      <DeliveryConfirmModal />
 
       <footer className="border-t border-white/5 mt-32">
         <div className="max-w-[1600px] mx-auto px-6 md:px-12 py-16 grid md:grid-cols-5 gap-12">

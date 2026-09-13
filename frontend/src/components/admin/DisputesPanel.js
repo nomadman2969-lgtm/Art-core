@@ -59,6 +59,13 @@ export function DisputesPanel() {
                       Order #{d.order_id.slice(0, 8)} · ${Number(d.order?.total || 0).toLocaleString()} · Buyer {d.buyer?.name} · Seller {d.seller?.name || "—"} · {new Date(d.created_at).toLocaleDateString()}
                     </div>
                     <div className="text-sm text-zinc-300 mt-2"><span className="text-[#F5A623] label-caps text-[10px] mr-2">{REASON_LABELS[d.reason]}</span>{d.description}</div>
+                    {d.tracking_proof && (
+                      <div className="mt-2 text-xs font-mono text-zinc-300 bg-white/[0.03] border border-white/8 rounded-sm px-3 py-2 inline-block" data-testid={`tracking-proof-${d.id}`}>
+                        Tracking proof: {d.tracking_proof.carrier} · {d.tracking_proof.tracking}
+                        {d.tracking_proof.carrier_delivered_at && <> · carrier delivered {new Date(d.tracking_proof.carrier_delivered_at).toLocaleDateString()} ({d.tracking_proof.source})</>}
+                        {d.auto_opened && <span className="ml-2 text-[#FF4D4D]">auto-opened via not-received prompt · payout frozen</span>}
+                      </div>
+                    )}
                     {d.images?.length > 0 && (
                       <div className="flex gap-2 mt-2">{d.images.map((im, i) => <img key={i} src={resolveImg(im)} alt="" className="w-14 h-14 object-cover rounded-sm border border-white/10" />)}</div>
                     )}

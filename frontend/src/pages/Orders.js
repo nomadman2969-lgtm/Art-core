@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, fileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import { Package, Star, Download, Truck, CheckCircle2 } from "lucide-react";
+import { Package, Star, Download, Truck, CheckCircle2, PackageCheck, PackageX, ShieldCheck } from "lucide-react";
 import { CertificateButton, DisputePanel } from "../components/orders/OrderExtras";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
@@ -12,7 +12,9 @@ const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 const FULFILLMENT_META = {
   pending: { label: "Awaiting Shipment", color: "#F5A623" },
   shipped: { label: "Shipped", color: "#7C3AED" },
+  carrier_delivered: { label: "Delivered — awaiting buyer confirmation", color: "#F5A623" },
   delivered: { label: "Delivered", color: "#CCFF00" },
+  not_received: { label: "Not received — under review", color: "#FF4D4D" },
 };
 
 export function Orders() {
@@ -127,6 +129,11 @@ export function OrderDetail() {
     } catch { toast.error("Order not found"); }
   };
   useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    const h = (e) => { if (e.detail?.id === id) load(); };
+    window.addEventListener("order-updated", h);
+    return () => window.removeEventListener("order-updated", h);
+  }, [id]);
 
   const submitReview = async () => {
     setPosting(true);
@@ -153,8 +160,29 @@ export function OrderDetail() {
   const markDelivered = async () => {
     setShipBusy(true);
     try {
-      await api.post(`/orders/${id}/mark-delivered`);
-      toast.success("Delivery confirmed");
+      await api.post(`/orders/${id}/confirm-received`);
+      toast.success("Delivery confirmed — payout scheduled");
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+    setShipBusy(false);
+  };
+
+  const notReceived = async () => {
+    if (!window.confirm("Report this item as not received? We'll freeze the artist's payout and open a case with the tracking proof attached.")) return;
+    setShipBusy(true);
+    try {
+      await api.post(`/orders/${id}/not-received`);
+      toast.success("Reported — payout frozen, case opened");
+      load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+    setShipBusy(false);
+  };
+
+  const carrierDelivered = async () => {
+    setShipBusy(true);
+    try {
+      await api.post(`/orders/${id}/carrier-delivered`);
+      toast.success("Buyer asked to confirm delivery");
       load();
     } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
     setShipBusy(false);
@@ -193,7 +221,7 @@ export function OrderDetail() {
         </div>
         {isSeller && fulfill.status === "pending" && (
           <form onSubmit={submitShip} className="mt-4 pt-4 border-t border-white/8 space-y-3" data-testid="ship-form">
-            <div className="text-[11px] text-zinc-500" data-testid="tracking-required-note">Tracking is required. Your payout releases 2 days after the collector confirms delivery — or 10 business days after the sale if they don't.</div>
+            <div className="text-[11px] text-zinc-500" data-testid="tracking-required-note">Tracking is required — you can't mark an order shipped without it. When tracking shows delivered, the collector must confirm receipt (or report it missing); your payout releases 2 days after confirmation, or 10 business days after the sale if they never answer.</div>
             <div className="grid md:grid-cols-2 gap-3">
               <input required placeholder="Carrier (USPS, UPS...)" value={shipForm.carrier}
                 data-testid="ship-carrier"
@@ -212,16 +240,42 @@ export function OrderDetail() {
             </button>
           </form>
         )}
-        {isBuyer && fulfill.status === "shipped" && (
-          <div className="mt-4 pt-4 border-t border-white/8">
-            <button data-testid="mark-delivered-btn" disabled={shipBusy} onClick={markDelivered} className="btn-lime !py-2 !text-xs">
-              <CheckCircle2 size={12} className="mr-2" />{shipBusy ? "..." : "Confirm Delivered — Release Payout"}
+        {isSeller && fulfill.status === "shipped" && (
+          <div className="mt-4 pt-4 border-t border-white/8" data-testid="seller-shipped-panel">
+            <button data-testid="carrier-delivered-btn" disabled={shipBusy} onClick={carrierDelivered} className="btn-violet !py-2 !text-xs">
+              <PackageCheck size={12} className="mr-2" />{shipBusy ? "..." : "Tracking shows delivered"}
             </button>
-            <div className="text-xs text-zinc-500 mt-2">Confirms receipt and releases the artist payout.</div>
+            <div className="text-xs text-zinc-500 mt-2">Once tracking says delivered, tap this — the collector is prompted to confirm receipt. If they don't answer within 3 days, delivery is confirmed automatically. (Also auto-flagged 7 days after shipping.)</div>
           </div>
         )}
+        {isBuyer && ["shipped", "carrier_delivered"].includes(fulfill.status) && (
+          <div className="mt-4 pt-4 border-t border-white/8" data-testid="buyer-confirm-panel">
+            {fulfill.status === "carrier_delivered" && (
+              <div className="text-xs text-[#F5A623] mb-3 flex items-center gap-2" data-testid="carrier-delivered-note">
+                <ShieldCheck size={12} /> Tracking shows delivered{fulfill.carrier_delivered_at ? ` on ${new Date(fulfill.carrier_delivered_at).toLocaleDateString()}` : ""}. Please confirm.
+                {fulfill.confirm_deadline && <span className="text-zinc-500">Auto-confirms {new Date(fulfill.confirm_deadline).toLocaleDateString()}.</span>}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-3">
+              <button data-testid="mark-delivered-btn" disabled={shipBusy} onClick={markDelivered} className="btn-lime !py-2 !text-xs">
+                <CheckCircle2 size={12} className="mr-2" />{shipBusy ? "..." : "I received my item"}
+              </button>
+              <button data-testid="not-received-btn" disabled={shipBusy} onClick={notReceived}
+                className="!py-2 px-4 text-xs font-semibold uppercase tracking-widest rounded-sm border border-[#FF4D4D]/60 text-[#FF4D4D] hover:bg-[#FF4D4D]/10 transition-colors inline-flex items-center">
+                <PackageX size={12} className="mr-2" /> I did not receive it
+              </button>
+            </div>
+            <div className="text-xs text-zinc-500 mt-2">Confirming receipt schedules the artist payout. Reporting not-received freezes it and opens a case.</div>
+          </div>
+        )}
+        {isSeller && fulfill.status === "carrier_delivered" && (
+          <div className="text-xs text-[#F5A623] mt-3" data-testid="seller-awaiting-note">Waiting for the collector to confirm receipt{fulfill.confirm_deadline ? ` — auto-confirms ${new Date(fulfill.confirm_deadline).toLocaleDateString()}` : ""}.</div>
+        )}
+        {fulfill.status === "not_received" && (
+          <div className="text-xs text-[#FF4D4D] mt-3" data-testid="not-received-note">Collector reported this item as not received. Payout is frozen while Art Core reviews the tracking proof.</div>
+        )}
         {fulfill.status === "delivered" && (
-          <div className="text-xs text-zinc-500 mt-3">Delivered {fulfill.delivered_at ? new Date(fulfill.delivered_at).toLocaleDateString() : ""}. Payouts released.</div>
+          <div className="text-xs text-zinc-500 mt-3">Delivered {fulfill.delivered_at ? new Date(fulfill.delivered_at).toLocaleDateString() : ""}{fulfill.confirmed_how === "auto" ? " (auto-confirmed)" : ""}. Payout scheduled.</div>
         )}
       </div>
 

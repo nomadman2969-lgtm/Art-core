@@ -74,29 +74,17 @@ async def ship_order(oid: str, req: ShipReq, user: dict = Depends(get_current_us
 
 @router.post("/orders/{oid}/mark-delivered")
 async def mark_delivered(oid: str, user: dict = Depends(get_current_user)):
-    """Buyer confirms delivery (releases payout markers)."""
+    """Buyer confirms delivery (legacy alias of /confirm-received)."""
     o = await db.orders.find_one({"id": oid})
     if not o:
         raise HTTPException(404, "Not found")
     if o.get("buyer_id") != user["id"] and user["role"] != "admin":
         raise HTTPException(403, "Not the buyer")
     current = (o.get("fulfillment") or {}).get("status", "pending")
-    if current not in ("shipped",):
+    if current not in ("shipped", "carrier_delivered"):
         raise HTTPException(400, f"Cannot mark delivered — status is {current}")
-    from payouts import release_on_delivery
-    payouts = await release_on_delivery(o)
-    await db.orders.update_one({"id": oid}, {"$set": {
-        "fulfillment.status": "delivered",
-        "fulfillment.delivered_at": now_iso(),
-        "artist_payouts": payouts,
-    }})
-    for p in payouts:
-        await db.notifications.insert_one({
-            "id": new_id(), "user_id": p["artist_id"], "kind": "payout_released",
-            "order_id": oid, "artwork_id": p["artwork_id"], "amount": p["net"],
-            "read": False, "created_at": now_iso(),
-        })
-    return await _enrich_order(await db.orders.find_one({"id": oid}))
+    from delivery import confirm_received
+    return await _enrich_order(await confirm_received(o, "buyer", by=user["id"]))
 
 
 @router.get("/orders/{oid}")

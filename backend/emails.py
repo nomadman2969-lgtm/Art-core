@@ -328,6 +328,19 @@ def gift_reminder_html(recipient_name: str, event_title: str, event_when: str, e
     return _wrap(body, "See you tomorrow")
 
 
+def delivery_confirm_html(user_name: str, order_id: str, carrier: str, tracking: str, order_url: str, window_days: int) -> str:
+    body = f"""
+<div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
+  Did your order arrive?
+</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:20px">Hey {user_name}, tracking shows your order <strong style="color:#fff">#{order_id[:8]}</strong> was delivered.</div>
+<div style="font-family:Courier New,monospace;font-size:13px;color:#CCFF00;background:rgba(204,255,0,0.06);border:1px solid rgba(204,255,0,0.3);border-radius:4px;padding:14px;margin-bottom:20px">{carrier or '—'} · {tracking or '—'}</div>
+<div style="color:#a1a1aa;font-size:13px;margin-bottom:24px">Please open Art Core and tell us whether you <strong style="color:#fff">received it</strong> or <strong style="color:#FF4D4D">did not receive it</strong>. This protects you and the artist. If we don't hear from you within {window_days} days, the order is confirmed automatically.</div>
+<a href="{order_url}" style="display:inline-block;background:#CCFF00;color:#000;padding:12px 22px;text-decoration:none;font-family:Impact,Arial Black,sans-serif;letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:2px">Confirm delivery →</a>
+"""
+    return _wrap(body, "Did your order arrive?")
+
+
 def otp_email_html(user_name: str, code: str, minutes: int) -> str:
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">

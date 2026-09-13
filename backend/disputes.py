@@ -79,7 +79,8 @@ async def open_dispute(oid: str, req: DisputeCreate, user: dict = Depends(get_cu
         "created_at": now_iso(), "updated_at": now_iso(),
     }
     await db.disputes.insert_one(d)
-    await db.orders.update_one({"id": oid}, {"$set": {"dispute_status": "open", "dispute_id": d["id"]}})
+    from payouts import freeze_payouts
+    await db.orders.update_one({"id": oid}, {"$set": {"dispute_status": "open", "dispute_id": d["id"], "artist_payouts": freeze_payouts(o, "disputed")}})
     if seller_id:
         await _notify(seller_id, "dispute_opened", dispute_id=d["id"], order_id=oid, reason=req.reason)
     async for admin in db.users.find({"role": "admin"}):
@@ -133,6 +134,14 @@ async def resolve(did: str, req: ResolveReq, user=Depends(require_role("admin"))
         "resolved_by": user["id"], "resolved_at": now_iso(), "updated_at": now_iso(),
     }, "$push": {"history": {"kind": req.action, "by": user["id"], "amount": refunded or None, "note": req.note, "at": now_iso()}}})
     await db.orders.update_one({"id": d["order_id"]}, {"$set": {"dispute_status": status}})
+    if req.action == "reject":
+        from payouts import unfreeze_payouts
+        o = await db.orders.find_one({"id": d["order_id"]})
+        if o:
+            upd = {"artist_payouts": await unfreeze_payouts(o)}
+            if (o.get("fulfillment") or {}).get("status") in ("not_received", "carrier_delivered", "shipped"):
+                upd.update({"fulfillment.status": "delivered", "fulfillment.delivered_at": now_iso(), "fulfillment.confirmed_how": "admin_dispute_rejected"})
+            await db.orders.update_one({"id": o["id"]}, {"$set": upd})
     await _notify(d["buyer_id"], "dispute_resolved", dispute_id=did, order_id=d["order_id"], resolution=req.action, amount=refunded or None)
     if d.get("seller_id"):
         await _notify(d["seller_id"], "dispute_resolved", dispute_id=did, order_id=d["order_id"], resolution=req.action, amount=refunded or None)
