@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from db import db, new_id, now_iso, strip_mongo
-from auth import get_current_user, get_optional_user, require_role
+from auth import get_current_user, get_optional_user, require_role, _pro_active
 
 router = APIRouter(prefix="/api/studio", tags=["studio"])
 
@@ -329,7 +329,7 @@ async def get_studio(artist_id: str, preview: bool = False, viewer: Optional[dic
             "id": artist["id"], "name": artist["name"], "bio": artist.get("bio"),
             "cover_image": artist.get("cover_image"), "avatar": artist.get("avatar"),
             "founding_member": bool(artist.get("founding_member")), "founding_number": artist.get("founding_number"),
-            "pro_active": __import__("auth")._pro_active(artist),
+            "pro_active": _pro_active(artist),
         },
         "config": cfg,
         "artworks": {

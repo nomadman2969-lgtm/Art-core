@@ -632,3 +632,9 @@ Then click Verify in Resend → Domains.
 - payouts.py: freeze_payouts / unfreeze_payouts. disputes.py: any open dispute freezes payouts; admin reject → unfreeze + order delivered (`confirmed_how: admin_dispute_rejected`). Sweep runs in server _reminder_loop every 10 min.
 - Frontend: `components/orders/DeliveryConfirmModal.js` mounted in Layout — full-screen z-5000, no close, Escape/backdrop blocked, body scroll locked, polls on route change + 60s + window focus; two buttons + 2-step confirm for not-received. Orders.js: new statuses (carrier_delivered / not_received), seller "Tracking shows delivered" button, buyer received/not-received buttons, seller awaiting note. Admin DisputesPanel shows tracking proof. Notification kinds: order_delivered_confirm, order_received_confirmed, order_auto_confirmed, order_not_received.
 - NOT integrated: real carrier tracking API (EasyPost/AfterShip/Shippo) — seller manual tap + 7-day estimate for now.
+
+## 2026-06 — Code review fixes
+- Real bug fixed: social.py used `_pro_active` outside its `if artist:` guard (crash when artist deleted) — now top-level import + guarded (2 sites).
+- delivery↔orders cycle removed: legacy `/orders/{id}/mark-delivered` route moved into delivery.py as an alias of `/confirm-received`; delivery imports `_enrich_order` one-way. auth→waiver remains a deliberate lazy import inside `register()` (waiver needs auth's Depends at import time).
+- studio.py `__import__("auth")` → static import; artworks.py ETag md5 → sha256; test fixture fake device token labelled as non-secret. waiver.py `is None` comparisons are correct (false positive).
+- Security audit (read-only) open items: SEC-001 hard-coded admin/demo passwords in server.py seed (move to env + rotate), SEC-002 CSV formula escaping in events.py analytics export, SEC-003 html.escape user values in emails.py; P3: login/OTP rate limits, pinned CORS, 2FA lockout decay.

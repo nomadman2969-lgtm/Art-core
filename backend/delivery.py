@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from db import db, new_id, now_iso, strip_mongo
 from auth import get_current_user
+from orders import _enrich_order
 
 router = APIRouter(prefix="/api", tags=["delivery"])
 
@@ -145,11 +146,11 @@ async def seller_carrier_delivered(oid: str, user: dict = Depends(get_current_us
         raise HTTPException(400, f"Order must be shipped first — status is {_status(o)}")
     if not (o.get("fulfillment") or {}).get("tracking"):
         raise HTTPException(400, "Tracking number is required")
-    from orders import _enrich_order
     return await _enrich_order(await mark_carrier_delivered(o, "seller" if user["role"] != "admin" else "admin", by=user["id"]))
 
 
 @router.post("/orders/{oid}/confirm-received")
+@router.post("/orders/{oid}/mark-delivered")
 async def buyer_confirm_received(oid: str, user: dict = Depends(get_current_user)):
     o = await db.orders.find_one({"id": oid})
     if not o:
@@ -158,7 +159,6 @@ async def buyer_confirm_received(oid: str, user: dict = Depends(get_current_user
         raise HTTPException(403, "Not the buyer")
     if _status(o) not in ("shipped", "carrier_delivered"):
         raise HTTPException(400, f"Cannot confirm — status is {_status(o)}")
-    from orders import _enrich_order
     return await _enrich_order(await confirm_received(o, "buyer", by=user["id"]))
 
 
@@ -173,7 +173,6 @@ async def buyer_not_received(oid: str, user: dict = Depends(get_current_user)):
         raise HTTPException(400, f"Cannot report — status is {_status(o)}")
     if o.get("refunded"):
         raise HTTPException(400, "Order already refunded")
-    from orders import _enrich_order
     return await _enrich_order(await report_not_received(o, user))
 
 

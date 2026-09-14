@@ -12,6 +12,9 @@ import requests
 import pyotp
 from pathlib import Path
 
+FAKE_DEVICE_TOKEN = "not-a-real-token-test-fixture-only"  # intentionally invalid; asserts 2FA is still required
+
+
 # Load backend .env (tests aren't spawned by uvicorn)
 _env = Path("/app/backend/.env")
 if _env.exists():
@@ -280,7 +283,7 @@ class TestTrustedDevices:
         assert "token" in jl2 and not jl2.get("requires_2fa"), f"device_token should skip 2FA: {jl2}"
 
         # Login with bogus token → requires_2fa
-        rl3 = login(email, pw, device_token="bogus_device_token_xxx")
+        rl3 = login(email, pw, device_token=FAKE_DEVICE_TOKEN)
         jl3 = rl3.json()
         assert jl3.get("requires_2fa") is True
 

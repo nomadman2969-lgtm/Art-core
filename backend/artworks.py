@@ -88,7 +88,7 @@ async def download(path: str, w: Optional[int] = None):
     import hashlib as _hl
     headers = {"Cache-Control": "public, max-age=31536000, immutable",
                "CDN-Cache-Control": "public, max-age=31536000",
-               "ETag": '"' + _hl.md5(f"{path}:{w or 0}:{record.get('size', 0)}".encode()).hexdigest() + '"'}
+               "ETag": '"' + _hl.sha256(f"{path}:{w or 0}:{record.get('size', 0)}".encode()).hexdigest()[:32] + '"'}
     ctype_rec = record.get("content_type", "")
     if w and ctype_rec.startswith("image/") and "svg" not in ctype_rec:
         w = min(THUMB_WIDTHS, key=lambda x: abs(x - w))
