@@ -19,7 +19,7 @@ for envf in ["/app/backend/.env", "/app/frontend/.env"]:
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN = ("monster@houseofmonster.com", "MonsterAdmin2026!")
+ADMIN = ("monster@houseofmonster.com", os.environ["ADMIN_PASSWORD"])
 ARTIST = ("demo.artist@artcorestudio.net", "DemoArtist2026!")
 
 

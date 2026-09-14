@@ -8,7 +8,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or "http://lo
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "monster@houseofmonster.com"
-ADMIN_PW = "MonsterAdmin2026!"
+ADMIN_PW = os.environ["ADMIN_PASSWORD"]
 
 
 def _login(email, pw):

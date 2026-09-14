@@ -43,7 +43,7 @@ MONGO_URL = _benv["MONGO_URL"]
 DB_NAME = _benv["DB_NAME"]
 
 ADMIN_EMAIL = "monster@houseofmonster.com"
-ADMIN_PASS = "MonsterAdmin2026!"
+ADMIN_PASS = os.environ["ADMIN_PASSWORD"]
 DEMO_ARTIST_EMAIL = "demo.artist@artcorestudio.net"
 DEMO_ARTIST_PASS = "DemoArtist2026!"
 

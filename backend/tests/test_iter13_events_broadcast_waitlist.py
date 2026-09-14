@@ -16,7 +16,7 @@ API = f"{BASE}/api"
 
 DEMO_ARTIST = ("demo.artist@artcorestudio.net", "DemoArtist2026!")
 DEMO_COLLECTOR = ("demo.collector@artcorestudio.net", "DemoCollector2026!")
-ADMIN = ("monster@houseofmonster.com", "MonsterAdmin2026!")
+ADMIN = ("monster@houseofmonster.com", os.environ["ADMIN_PASSWORD"])
 KAI = ("kai@demo.artcorestudio.net", "DemoArtist2026!")
 
 

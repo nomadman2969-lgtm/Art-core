@@ -294,7 +294,7 @@ class TestRegression:
 
     def test_login_admin(self):
         r = requests.post(f"{API}/auth/login", json={
-            "email": "monster@houseofmonster.com", "password": "MonsterAdmin2026!"
+            "email": "monster@houseofmonster.com", "password": os.environ["ADMIN_PASSWORD"]
         })
         assert r.status_code == 200
         assert "token" in r.json()

@@ -275,14 +275,14 @@ async def main():
     }})
     await db.users.update_one({"id": demo_collector["id"]}, {"$set": {"avatar": IMG.get("avatar-collector")}})
     for a in ARTISTS:
-        u = {"id": new_id(), "email": a["email"], "password_hash": hash_password("DemoArtist2026!"), "name": a["name"],
+        u = {"id": new_id(), "email": a["email"], "password_hash": hash_password(os.environ["DEMO_ARTIST_PASSWORD"]), "name": a["name"],
              "name_lc": a["name"].lower(), "role": "artist", "bio": a["bio"], "avatar": IMG.get(f"avatar-{a['key']}"),
              "cover_image": None, "approved": True, "is_demo": True, "stripe_connect_status": "not_started",
              "created_at": ago(days=random.randint(60, 300)), "seed": SEED}
         await db.users.insert_one(u)
         users[a["key"]] = u
     for c in COLLECTORS:
-        u = {"id": new_id(), "email": c["email"], "password_hash": hash_password("DemoCollector2026!"), "name": c["name"],
+        u = {"id": new_id(), "email": c["email"], "password_hash": hash_password(os.environ["DEMO_COLLECTOR_PASSWORD"]), "name": c["name"],
              "name_lc": c["name"].lower(), "role": "buyer", "bio": c["bio"], "avatar": None, "cover_image": None,
              "approved": True, "is_demo": True, "created_at": ago(days=random.randint(30, 200)), "seed": SEED}
         await db.users.insert_one(u)

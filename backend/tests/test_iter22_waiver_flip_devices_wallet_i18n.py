@@ -26,7 +26,7 @@ if _env.exists():
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if "REACT_APP_BACKEND_URL" in os.environ else "https://monster-curated.preview.emergentagent.com"
 API = f"{BASE_URL}/api"
 
-ADMIN = ("monster@houseofmonster.com", "MonsterAdmin2026!")
+ADMIN = ("monster@houseofmonster.com", os.environ["ADMIN_PASSWORD"])
 ARTIST = ("demo.artist@artcorestudio.net", "DemoArtist2026!")
 COLLECTOR = ("demo.collector@artcorestudio.net", "DemoCollector2026!")
 

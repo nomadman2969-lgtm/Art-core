@@ -194,6 +194,10 @@ async def resend(req: ChallengeReq):
     user = await db.users.find_one({"id": uid})
     if not user or user.get("twofa_method") != "email":
         raise HTTPException(400, "Email codes are not enabled for this account")
+    from ratelimit import check, hit, OTP_RESEND_LIMIT, OTP_RESEND_WINDOW
+    key = f"otp:resend:{uid}"
+    await check(key, OTP_RESEND_LIMIT, OTP_RESEND_WINDOW)
+    await hit(key, OTP_RESEND_WINDOW)
     await send_email_code(user)
     return {"sent": True}
 
@@ -227,12 +231,18 @@ async def verify_login(req: VerifyLoginReq):
     if not user or not user.get("twofa_enabled"):
         raise HTTPException(401, "Invalid challenge")
     fails = int(user.get("twofa_fail_count") or 0)
+    from ratelimit import TWOFA_LOCK_MINUTES
+    last_fail = user.get("twofa_fail_at") or ""
+    lock_until = (datetime.now(timezone.utc) - timedelta(minutes=TWOFA_LOCK_MINUTES)).isoformat()
+    if fails >= 8 and last_fail < lock_until:
+        fails = 0  # lock decayed
+        await db.users.update_one({"id": uid}, {"$unset": {"twofa_fail_count": "", "twofa_fail_at": ""}})
     if fails >= 8:
-        raise HTTPException(429, "Too many attempts — sign in again in a few minutes")
+        raise HTTPException(429, f"Too many attempts — try again in {TWOFA_LOCK_MINUTES} minutes", headers={"Retry-After": str(TWOFA_LOCK_MINUTES * 60)})
     if not await verify_any(user, req.code):
-        await db.users.update_one({"id": uid}, {"$inc": {"twofa_fail_count": 1}})
+        await db.users.update_one({"id": uid}, {"$inc": {"twofa_fail_count": 1}, "$set": {"twofa_fail_at": datetime.now(timezone.utc).isoformat()}})
         raise HTTPException(401, "Wrong code")
-    await db.users.update_one({"id": uid}, {"$unset": {"twofa_fail_count": ""}})
+    await db.users.update_one({"id": uid}, {"$unset": {"twofa_fail_count": "", "twofa_fail_at": ""}})
     out = {"token": make_token(user["id"], user["role"]), "user": public_user(user)}
     if req.remember_device:
         raw = secrets.token_urlsafe(32)

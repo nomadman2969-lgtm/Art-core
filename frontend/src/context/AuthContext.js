@@ -25,6 +25,12 @@ export function AuthProvider({ children }) {
     setUser(r.data.user);
     return r.data.user;
   };
+  const demoSignIn = async (role) => {
+    const r = await api.post("/auth/demo-login", { role });
+    localStorage.setItem("hom_token", r.data.token);
+    setUser(r.data.user);
+    return r.data.user;
+  };
   const verifyTwoFactor = async (challenge_token, code, rememberDevice = false) => {
     const device_label = `${navigator.platform || "Device"} · ${/Mobile|Android|iPhone/i.test(navigator.userAgent) ? "Mobile" : "Desktop"} browser`;
     const r = await api.post("/auth/2fa/verify-login", { challenge_token, code, remember_device: rememberDevice, device_label });
@@ -46,7 +52,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh, setUser, verifyTwoFactor }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh, setUser, verifyTwoFactor, demoSignIn }}>
       {children}
     </AuthContext.Provider>
   );

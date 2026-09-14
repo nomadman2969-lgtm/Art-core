@@ -23,7 +23,7 @@ def session():
 @pytest.fixture(scope="module")
 def admin_token(session):
     r = session.post(f"{BASE}/auth/login", json={
-        "email": "monster@houseofmonster.com", "password": "MonsterAdmin2026!"
+        "email": "monster@houseofmonster.com", "password": os.environ["ADMIN_PASSWORD"]
     })
     assert r.status_code == 200, r.text
     d = r.json()

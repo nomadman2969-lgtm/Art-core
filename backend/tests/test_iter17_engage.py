@@ -40,7 +40,7 @@ def artist_token():
 
 @pytest.fixture(scope="module")
 def admin_token():
-    return _login("monster@houseofmonster.com", "MonsterAdmin2026!")
+    return _login("monster@houseofmonster.com", os.environ["ADMIN_PASSWORD"])
 
 
 def _auth(t):

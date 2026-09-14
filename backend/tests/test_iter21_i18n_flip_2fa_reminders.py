@@ -37,7 +37,7 @@ ARTIST_PW = "DemoArtist2026!"
 COLLECTOR_EMAIL = "demo.collector@artcorestudio.net"
 COLLECTOR_PW = "DemoCollector2026!"
 ADMIN_EMAIL = "monster@houseofmonster.com"
-ADMIN_PW = "MonsterAdmin2026!"
+ADMIN_PW = os.environ["ADMIN_PASSWORD"]
 
 
 def _login(email, pw):

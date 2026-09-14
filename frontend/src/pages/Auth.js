@@ -11,7 +11,7 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [demoBusy, setDemoBusy] = useState(null);
-  const { login, verifyTwoFactor } = useAuth();
+  const { login, verifyTwoFactor, demoSignIn } = useAuth();
   const nav = useNavigate();
   const [challenge, setChallenge] = useState(null);
   const [code, setCode] = useState("");
@@ -51,12 +51,9 @@ export function Login() {
   };
 
   const demoLogin = async (key) => {
-    const creds = key === "artist"
-      ? { email: "demo.artist@artcorestudio.net", password: "DemoArtist2026!" }
-      : { email: "demo.collector@artcorestudio.net", password: "DemoCollector2026!" };
     setDemoBusy(key);
     try {
-      const u = await login(creds.email, creds.password);
+      const u = await demoSignIn(key);
       toast.success(`Signed in as demo ${key}`);
       routeByRole(u);
     } catch { toast.error("Demo login failed — try again in a sec"); }

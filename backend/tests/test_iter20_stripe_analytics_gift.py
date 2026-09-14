@@ -21,7 +21,7 @@ BASE_URL = _read_frontend_url()
 assert BASE_URL, "REACT_APP_BACKEND_URL missing"
 API = f"{BASE_URL}/api"
 
-ADMIN = ("monster@houseofmonster.com", "MonsterAdmin2026!")
+ADMIN = ("monster@houseofmonster.com", os.environ["ADMIN_PASSWORD"])
 ARTIST = ("demo.artist@artcorestudio.net", "DemoArtist2026!")
 BUYER = ("demo.collector@artcorestudio.net", "DemoCollector2026!")
 

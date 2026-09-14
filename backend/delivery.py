@@ -181,7 +181,8 @@ async def sweep_delivery_confirmations() -> dict:
     now = _now()
     estimated = 0
     cutoff = (now - timedelta(days=ESTIMATED_TRANSIT_DAYS)).isoformat()
-    for o in await db.orders.find({"fulfillment.status": "shipped", "fulfillment.shipped_at": {"$lte": cutoff}, "refunded": {"$ne": True}}).to_list(200):
+    for o in await db.orders.find({"fulfillment.status": "shipped", "fulfillment.shipped_at": {"$lte": cutoff}, "refunded": {"$ne": True},
+                                   "fulfillment.tracker_id": {"$in": [None]}}).to_list(200):
         await mark_carrier_delivered(o, "estimated")
         estimated += 1
     auto = 0

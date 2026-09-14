@@ -13,7 +13,7 @@ from PIL import Image
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://monster-curated.preview.emergentagent.com").rstrip("/") + "/api"
 
 ADMIN_EMAIL = "monster@houseofmonster.com"
-ADMIN_PASS = "MonsterAdmin2026!"
+ADMIN_PASS = os.environ["ADMIN_PASSWORD"]
 
 
 def _login(email, password):

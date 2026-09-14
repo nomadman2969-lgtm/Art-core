@@ -63,6 +63,8 @@ async def ship_order(oid: str, req: ShipReq, user: dict = Depends(get_current_us
         "fulfillment.tracking": req.tracking,
         "fulfillment.note": req.note,
     }})
+    from tracking import start_tracking
+    await start_tracking(oid, req.carrier, req.tracking)
     if o.get("buyer_id"):
         await db.notifications.insert_one({
             "id": new_id(), "user_id": o["buyer_id"], "kind": "order_shipped",

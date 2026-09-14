@@ -619,7 +619,15 @@ async def event_analytics_csv(event_id: str, kind: str = "attendees", user: dict
         raise HTTPException(400, "kind must be 'attendees' or 'revenue'")
 
     buf = _io.StringIO()
-    writer = csv.writer(buf)
+
+    class _SafeWriter:
+        """Neutralise spreadsheet formula injection (cells starting with = + - @ or tab/CR)."""
+        def __init__(self, w): self._w = w
+
+        def writerow(self, row):
+            self._w.writerow([("'" + v) if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r") else v for v in row])
+
+    writer = _SafeWriter(csv.writer(buf))
     safe_title = "".join(c for c in e["title"] if c.isalnum() or c in " -_")[:40].strip().replace(" ", "_")
 
     if kind == "attendees":

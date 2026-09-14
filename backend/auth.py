@@ -4,7 +4,7 @@ import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from pydantic import BaseModel, EmailStr, Field
 from db import db, new_id, now_iso, strip_mongo
 
@@ -154,10 +154,18 @@ async def register(req: RegisterReq):
 
 
 @router.post("/login")
-async def login(req: LoginReq):
-    user = await db.users.find_one({"email": req.email.lower()})
+async def login(req: LoginReq, request: Request):
+    from ratelimit import check, hit, clear, client_ip, LOGIN_IP_LIMIT, LOGIN_IP_WINDOW, LOGIN_EMAIL_LIMIT, LOGIN_EMAIL_WINDOW
+    email = req.email.lower()
+    ip_key, email_key = f"login:ip:{client_ip(request)}", f"login:email:{email}"
+    await check(ip_key, LOGIN_IP_LIMIT, LOGIN_IP_WINDOW)
+    await check(email_key, LOGIN_EMAIL_LIMIT, LOGIN_EMAIL_WINDOW)
+    user = await db.users.find_one({"email": email})
     if not user or not verify_password(req.password, user["password_hash"]):
+        await hit(ip_key, LOGIN_IP_WINDOW)
+        await hit(email_key, LOGIN_EMAIL_WINDOW)
         raise HTTPException(401, "Invalid credentials")
+    await clear(email_key)
     if user.get("twofa_enabled"):
         from twofa import make_challenge_token, send_email_code, is_trusted_device
         if await is_trusted_device(user, req.device_token):
@@ -167,6 +175,24 @@ async def login(req: LoginReq):
         return {"requires_2fa": True, "method": user.get("twofa_method"), "challenge_token": make_challenge_token(user["id"])}
     token = make_token(user["id"], user["role"])
     return {"token": token, "user": public_user(user)}
+
+
+class DemoLoginReq(BaseModel):
+    role: str = Field(pattern="^(artist|collector)$")
+
+
+@router.post("/demo-login")
+async def demo_login(req: DemoLoginReq, request: Request):
+    """One-tap demo sign-in — demo passwords live only in backend env, never in the client."""
+    from ratelimit import check, hit, client_ip
+    key = f"demo:ip:{client_ip(request)}"
+    await check(key, 30, 15 * 60)
+    await hit(key, 15 * 60)
+    email = "demo.artist@artcorestudio.net" if req.role == "artist" else "demo.collector@artcorestudio.net"
+    user = await db.users.find_one({"email": email, "is_demo": True})
+    if not user:
+        raise HTTPException(503, "Demo account unavailable")
+    return {"token": make_token(user["id"], user["role"]), "user": public_user(user)}
 
 
 @router.get("/me")

@@ -67,6 +67,24 @@ async def send_email(to: str, subject: str, html: str, from_addr: Optional[str] 
 
 # ----- Email templates -----
 
+def _escaped(fn):
+    """HTML-escape every user-supplied string (and string values of dict args) before templating."""
+    import functools, html as _h
+
+    def _esc(v):
+        if isinstance(v, str):
+            return _h.escape(v, quote=True)
+        if isinstance(v, dict):
+            return {k: _esc(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [_esc(x) for x in v]
+        return v
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        return fn(*[_esc(a) for a in args], **{k: _esc(v) for k, v in kwargs.items()})
+    return wrapper
+
 def _wrap(body: str, title: str = "Art Core") -> str:
     return f"""
 <!doctype html>
@@ -98,6 +116,7 @@ def _wrap(body: str, title: str = "Art Core") -> str:
 """
 
 
+@_escaped
 def refund_email_html(user_name: str, event_title: str, amount: float, event_when: str) -> str:
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
@@ -136,6 +155,7 @@ def refund_email_html(user_name: str, event_title: str, amount: float, event_whe
     return _wrap(body, "Refund Notice")
 
 
+@_escaped
 def ticket_receipt_html(user_name: str, event_title: str, amount: float, event_when: str, event_where: str) -> str:
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
@@ -179,6 +199,7 @@ def _fmt_when(iso_str: str) -> str:
         return iso_str or "TBA"
 
 
+@_escaped
 def waitlist_position_html(user_name: str, event: dict, position: int) -> str:
     where = ", ".join(x for x in [(event.get("location") or {}).get("address"), (event.get("location") or {}).get("city")] if x) or "TBA"
     ordinal = f"#{position}"
@@ -244,6 +265,7 @@ def event_broadcast_html(user_name: str, host_name: str, event: dict, subject: s
     return _wrap(body, "Event Update")
 
 
+@_escaped
 def gift_ticket_html(recipient_name: str, gifter_name: str, event_title: str, event_when: str, event_where: str,
                      message: Optional[str], ticket_url: str, qr_url: str) -> str:
     note = f'<div style="margin:16px 0;padding:14px;border-left:3px solid #CCFF00;color:#e5e7eb;font-size:14px;font-style:italic">“{message}”<div style="font-size:11px;color:#71717a;margin-top:6px">— {gifter_name}</div></div>' if message else ""
@@ -282,6 +304,7 @@ def gift_ticket_html(recipient_name: str, gifter_name: str, event_title: str, ev
     return _wrap(body, "You've got a ticket")
 
 
+@_escaped
 def gift_sent_html(gifter_name: str, recipient_email: str, event_title: str, amount: float, event_when: str) -> str:
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
@@ -296,6 +319,7 @@ def gift_sent_html(gifter_name: str, recipient_email: str, event_title: str, amo
     return _wrap(body, "Gift sent")
 
 
+@_escaped
 def gift_reminder_html(recipient_name: str, event_title: str, event_when: str, event_where: str, ticket_url: str, qr_url: str) -> str:
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
@@ -328,6 +352,7 @@ def gift_reminder_html(recipient_name: str, event_title: str, event_when: str, e
     return _wrap(body, "See you tomorrow")
 
 
+@_escaped
 def delivery_confirm_html(user_name: str, order_id: str, carrier: str, tracking: str, order_url: str, window_days: int) -> str:
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
@@ -341,6 +366,7 @@ def delivery_confirm_html(user_name: str, order_id: str, carrier: str, tracking:
     return _wrap(body, "Did your order arrive?")
 
 
+@_escaped
 def otp_email_html(user_name: str, code: str, minutes: int) -> str:
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">
@@ -353,6 +379,7 @@ def otp_email_html(user_name: str, code: str, minutes: int) -> str:
     return _wrap(body, "Your sign-in code")
 
 
+@_escaped
 def waiver_ending_html(user_name: str, tail: str, commission_percent: float) -> str:
     body = f"""
 <div style="font-family:Impact,Arial Black,sans-serif;font-size:36px;color:#fff;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">

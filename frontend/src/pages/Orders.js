@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Package, Star, Download, Truck, CheckCircle2, PackageCheck, PackageX, ShieldCheck } from "lucide-react";
 import { CertificateButton, DisputePanel } from "../components/orders/OrderExtras";
+import { LiveTrackingPanel } from "../components/orders/LiveTrackingPanel";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -219,6 +220,7 @@ export function OrderDetail() {
             </div>
           )}
         </div>
+        {(isBuyer || isSeller) && <LiveTrackingPanel orderId={o.id} fulfillment={fulfill} />}
         {isSeller && fulfill.status === "pending" && (
           <form onSubmit={submitShip} className="mt-4 pt-4 border-t border-white/8 space-y-3" data-testid="ship-form">
             <div className="text-[11px] text-zinc-500" data-testid="tracking-required-note">Tracking is required — you can't mark an order shipped without it. When tracking shows delivered, the collector must confirm receipt (or report it missing); your payout releases 2 days after confirmation, or 10 business days after the sale if they never answer.</div>
@@ -245,7 +247,7 @@ export function OrderDetail() {
             <button data-testid="carrier-delivered-btn" disabled={shipBusy} onClick={carrierDelivered} className="btn-violet !py-2 !text-xs">
               <PackageCheck size={12} className="mr-2" />{shipBusy ? "..." : "Tracking shows delivered"}
             </button>
-            <div className="text-xs text-zinc-500 mt-2">Once tracking says delivered, tap this — the collector is prompted to confirm receipt. If they don't answer within 3 days, delivery is confirmed automatically. (Also auto-flagged 7 days after shipping.)</div>
+            <div className="text-xs text-zinc-500 mt-2">{fulfill.tracker_id ? "Live tracking is on — this flips automatically when the carrier reports delivered. Use this button only if the carrier site shows delivered but we haven't caught up." : "Once tracking says delivered, tap this — the collector is prompted to confirm receipt. If they don't answer within 3 days, delivery is confirmed automatically. (Also auto-flagged 7 days after shipping.)"}</div>
           </div>
         )}
         {isBuyer && ["shipped", "carrier_delivered"].includes(fulfill.status) && (

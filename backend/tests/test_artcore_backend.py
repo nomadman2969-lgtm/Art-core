@@ -11,7 +11,7 @@ BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://monster-curated.preview.
 TS = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
 
 ADMIN_EMAIL = "monster@houseofmonster.com"
-ADMIN_PASS = "MonsterAdmin2026!"
+ADMIN_PASS = os.environ["ADMIN_PASSWORD"]
 
 STATE = {}  # shared across tests
 

@@ -11,7 +11,7 @@ from fastapi import FastAPI, Depends
 from starlette.middleware.cors import CORSMiddleware
 
 from db import db, now_iso, new_id
-from auth import router as auth_router, hash_password, get_optional_user
+from auth import router as auth_router, hash_password, verify_password, get_optional_user
 from twofa import router as twofa_router
 from waiver import router as waiver_router, admin_router as waiver_admin_router, founding_stats
 from pro import router as pro_router
@@ -29,6 +29,7 @@ from studio import router as studio_router, posts_router
 from notifications import router as notifications_router
 from orders import router as orders_router
 from delivery import router as delivery_router
+from tracking import router as tracking_router
 from offers import router as offers_router
 from realtime import router as realtime_router
 from certificates import router as certificates_router
@@ -64,6 +65,7 @@ app.include_router(studio_router)
 app.include_router(posts_router)
 app.include_router(notifications_router)
 app.include_router(delivery_router)
+app.include_router(tracking_router)
 app.include_router(orders_router)
 app.include_router(offers_router)
 app.include_router(realtime_router)
@@ -136,6 +138,11 @@ async def _reminder_loop():
         except Exception as e:
             logger.error(f"Payout release sweep failed: {e}")
         try:
+            from tracking import poll_active_trackers
+            await poll_active_trackers()
+        except Exception as e:
+            logger.error(f"Tracking poll failed: {e}")
+        try:
             from delivery import sweep_delivery_confirmations
             await sweep_delivery_confirmations()
         except Exception as e:
@@ -168,14 +175,15 @@ async def startup():
         logger.info("Storage initialized")
     except Exception as e:
         logger.error(f"Storage init failed: {e}")
-    # Seed admin
-    admin_email = "monster@houseofmonster.com"
+    # Seed admin from env (password re-synced on every boot → rotate by changing ADMIN_PASSWORD)
+    admin_email = os.environ["ADMIN_EMAIL"].lower()
+    admin_password = os.environ["ADMIN_PASSWORD"]
     existing = await db.users.find_one({"email": admin_email})
     if not existing:
         admin = {
             "id": new_id(),
             "email": admin_email,
-            "password_hash": hash_password("MonsterAdmin2026!"),
+            "password_hash": hash_password(admin_password),
             "name": "Monster",
             "role": "admin",
             "bio": "Brooklyn-based abstract artist. Founder of Art Core. Lives with two cats and a lot of neon.",
@@ -187,6 +195,16 @@ async def startup():
         }
         await db.users.insert_one(admin)
         logger.info("Seeded admin user")
+    elif not verify_password(admin_password, existing["password_hash"]):
+        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password), "password_rotated_at": now_iso()}})
+        logger.info("Rotated admin password from env")
+    try:
+        from ratelimit import ensure_indexes
+        await ensure_indexes()
+        from tracking import ensure_indexes as _ti
+        await _ti()
+    except Exception as e:
+        logger.warning("rate limit indexes: %s", e)
 
     try:
         from seed_demo import refresh_demo_dates
@@ -200,21 +218,24 @@ async def startup():
     demo_accounts = [
         {
             "email": "demo.artist@artcorestudio.net",
-            "password": "DemoArtist2026!",
+            "password": os.environ["DEMO_ARTIST_PASSWORD"],
             "name": "Demo Artist",
             "role": "artist",
             "bio": "This is a demo artist account. Explore posting artworks, running auctions, and hosting events.",
         },
         {
             "email": "demo.collector@artcorestudio.net",
-            "password": "DemoCollector2026!",
+            "password": os.environ["DEMO_COLLECTOR_PASSWORD"],
             "name": "Demo Collector",
             "role": "buyer",
             "bio": "This is a demo buyer account. Explore browsing, offers, purchases, and RSVPing to events.",
         },
     ]
     for d in demo_accounts:
-        if await db.users.find_one({"email": d["email"]}):
+        existing_demo = await db.users.find_one({"email": d["email"]})
+        if existing_demo:
+            if not verify_password(d["password"], existing_demo["password_hash"]):
+                await db.users.update_one({"email": d["email"]}, {"$set": {"password_hash": hash_password(d["password"]), "is_demo": True}})
             continue
         await db.users.insert_one({
             "id": new_id(),
