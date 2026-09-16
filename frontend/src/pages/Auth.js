@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [demoBusy, setDemoBusy] = useState(null);
+  const [demoEnabled, setDemoEnabled] = useState(false);
+  useEffect(() => { api.get("/settings").then((r) => setDemoEnabled(!!r.data.demo_login_enabled)).catch(() => {}); }, []);
   const { login, verifyTwoFactor, demoSignIn } = useAuth();
   const nav = useNavigate();
   const [challenge, setChallenge] = useState(null);
@@ -90,7 +92,8 @@ export function Login() {
       <div className="label-caps text-[#CCFF00]">{t("auth.sign_in")}</div>
       <h1 className="font-anton text-6xl uppercase mt-4 mb-8 leading-none">{t("auth.welcome_1")}<br />{t("auth.welcome_2")}</h1>
 
-      {/* One-click demo sign-in */}
+      {/* One-click demo sign-in (admin-toggleable) */}
+      {demoEnabled && (<>
       <div className="mb-8">
         <div className="label-caps text-zinc-500 mb-3">{t("auth.one_tap")}</div>
         <div className="grid grid-cols-2 gap-3">
@@ -121,6 +124,7 @@ export function Login() {
         <div className="text-[10px] text-zinc-500 label-caps">{t("auth.or_normal")}</div>
         <div className="flex-1 h-px bg-white/8" />
       </div>
+      </>)}
 
       <form onSubmit={submit} className="space-y-5">
         <input data-testid="login-email" required type="email" placeholder={t("auth.email")} value={email} onChange={(e) => setEmail(e.target.value)}
@@ -140,6 +144,7 @@ export function Register() {
   const { t } = useTranslation();
   const [params] = useSearchParams();
   const [role, setRole] = useState(params.get("role") === "artist" ? "artist" : "buyer");
+  const [agreed, setAgreed] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -173,7 +178,11 @@ export function Register() {
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none focus:border-[#CCFF00]" />
         <input data-testid="register-password" required type="password" placeholder={t("auth.password_min")} value={password} onChange={(e) => setPassword(e.target.value)}
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none focus:border-[#CCFF00]" />
-        <button data-testid="register-submit" disabled={busy} className="btn-lime w-full mt-4">{busy ? t("auth.creating") : t("auth.create_account")}</button>
+        <label className="flex items-start gap-3 text-xs text-zinc-400 leading-relaxed cursor-pointer" data-testid="register-consent">
+          <input type="checkbox" required data-testid="register-consent-input" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5 accent-[#CCFF00]" />
+          <span>I'm 18 or older and agree to the <Link to="/legal/terms" className="text-[#CCFF00] hover:underline">Terms of Service</Link>, <Link to="/legal/privacy" className="text-[#CCFF00] hover:underline">Privacy Policy</Link> and <Link to="/legal/refunds" className="text-[#CCFF00] hover:underline">Refund Policy</Link> — including that I will never ship or request anything other than the listed artwork.</span>
+        </label>
+        <button data-testid="register-submit" disabled={busy || !agreed} className="btn-lime w-full mt-4">{busy ? t("auth.creating") : t("auth.create_account")}</button>
       </form>
       <div className="mt-8 text-sm text-zinc-400">
         {t("auth.already")} <Link to="/login" data-testid="link-login" className="text-[#CCFF00] hover:underline">{t("auth.sign_in_link")}</Link>

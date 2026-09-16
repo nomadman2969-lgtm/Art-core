@@ -46,6 +46,7 @@ export default function AdminDashboard() {
       founding_enabled: !!(settings.founding_enabled ?? true),
       founding_rate: Number(settings.founding_rate ?? 4),
       founding_cap: Number(settings.founding_cap ?? 500),
+      demo_login_enabled: !!(settings.demo_login_enabled ?? true),
     });
     toast.success("Settings saved");
   };
@@ -139,6 +140,9 @@ export default function AdminDashboard() {
             <input data-testid="waiver-sales-input" type="number" min="0" max="1000" value={settings.waiver_max_sales ?? 5}
               onChange={(e) => setSettings({ ...settings, waiver_max_sales: e.target.value })}
               className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
+          </Row>
+          <Row label="Demo sign-in buttons">
+            <label className="flex items-center gap-2 text-sm"><input data-testid="demo-login-enabled-input" type="checkbox" checked={settings.demo_login_enabled ?? true} onChange={(e) => setSettings({ ...settings, demo_login_enabled: e.target.checked })} className="accent-[#CCFF00]" /> Show "Enter as Artist / Collector" one-tap demo buttons on the login page (turn off before going public)</label>
           </Row>
           <Row label="Founding rate lock">
             <label className="flex items-center gap-2 text-sm"><input data-testid="founding-enabled-input" type="checkbox" checked={settings.founding_enabled ?? true} onChange={(e) => setSettings({ ...settings, founding_enabled: e.target.checked })} className="accent-[#CCFF00]" /> New artists lock the founding rate for life (while spots remain)</label>

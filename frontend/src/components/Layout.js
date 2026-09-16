@@ -179,7 +179,14 @@ export default function Layout({ children }) {
             <NewsletterForm />
           </div>
         </div>
-        <div className="border-t border-white/5 py-6 text-center text-xs text-zinc-500 font-unbounded">© {new Date().getFullYear()} Art Core — {t("footer.made_for_artists")}</div>
+        <div className="border-t border-white/5 py-6 px-6 flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 text-xs text-zinc-500 font-unbounded">
+          <span>© {new Date().getFullYear()} Art Core — {t("footer.made_for_artists")}</span>
+          <span className="flex items-center gap-4">
+            <Link to="/legal/terms" data-testid="footer-terms" className="hover:text-[#CCFF00]">Terms</Link>
+            <Link to="/legal/privacy" data-testid="footer-privacy" className="hover:text-[#CCFF00]">Privacy</Link>
+            <Link to="/legal/refunds" data-testid="footer-refunds" className="hover:text-[#CCFF00]">Refunds</Link>
+          </span>
+        </div>
       </footer>
     </div>
   );

@@ -185,6 +185,9 @@ class DemoLoginReq(BaseModel):
 async def demo_login(req: DemoLoginReq, request: Request):
     """One-tap demo sign-in — demo passwords live only in backend env, never in the client."""
     from ratelimit import check, hit, client_ip
+    settings = await db.settings.find_one({"id": "global"}) or {}
+    if not settings.get("demo_login_enabled", True):
+        raise HTTPException(403, "Demo sign-in is turned off")
     key = f"demo:ip:{client_ip(request)}"
     await check(key, 30, 15 * 60)
     await hit(key, 15 * 60)

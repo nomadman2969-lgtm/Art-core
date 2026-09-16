@@ -99,6 +99,7 @@ async def public_settings():
         "waiver_enabled": s.get("waiver_enabled", True),
         "waiver_days": s.get("waiver_days", 30),
         "waiver_max_sales": s.get("waiver_max_sales", 5),
+        "demo_login_enabled": s.get("demo_login_enabled", True),
         **(await founding_stats(s)),
     }
 
