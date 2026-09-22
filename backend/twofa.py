@@ -243,7 +243,7 @@ async def verify_login(req: VerifyLoginReq):
         await db.users.update_one({"id": uid}, {"$inc": {"twofa_fail_count": 1}, "$set": {"twofa_fail_at": datetime.now(timezone.utc).isoformat()}})
         raise HTTPException(401, "Wrong code")
     await db.users.update_one({"id": uid}, {"$unset": {"twofa_fail_count": "", "twofa_fail_at": ""}})
-    out = {"token": make_token(user["id"], user["role"]), "user": public_user(user)}
+    out = {"token": make_token(user["id"], user["role"]), "user": public_user(user, include_email=True)}
     if req.remember_device:
         raw = secrets.token_urlsafe(32)
         now = datetime.now(timezone.utc)

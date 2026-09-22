@@ -40,6 +40,7 @@ import HostPage from "@/pages/HostPage";
 import Upcycle from "@/pages/Upcycle";
 import NotFound from "@/pages/NotFound";
 import Legal from "@/pages/Legal";
+import LaunchPage from "@/pages/LaunchPage";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 function RequireRole({ roles, children }) {
@@ -111,6 +112,7 @@ function App() {
                 <Route path="/security" element={<RequireAuth><Security /></RequireAuth>} />
                 <Route path="/pro" element={<Pro />} />
                 <Route path="/legal/:doc?" element={<Legal />} />
+                <Route path="/launch/:id" element={<LaunchPage />} />
                 <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
                 <Route path="/studio-custom" element={<ComingSoon title="Studio Themes" accent="#CCFF00"
                   tagline="Make your profile yours."

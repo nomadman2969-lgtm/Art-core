@@ -30,6 +30,7 @@ from notifications import router as notifications_router
 from orders import router as orders_router
 from delivery import router as delivery_router
 from tracking import router as tracking_router
+from poster import router as poster_router
 from offers import router as offers_router
 from realtime import router as realtime_router
 from certificates import router as certificates_router
@@ -66,6 +67,7 @@ app.include_router(posts_router)
 app.include_router(notifications_router)
 app.include_router(delivery_router)
 app.include_router(tracking_router)
+app.include_router(poster_router)
 app.include_router(orders_router)
 app.include_router(offers_router)
 app.include_router(realtime_router)

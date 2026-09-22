@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, thumbUrl } from "../../api";
+import { api, thumbUrl, privateFileUrl } from "../../api";
 import { REASON_LABELS, DISPUTE_STATUS } from "../orders/OrderExtras";
 
 const resolveImg = (p) => thumbUrl(p, 240);
@@ -67,7 +67,7 @@ export function DisputesPanel() {
                       </div>
                     )}
                     {d.images?.length > 0 && (
-                      <div className="flex gap-2 mt-2">{d.images.map((im, i) => <img key={i} src={resolveImg(im)} alt="" className="w-14 h-14 object-cover rounded-sm border border-white/10" />)}</div>
+                      <div className="flex gap-2 mt-2">{(d.image_urls || d.images).map((im, i) => <img key={i} src={privateFileUrl(im)} alt="" className="w-14 h-14 object-cover rounded-sm border border-white/10" />)}</div>
                     )}
                     {!openState && <div className="text-xs text-zinc-500 mt-2">Resolution: {d.resolution}{d.refund_amount ? ` · $${d.refund_amount}` : ""}{d.admin_note ? ` · "${d.admin_note}"` : ""}</div>}
                   </div>

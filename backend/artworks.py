@@ -2,7 +2,7 @@
 import os
 import uuid
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response, Header
 from pydantic import BaseModel, Field, field_validator
 from db import db, new_id, now_iso, strip_mongo
 from auth import get_current_user, get_optional_user, require_role, public_user
@@ -80,8 +80,53 @@ async def upload_video(file: UploadFile = File(...), user: dict = Depends(get_cu
 THUMB_WIDTHS = (240, 480, 960)
 
 
+PRIVATE_HEADERS = {"Cache-Control": "private, no-store", "Vary": "Authorization", "Referrer-Policy": "no-referrer"}
+SIGNED_TTL = 15 * 60
+
+
+def sign_file_url(path: str, ttl: int = SIGNED_TTL) -> str:
+    """Short-lived, path-scoped link for private assets — never carries the account JWT."""
+    import hmac as _hmac, hashlib as _hl, time as _t, os as _os
+    clean = (path or "").replace("/api/files/", "").lstrip("/")
+    exp = int(_t.time()) + ttl
+    sig = _hmac.new(_os.environ["JWT_SECRET"].encode(), f"{clean}:{exp}".encode(), _hl.sha256).hexdigest()[:40]
+    return f"/api/files/{clean}?exp={exp}&sig={sig}"
+
+
+def _signature_ok(path: str, exp: Optional[int], sig: Optional[str]) -> bool:
+    import hmac as _hmac, hashlib as _hl, time as _t, os as _os
+    if not exp or not sig or exp < int(_t.time()):
+        return False
+    expected = _hmac.new(_os.environ["JWT_SECRET"].encode(), f"{path}:{exp}".encode(), _hl.sha256).hexdigest()[:40]
+    return _hmac.compare_digest(expected, sig)
+
+
+async def _authorize_private(record: dict, authorization: Optional[str]):
+    """Private assets (dispute photos, DM images): only the parties on that order/thread or an admin."""
+    from auth import get_current_user
+    user = await get_current_user(authorization)
+    if user.get("role") == "admin":
+        return
+    scope = record.get("scope") or {}
+    if scope.get("kind") == "thread" and user["id"] in (scope.get("users") or []):
+        return
+    if scope.get("kind") == "order":
+        o = await db.orders.find_one({"id": scope.get("order_id")})
+        if o and (o.get("buyer_id") == user["id"] or any(p.get("artist_id") == user["id"] for p in o.get("artist_payouts", []))):
+            return
+    if record.get("user_id") == user["id"]:
+        return
+    raise HTTPException(403, "Private file")
+
+
+async def mark_private(paths: list, scope: dict):
+    clean = [p.replace("/api/files/", "").lstrip("/") for p in paths if p and not p.startswith("http")]
+    if clean:
+        await db.files.update_many({"storage_path": {"$in": clean}}, {"$set": {"private": True, "scope": scope}})
+
+
 @router.get("/files/{path:path}")
-async def download(path: str, w: Optional[int] = None):
+async def download(path: str, w: Optional[int] = None, exp: Optional[int] = None, sig: Optional[str] = None, authorization: Optional[str] = Header(None)):
     record = await db.files.find_one({"storage_path": path, "is_deleted": False})
     if not record:
         raise HTTPException(404, "File not found")
@@ -89,6 +134,10 @@ async def download(path: str, w: Optional[int] = None):
     headers = {"Cache-Control": "public, max-age=31536000, immutable",
                "CDN-Cache-Control": "public, max-age=31536000",
                "ETag": '"' + _hl.sha256(f"{path}:{w or 0}:{record.get('size', 0)}".encode()).hexdigest()[:32] + '"'}
+    if record.get("private"):
+        if not _signature_ok(path, exp, sig):
+            await _authorize_private(record, authorization)
+        headers = {**PRIVATE_HEADERS, "ETag": headers["ETag"]}
     ctype_rec = record.get("content_type", "")
     if w and ctype_rec.startswith("image/") and "svg" not in ctype_rec:
         w = min(THUMB_WIDTHS, key=lambda x: abs(x - w))

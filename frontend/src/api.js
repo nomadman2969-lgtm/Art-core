@@ -13,6 +13,8 @@ api.interceptors.request.use((config) => {
 });
 
 export const fileUrl = (path) => (path ? `${API}/files/${path}` : null);
+// Private assets (dispute photos, DM images) come back from the API as short-lived signed paths
+export const privateFileUrl = (signedPath) => (!signedPath ? null : signedPath.startsWith("http") ? signedPath : `${BACKEND_URL}${signedPath}`);
 // Resized JPEG variant for grids/feeds (240 | 480 | 960)
 export const thumbUrl = (path, w = 480) => (path ? (path.startsWith("http") ? path : `${API}/files/${path}?w=${w}`) : null);
 

@@ -524,9 +524,20 @@ async def rsvp(event_id: str, user: dict = Depends(get_current_user)):
 
 
 @router.get("/{event_id}/attendees")
-async def attendees(event_id: str, limit: int = 100):
-    cursor = db.event_rsvps.find({"event_id": event_id}).sort("created_at", 1).limit(limit)
-    return [strip_mongo(r) for r in await cursor.to_list(limit)]
+async def attendees(event_id: str, limit: int = 100, me: dict = Depends(get_current_user)):
+    e = await db.events.find_one({"id": event_id})
+    if not e:
+        raise HTTPException(404, "Event not found")
+    is_host = me["id"] == e.get("host_id") or me.get("role") == "admin"
+    cursor = db.event_rsvps.find({"event_id": event_id, "refunded": {"$ne": True}}).sort("created_at", 1).limit(min(limit, 500))
+    out = []
+    for r in await cursor.to_list(min(limit, 500)):
+        row = {"id": r["id"], "user_id": r.get("user_id"), "user_name": r.get("user_name") or ("Gift guest" if r.get("gift") else "Guest"),
+               "created_at": r.get("created_at"), "gift": bool(r.get("gift"))}
+        if is_host:
+            row.update({"user_email": r.get("user_email"), "paid": bool(r.get("paid")), "amount": r.get("amount"), "checked_in": bool(r.get("checked_in"))})
+        out.append(row)
+    return out
 
 
 # ---------- Analytics (host-only) ----------
@@ -858,6 +869,9 @@ async def _promote_from_waitlist(e: dict) -> Optional[dict]:
 
 def _waitlist_invite_html(user_name: str, e: dict, checkout_url: Optional[str] = None, hold_expires_at: Optional[str] = None) -> str:
     from emails import _wrap
+    import html as _h
+    user_name = _h.escape(user_name or "")
+    e = {**e, "title": _h.escape(str(e.get("title") or ""))}
     price = f"${e['ticket_price']:,.2f}" if not e.get("is_free") else "Free"
     cta_href = checkout_url or f"https://artcorestudio.net/events/{e['id']}"
     cta_label = "Complete payment (15 min)" if checkout_url else "Claim your seat"

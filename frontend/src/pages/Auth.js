@@ -34,8 +34,10 @@ export function Login() {
     catch (er) { toast.error(er?.response?.data?.detail || "Couldn't resend"); }
   };
 
+  const nextParam = new URLSearchParams(window.location.search).get("next");
   const routeByRole = (u) => {
-    if (u.role === "admin") nav("/admin");
+    if (nextParam && nextParam.startsWith("/")) nav(nextParam);
+    else if (u.role === "admin") nav("/admin");
     else if (u.role === "artist") nav("/studio");
     else nav("/dashboard");
   };
@@ -157,7 +159,8 @@ export function Register() {
     try {
       const u = await register({ email, password, name, role });
       toast.success(t("auth.welcome_to"));
-      nav(u.role === "artist" ? "/onboarding" : "/dashboard");
+      const next = params.get("next");
+      nav(next && next.startsWith("/") ? next : (u.role === "artist" ? "/onboarding" : "/dashboard"));
     } catch (er) { toast.error(er?.response?.data?.detail || "Failed"); }
     finally { setBusy(false); }
   };

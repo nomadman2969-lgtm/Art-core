@@ -184,7 +184,7 @@ async def all_artists(user=Depends(require_role("admin"))):
     out = []
     for u in await cursor.to_list(500):
         u = strip_mongo(u)
-        out.append(public_user(u))
+        out.append(public_user(u, include_email=True))
     return out
 
 

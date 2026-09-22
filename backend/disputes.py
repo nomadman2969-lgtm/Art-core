@@ -38,6 +38,8 @@ class ResolveReq(BaseModel):
 
 async def _enrich(d: dict) -> dict:
     d = strip_mongo(d)
+    from artworks import sign_file_url
+    d["image_urls"] = [sign_file_url(p) for p in d.get("images") or []]
     o = await db.orders.find_one({"id": d["order_id"]})
     if o:
         d["order"] = {"id": o["id"], "total": o.get("total"), "created_at": o.get("created_at"),
@@ -79,6 +81,8 @@ async def open_dispute(oid: str, req: DisputeCreate, user: dict = Depends(get_cu
         "created_at": now_iso(), "updated_at": now_iso(),
     }
     await db.disputes.insert_one(d)
+    from artworks import mark_private
+    await mark_private(d["images"], {"kind": "order", "order_id": oid})
     from payouts import freeze_payouts
     await db.orders.update_one({"id": oid}, {"$set": {"dispute_status": "open", "dispute_id": d["id"], "artist_payouts": freeze_payouts(o, "disputed")}})
     if seller_id:

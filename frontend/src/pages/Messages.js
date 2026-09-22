@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, fileUrl } from "../api";
+import { api, fileUrl, privateFileUrl } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Search, Send, Paperclip, Image as ImageIcon, Palette, Check, CheckCheck, X, Smile } from "lucide-react";
@@ -291,7 +291,7 @@ export function MessageThread() {
 function AttachmentCard({ att, mine }) {
   const textClr = mine ? "text-black" : "text-white";
   if (att.kind === "image") {
-    return <img src={att.url?.startsWith("http") ? att.url : fileUrl(att.url?.replace(/^\/api\/files\//, ""))} className="max-w-full max-h-72 object-cover" alt="" />;
+    return <img src={privateFileUrl(att.signed_url || att.url)} data-testid="dm-image-attachment" className="max-w-full max-h-72 object-cover" alt="" />;
   }
   if (att.kind === "artwork") {
     return (

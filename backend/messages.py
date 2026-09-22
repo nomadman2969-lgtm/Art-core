@@ -67,7 +67,9 @@ async def _enrich_attachment(att: Optional[dict]) -> Optional[dict]:
             return {"kind": "order", "ref_id": ref_id, "total": o.get("total"),
                     "status": (o.get("fulfillment") or {}).get("status")}
     if kind == "image":
-        return {"kind": "image", "url": att.get("url"), "label": att.get("label")}
+        from artworks import sign_file_url
+        return {"kind": "image", "url": att.get("url"), "label": att.get("label"),
+                "signed_url": sign_file_url(att["url"]) if att.get("url") and not str(att["url"]).startswith("http") else att.get("url")}
     return att
 
 
@@ -76,6 +78,9 @@ async def deliver_dm(sender: dict, to_user_id: str, text: str, attachment: Optio
     target = await db.users.find_one({"id": to_user_id})
     if not target:
         raise HTTPException(404, "User not found")
+    if attachment and attachment.get("kind") == "image" and attachment.get("url"):
+        from artworks import mark_private
+        await mark_private([attachment["url"]], {"kind": "thread", "users": [sender["id"], to_user_id]})
     msg = {
         "id": new_id(),
         "thread_key": _thread_key(sender["id"], to_user_id),

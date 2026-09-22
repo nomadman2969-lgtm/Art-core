@@ -92,10 +92,10 @@ class UserPublic(BaseModel):
     approved: bool = True
 
 
-def public_user(u: dict) -> dict:
+def public_user(u: dict, include_email: bool = False) -> dict:
     return {
         "id": u["id"],
-        "email": u["email"],
+        **({"email": u["email"]} if include_email else {}),
         "name": u["name"],
         "role": u["role"],
         "bio": u.get("bio"),
@@ -150,7 +150,7 @@ async def register(req: RegisterReq):
         await grant_waiver(user["id"], user["email"], _settings)
         await grant_founding(user["id"], _settings)
     token = make_token(user["id"], user["role"])
-    return {"token": token, "user": public_user(user)}
+    return {"token": token, "user": public_user(user, include_email=True)}
 
 
 @router.post("/login")
@@ -169,12 +169,12 @@ async def login(req: LoginReq, request: Request):
     if user.get("twofa_enabled"):
         from twofa import make_challenge_token, send_email_code, is_trusted_device
         if await is_trusted_device(user, req.device_token):
-            return {"token": make_token(user["id"], user["role"]), "user": public_user(user)}
+            return {"token": make_token(user["id"], user["role"]), "user": public_user(user, include_email=True)}
         if user.get("twofa_method") == "email":
             await send_email_code(user)
         return {"requires_2fa": True, "method": user.get("twofa_method"), "challenge_token": make_challenge_token(user["id"])}
     token = make_token(user["id"], user["role"])
-    return {"token": token, "user": public_user(user)}
+    return {"token": token, "user": public_user(user, include_email=True)}
 
 
 class DemoLoginReq(BaseModel):
@@ -195,12 +195,12 @@ async def demo_login(req: DemoLoginReq, request: Request):
     user = await db.users.find_one({"email": email, "is_demo": True})
     if not user:
         raise HTTPException(503, "Demo account unavailable")
-    return {"token": make_token(user["id"], user["role"]), "user": public_user(user)}
+    return {"token": make_token(user["id"], user["role"]), "user": public_user(user, include_email=True)}
 
 
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)):
-    return public_user(user)
+    return public_user(user, include_email=True)
 
 
 class UpdateProfileReq(BaseModel):
@@ -217,4 +217,4 @@ async def update_me(req: UpdateProfileReq, user: dict = Depends(get_current_user
     if updates:
         await db.users.update_one({"id": user["id"]}, {"$set": updates})
     fresh = strip_mongo(await db.users.find_one({"id": user["id"]}))
-    return public_user(fresh)
+    return public_user(fresh, include_email=True)
