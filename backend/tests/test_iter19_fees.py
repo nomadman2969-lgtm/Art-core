@@ -6,7 +6,7 @@ import pytest
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://monster-curated.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN = ("monster@houseofmonster.com", os.environ["ADMIN_PASSWORD"])
+ADMIN = ("admin@artcorestudio.net", os.environ["ADMIN_PASSWORD"])
 ARTIST = ("demo.artist@artcorestudio.net", "DemoArtist2026!")
 BUYER = ("demo.collector@artcorestudio.net", "DemoCollector2026!")
 

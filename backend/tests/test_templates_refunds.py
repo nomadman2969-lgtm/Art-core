@@ -7,7 +7,7 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or "http://localhost:8001"
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "monster@houseofmonster.com"
+ADMIN_EMAIL = "admin@artcorestudio.net"
 ADMIN_PW = os.environ["ADMIN_PASSWORD"]
 
 

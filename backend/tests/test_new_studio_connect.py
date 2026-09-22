@@ -72,7 +72,7 @@ def _make_live_artwork(artist_token, price=200.0, title="TEST piece"):
 @pytest.fixture(scope="module")
 def ctx():
     r = _req("POST", "/auth/login", json={
-        "email": "monster@houseofmonster.com", "password": os.environ["ADMIN_PASSWORD"]
+        "email": "admin@artcorestudio.net", "password": os.environ["ADMIN_PASSWORD"]
     })
     assert r.status_code == 200, r.text
     admin_token = r.json()["token"]

@@ -11,7 +11,7 @@ UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
 
 COLLECTOR = ("demo.collector@artcorestudio.net", "DemoCollector2026!")
 ARTIST = ("demo.artist@artcorestudio.net", "DemoArtist2026!")
-ADMIN = ("monster@houseofmonster.com", os.environ["ADMIN_PASSWORD"])
+ADMIN = ("admin@artcorestudio.net", os.environ["ADMIN_PASSWORD"])
 
 
 def _login(email, pw):

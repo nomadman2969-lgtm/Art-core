@@ -37,7 +37,7 @@ def ctx():
 
     # admin login
     r = _req("POST", "/auth/login", json={
-        "email": "monster@houseofmonster.com", "password": os.environ["ADMIN_PASSWORD"]
+        "email": "admin@artcorestudio.net", "password": os.environ["ADMIN_PASSWORD"]
     })
     assert r.status_code == 200, r.text
     admin_token = r.json()["token"]
@@ -465,7 +465,7 @@ class TestRegression:
 
     def test_admin_login(self):
         r = _req("POST", "/auth/login", json={
-            "email": "monster@houseofmonster.com", "password": os.environ["ADMIN_PASSWORD"]
+            "email": "admin@artcorestudio.net", "password": os.environ["ADMIN_PASSWORD"]
         })
         assert r.status_code == 200 and r.json()["user"]["role"] == "admin"
 

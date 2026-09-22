@@ -36,7 +36,7 @@ ARTIST_EMAIL = "demo.artist@artcorestudio.net"
 ARTIST_PW = "DemoArtist2026!"
 COLLECTOR_EMAIL = "demo.collector@artcorestudio.net"
 COLLECTOR_PW = "DemoCollector2026!"
-ADMIN_EMAIL = "monster@houseofmonster.com"
+ADMIN_EMAIL = "admin@artcorestudio.net"
 ADMIN_PW = os.environ["ADMIN_PASSWORD"]
 
 
