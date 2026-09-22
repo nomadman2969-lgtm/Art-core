@@ -78,7 +78,10 @@ async def deliver_dm(sender: dict, to_user_id: str, text: str, attachment: Optio
     target = await db.users.find_one({"id": to_user_id})
     if not target:
         raise HTTPException(404, "User not found")
-    if attachment and attachment.get("kind") == "image" and attachment.get("url"):
+    if attachment and attachment.get("kind") == "image":
+        clean = str(attachment.get("url") or "").replace("/api/files/", "").lstrip("/")
+        if not clean or not await db.files.find_one({"storage_path": clean, "is_deleted": False}):
+            raise HTTPException(400, "Image attachment must reference an uploaded file")
         from artworks import mark_private
         await mark_private([attachment["url"]], {"kind": "thread", "users": [sender["id"], to_user_id]})
     msg = {

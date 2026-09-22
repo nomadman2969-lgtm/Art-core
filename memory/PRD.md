@@ -652,3 +652,10 @@ Then click Verify in Resend → Domains.
 - Register form: required 18+/Terms/Privacy/Refunds consent checkbox (register-consent-input) — submit disabled until checked.
 - Demo one-tap buttons gated by `settings.global.demo_login_enabled` (default true): exposed in GET /api/settings, admin toggle in /admin Settings ("Demo sign-in buttons", demo-login-enabled-input), `/api/auth/demo-login` → 403 when off. **Turn OFF before public launch.**
 - Launch checklist given to user: Stripe live mode, Resend DNS, deploy + custom domain (support_agent steps), real founder content, disable demo buttons.
+
+## 2026-06 — Launch page, private files, security re-audit fixes (iteration_27: 12/12 backend + all frontend pass)
+- `/launch/:id` (LaunchPage.js): event landing with hero, when/where, CTA (logged-out → `/register?next=`; logged-in → RSVP/ticket → /tickets), Share, flyer poster download. `GET /api/events/{id}/poster.png` (poster.py, 1080×1620 Pillow, QR → launch URL). Auth.js honours `?next=`.
+- Private files: `files.private` + `scope` ({kind:order,order_id} | {kind:thread,users}) set by disputes.open_dispute and messages.deliver_dm (image attachments must reference a real upload → 400 otherwise). `GET /api/files/{path}` for private → needs authorized JWT header (buyer/seller/thread member/uploader/admin) OR short-lived (15 min) HMAC signed link `?exp=&sig=` minted by `artworks.sign_file_url` — returned as `disputes.image_urls[]` and `attachment.signed_url`. No account JWT in URLs. Private responses: `Cache-Control: private, no-store`, `Referrer-Policy: no-referrer`.
+- Security re-audit fixes: `/events/{id}/attendees` now auth-required, minimal shape for non-hosts (host/admin get email/paid/amount/checked_in); `public_user()` drops email unless `include_email=True` (/me, login, admin list); `_waitlist_invite_html` escaped; rate-limit IP uses last X-Forwarded-For hop.
+- Remaining P3: pin CORS via `CORS_ORIGINS` at deploy; dependency CVE scan; Stripe live key encryption at rest.
+- PayPal: user requested then CANCELLED — not implemented.
