@@ -234,7 +234,8 @@ async def startup():
             "bio": "This is a demo buyer account. Explore browsing, offers, purchases, and RSVPing to events.",
         },
     ]
-    for d in demo_accounts:
+    _settings = await db.settings.find_one({"id": "global"}) or {}
+    for d in (demo_accounts if _settings.get("demo_login_enabled", True) else []):
         existing_demo = await db.users.find_one({"email": d["email"]})
         if existing_demo:
             if not verify_password(d["password"], existing_demo["password_hash"]):

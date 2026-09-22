@@ -659,3 +659,6 @@ Then click Verify in Resend → Domains.
 - Security re-audit fixes: `/events/{id}/attendees` now auth-required, minimal shape for non-hosts (host/admin get email/paid/amount/checked_in); `public_user()` drops email unless `include_email=True` (/me, login, admin list); `_waitlist_invite_html` escaped; rate-limit IP uses last X-Forwarded-For hop.
 - Remaining P3: pin CORS via `CORS_ORIGINS` at deploy; dependency CVE scan; Stripe live key encryption at rest.
 - PayPal: user requested then CANCELLED — not implemented.
+
+## 2026-06 — Clean slate
+- Admin email → admin@artcorestudio.net (env ADMIN_EMAIL). Full data wipe: all non-admin users + all content collections deleted; files soft-deleted; admin profile reset (avatar/cover/bio/stripe fields). `demo_login_enabled=false`; server.py seeds demo accounts only when the toggle is on. Dev-overlay fix: index.html ignores anonymous cross-origin 'Script error.' events (real errors still surface).
