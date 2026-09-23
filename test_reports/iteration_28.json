@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 28 — onboarding without a tour. Backend + frontend both green. 9/9 pytest tests pass covering setup-checklist shape/defaults/actions (shared/dismiss/restore/unknown->400), route-ordering (not shadowed by /{artist_id}), PATCH /auth/me → profile.done flip, upload+create artwork → artwork.done flip, and /api/settings.stripe_mode. Frontend: /how-it-works ($92.80, all sections, FAQ toggle, mobile 390px zero overflow), hero + footer links present; SetupChecklist card visible with '0 of 5 done', 5 items, checklist-profile → tab-story active, checklist-payouts → tab-payouts active, checklist-artwork → /studio/upload, /studio?tab=payouts deep link opens Payouts, dismiss hides card and stays hidden on reload; empty states render on /studio Artworks, /orders, /selling, /saved, /feed, /messages, /tickets and /explore (logged out) with correct CTAs; Cart shows escrow-note with 'Protected purchase' + How-it-works link + 'Stripe test mode · card 4242…' line (surfaced because settings.stripe_mode==='test').",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Cart", "issue": "When cart contains an artwork in status=pending_fee (not yet listed live), the cart line renders '$NaN' price and Total '$NaN' instead of gracefully filtering out or showing an unavailable-state. Escrow copy still shows fine.", "selector": "/cart line-total & total", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter28_onboarding.py",
+    "/app/test_reports/pytest/iter28.xml"
+  ],
+  "action_items": [
+    "Optional: In Cart, filter out or mark items whose /api/artworks/{id} lookup fails or returns status=pending_fee/removed so the total doesn't show '$NaN'."
+  ],
+  "critical_code_review_comments": [
+    "studio.py setup_checklist is correctly placed before /{artist_id} — good. Note: publish.done requires published_at AND artworks>0, but the label says just 'Publish your studio' — could be misleading to an artist who has published but has no artworks yet (label + condition mismatch). Minor UX polish, not a bug.",
+    "SetupChecklist go() only handles tab= links via onTab; for the share step it calls share(). For 'publish' whose href is '/studio', it does nothing (no matching tab= regex) — but publish is a Link (not a button), because usesTab is only true if href has tab= or key==='share'. Publish is rendered as <Link to='/studio'> which is a same-page no-op. Consider making it a button that scrolls to Preview/Publish CTA."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter28_onboarding.py"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (all iteration-28 flows green)"},
+  "test_credentials": "Fresh throwaway artists registered via POST /api/auth/register per test (email prefix TEST_/iter28_). Admin creds unchanged in /app/memory/test_credentials.md.",
+  "seed_data_creation": "None persisted intentionally; throwaway artist + buyer + one pending_fee artwork created during frontend cart test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file: /app/backend/tests/test_iter28_onboarding.py. Auth uses localStorage key 'hom_token' (NOT 'token'). Register response returns r.data.token. Demo one-tap login is OFF (settings.demo_login_enabled=false). To test as artist/buyer, always register fresh throwaway users; do not attempt demo-login. Setup-checklist counts artworks with status != 'removed' (pending_fee still counts as an uploaded artwork).",
+  "rca of the issue": "N/A — no critical bugs."
+}

@@ -662,3 +662,11 @@ Then click Verify in Resend → Domains.
 
 ## 2026-06 — Clean slate
 - Admin email → admin@artcorestudio.net (env ADMIN_EMAIL). Full data wipe: all non-admin users + all content collections deleted; files soft-deleted; admin profile reset (avatar/cover/bio/stripe fields). `demo_login_enabled=false`; server.py seeds demo accounts only when the toggle is on. Dev-overlay fix: index.html ignores anonymous cross-origin 'Script error.' events (real errors still surface).
+
+## 2026-06 — Onboarding without a tour (iteration_28: 9/9 backend + all frontend pass)
+- `GET /api/studio/setup-checklist` (+ `POST …/{shared|dismiss|restore}`) — 5 steps: profile (avatar + bio≥20), artwork (count>0), payouts (stripe_connect_status pending/active), publish (published_at + artwork), share (users.checklist_shared). Defined BEFORE `/{artist_id}` in studio.py. `users.checklist_dismissed`.
+- `components/studio/SetupChecklist.js` mounted in StudioEditor above tabs (progress bar, tab-switching items, dismiss). StudioEditor honours `?tab=` deep link.
+- `components/EmptyState.js` (icon/title/body/cta/secondary) used on: Studio artworks, Orders, Selling, Messages, Tickets, Saved, Feed, Explore.
+- Cart: escrow note (escrow-note) + test-card hint only when `settings.stripe_mode==='test'` (`/api/settings` now returns stripe_mode). Cart NaN guard for items without a price.
+- `/how-it-works` (HowItWorks.js): collectors 3 steps, artists 3 steps, live fee example from settings ($100→$92.80), more-than-a-shop, FAQ, CTAs. Linked from Home hero (hero-how-it-works) + footer (footer-how-it-works).
+- Throwaway artist for testing: tut.artist@example.com / TutArtist123!

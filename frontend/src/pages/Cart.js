@@ -41,7 +41,7 @@ export function Cart() {
                   <div className="font-unbounded font-semibold text-lg truncate">{i.title}</div>
                   <div className="label-caps mt-1">{i.artist}</div>
                 </div>
-                <div className="font-anton text-xl text-[#CCFF00]">${Number(i.price).toLocaleString()}</div>
+                <div className="font-anton text-xl text-[#CCFF00]">${(Number.isFinite(Number(i.price)) ? Number(i.price) : 0).toLocaleString()}</div>
                 <button data-testid={`remove-${i.id}`} onClick={() => remove(i.id)} className="text-zinc-500 hover:text-[#FF4D4D] p-2"><Trash2 size={16} /></button>
               </div>
             ))}
