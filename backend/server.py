@@ -31,6 +31,8 @@ from orders import router as orders_router
 from delivery import router as delivery_router
 from tracking import router as tracking_router
 from poster import router as poster_router
+from admin_tools import router as admin_tools_router
+from listing_assist import router as listing_assist_router
 from offers import router as offers_router
 from realtime import router as realtime_router
 from certificates import router as certificates_router
@@ -68,6 +70,8 @@ app.include_router(notifications_router)
 app.include_router(delivery_router)
 app.include_router(tracking_router)
 app.include_router(poster_router)
+app.include_router(admin_tools_router)
+app.include_router(listing_assist_router)
 app.include_router(orders_router)
 app.include_router(offers_router)
 app.include_router(realtime_router)
@@ -103,6 +107,7 @@ async def public_settings():
         "waiver_max_sales": s.get("waiver_max_sales", 5),
         "demo_login_enabled": s.get("demo_login_enabled", True),
         "stripe_mode": s.get("stripe_mode") or os.environ.get("STRIPE_MODE", "test"),
+        "dispute_auto_days": s.get("dispute_auto_days", 7),
         **(await founding_stats(s)),
     }
 
@@ -151,6 +156,11 @@ async def _reminder_loop():
             await sweep_delivery_confirmations()
         except Exception as e:
             logger.error(f"Delivery confirmation sweep failed: {e}")
+        try:
+            from admin_tools import sweep_stale_disputes
+            await sweep_stale_disputes()
+        except Exception as e:
+            logger.error(f"Dispute safety-valve sweep failed: {e}")
         try:
             from waiver import check_waiver_reminders
             await check_waiver_reminders()

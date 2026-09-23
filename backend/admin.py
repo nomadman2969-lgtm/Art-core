@@ -26,6 +26,7 @@ class SettingsUpdate(BaseModel):
     founding_rate: Optional[float] = Field(default=None, ge=0, le=50)
     founding_cap: Optional[int] = Field(default=None, ge=0, le=100000)
     demo_login_enabled: Optional[bool] = None
+    dispute_auto_days: Optional[int] = Field(default=None, ge=2, le=30)
 
 
 async def _get_settings():

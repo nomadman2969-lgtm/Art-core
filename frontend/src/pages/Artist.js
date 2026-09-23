@@ -4,6 +4,7 @@ import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Plus, Gavel } from "lucide-react";
+import { ListingAssistant } from "../components/studio/ListingAssistant";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -221,6 +222,7 @@ export function UploadArtwork() {
       <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-4">New Artwork</h1>
       <p className="text-zinc-400 mb-12">Listing fee: <span className="text-[#CCFF00] font-unbounded">${settings?.upload_fee ?? "..."}</span></p>
       <form onSubmit={submit} className="space-y-6">
+        {images.length === 0 && <div className="text-xs text-zinc-500 border border-dashed border-white/10 rounded-sm p-3" data-testid="assist-tip">Tip: add your photo first (bottom of the form) and the <span className="text-[#7C3AED]">Listing assistant</span> can draft the title, description, tags and price for you.</div>}
         <Field label="Title"><input data-testid="art-title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none focus:border-[#CCFF00]" /></Field>
         <Field label="Description"><textarea data-testid="art-description" required rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 focus:border-[#CCFF00] outline-none" /></Field>
         <div className="grid grid-cols-2 gap-4">
@@ -300,6 +302,7 @@ export function UploadArtwork() {
             ))}
           </div>
         </Field>
+        <ListingAssistant imagePath={images[0]} form={form} onApply={(patch) => setForm((x) => ({ ...x, ...patch }))} />
         <button data-testid="submit-artwork" className="btn-lime mt-6">Save & Continue</button>
       </form>
     </div>

@@ -37,7 +37,7 @@ async def _enrich(n: dict) -> dict:
             if art:
                 n["artwork"] = {"id": art["id"], "title": art["title"], "images": art.get("images", [])[:1]}
     if kind in ("order_shipped", "dispute_opened", "dispute_resolved", "order_refunded", "payout_reversed",
-                "order_delivered_confirm", "order_auto_confirmed", "order_received_confirmed", "order_not_received") and n.get("order_id"):
+                "order_delivered_confirm", "order_auto_confirmed", "order_received_confirmed", "order_not_received", "dispute_auto_warning", "dispute_auto_failed") and n.get("order_id"):
         n["order"] = {"id": n["order_id"]}
     if kind == "payout_released" and n.get("order_id"):
         n["order"] = {"id": n["order_id"]}

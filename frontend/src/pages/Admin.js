@@ -33,6 +33,17 @@ export default function AdminDashboard() {
   };
   useEffect(load, []);
 
+  const exportData = async (e) => {
+    e.preventDefault();
+    toast.message("Preparing your backup...");
+    try {
+      const r = await api.get("/admin/export.zip", { responseType: "blob" });
+      const url = URL.createObjectURL(r.data);
+      const a = document.createElement("a"); a.href = url; a.download = `artcore-export-${new Date().toISOString().slice(0, 10)}.zip`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Backup downloaded");
+    } catch { toast.error("Export failed"); }
+  };
   const saveSettings = async () => {
     await api.patch("/admin/settings", {
       commission_percent: Number(settings.commission_percent),
@@ -47,6 +58,7 @@ export default function AdminDashboard() {
       founding_rate: Number(settings.founding_rate ?? 4),
       founding_cap: Number(settings.founding_cap ?? 500),
       demo_login_enabled: !!(settings.demo_login_enabled ?? true),
+      dispute_auto_days: Number(settings.dispute_auto_days ?? 7),
     });
     toast.success("Settings saved");
   };
@@ -140,6 +152,18 @@ export default function AdminDashboard() {
             <input data-testid="waiver-sales-input" type="number" min="0" max="1000" value={settings.waiver_max_sales ?? 5}
               onChange={(e) => setSettings({ ...settings, waiver_max_sales: e.target.value })}
               className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none" />
+          </Row>
+          <Row label="Dispute safety valve">
+            <div className="flex items-center gap-3 text-sm">
+              <span>Auto-resolve disputes nobody has reviewed after</span>
+              <input data-testid="dispute-auto-days-input" type="number" min="2" max="30" value={settings.dispute_auto_days ?? 7} onChange={(e) => setSettings({ ...settings, dispute_auto_days: e.target.value })} className="w-20 bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2" />
+              <span>days</span>
+            </div>
+            <div className="text-xs text-zinc-500 mt-2">You get a warning 2 days before. Rule: “not received” with carrier-confirmed tracking → payout released to the artist; anything else → full refund to the buyer. Money is never stuck.</div>
+          </Row>
+          <Row label="Data export">
+            <a data-testid="admin-export-btn" href={`${process.env.REACT_APP_BACKEND_URL}/api/admin/export.zip`} onClick={exportData} className="btn-ghost !py-2 !text-xs inline-flex items-center gap-2">Download full backup (.zip)</a>
+            <div className="text-xs text-zinc-500 mt-2">Every user, order, payout, dispute, event and transaction as JSON + CSV. Passwords and 2FA secrets are excluded.</div>
           </Row>
           <Row label="Demo sign-in buttons">
             <label className="flex items-center gap-2 text-sm"><input data-testid="demo-login-enabled-input" type="checkbox" checked={settings.demo_login_enabled ?? true} onChange={(e) => setSettings({ ...settings, demo_login_enabled: e.target.checked })} className="accent-[#CCFF00]" /> Show "Enter as Artist / Collector" one-tap demo buttons on the login page (turn off before going public)</label>
