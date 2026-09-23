@@ -8,6 +8,7 @@ import { ReportButton } from "../components/ReportButton";
 import { RecommendedEvents } from "../components/events/RecommendedEvents";
 import { StaffPicks } from "../components/home/StaffPicks";
 import FeedComposer from "../components/FeedComposer";
+import { EmptyState } from "../components/EmptyState";
 
 const resolveImg = (p) => thumbUrl(p, 960);
 
@@ -211,15 +212,15 @@ export default function HomeFeed() {
       </div>
 
       {feed.items.length === 0 ? (
-        <div className="border border-dashed border-white/10 py-24 text-center rounded-sm">
-          <Sparkles size={32} className="mx-auto text-zinc-600" />
-          <div className="label-caps mt-4 text-zinc-500">
-            {activeFilters.length > 0 ? "Nothing matches these filters" : "Nothing here yet"}
-          </div>
+        <div className={activeFilters.length > 0 ? "border border-dashed border-white/10 py-24 text-center rounded-sm" : ""}>
           {activeFilters.length > 0 ? (
-            <button onClick={clearFilters} className="btn-ghost mt-6">Clear Filters</button>
+            <>
+              <Sparkles size={32} className="mx-auto text-zinc-600" />
+              <div className="label-caps mt-4 text-zinc-500">Nothing matches these filters</div>
+              <button onClick={clearFilters} className="btn-ghost mt-6">Clear Filters</button>
+            </>
           ) : (
-            <Link to="/artists" className="btn-lime mt-6 inline-flex">Discover Artists</Link>
+            <EmptyState icon="compass" title="Your feed is quiet" body="Follow a few artists and their new pieces, studio posts, and events show up here. Start with Explore to see what's fresh." cta="Discover artists" to="/artists" secondary="Explore" secondaryTo="/explore" testId="feed-empty" />
           )}
         </div>
       ) : (

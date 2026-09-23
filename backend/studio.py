@@ -271,6 +271,34 @@ async def _get_or_create_config(artist_id: str) -> dict:
     return strip_mongo(await db.studio_configs.find_one({"artist_id": artist_id}))
 
 
+@router.get("/setup-checklist")
+async def setup_checklist(user: dict = Depends(get_current_user)):
+    """Artist onboarding to-do list (drives the Studio 'Get set up' card)."""
+    cfg = await db.studio_configs.find_one({"artist_id": user["id"]}) or {}
+    artworks = await db.artworks.count_documents({"artist_id": user["id"], "status": {"$ne": "removed"}})
+    steps = [
+        {"key": "profile", "label": "Add a photo and a short bio", "done": bool(user.get("avatar")) and len((user.get("bio") or "").strip()) >= 20, "href": "/studio?tab=story"},
+        {"key": "artwork", "label": "Upload your first artwork", "done": artworks > 0, "href": "/studio/upload"},
+        {"key": "payouts", "label": "Connect payouts (Stripe) so you can get paid", "done": (user.get("stripe_connect_status") or "not_started") in ("active", "complete", "pending"), "href": "/studio?tab=payouts"},
+        {"key": "publish", "label": "Publish your studio", "done": bool(cfg.get("published_at")) and artworks > 0, "href": "/studio"},
+        {"key": "share", "label": "Share your studio link", "done": bool(user.get("checklist_shared")), "href": f"/artist/{user['id']}"},
+    ]
+    done = sum(1 for s in steps if s["done"])
+    return {"steps": steps, "done": done, "total": len(steps), "complete": done == len(steps), "dismissed": bool(user.get("checklist_dismissed"))}
+
+
+@router.post("/setup-checklist/{action}")
+async def setup_checklist_action(action: str, user: dict = Depends(get_current_user)):
+    field = {"shared": "checklist_shared", "dismiss": "checklist_dismissed", "restore": None}.get(action, "")
+    if field == "":
+        raise HTTPException(400, "Unknown action")
+    if action == "restore":
+        await db.users.update_one({"id": user["id"]}, {"$unset": {"checklist_dismissed": ""}})
+    else:
+        await db.users.update_one({"id": user["id"]}, {"$set": {field: True}})
+    return {"ok": True}
+
+
 @router.get("/{artist_id}")
 async def get_studio(artist_id: str, preview: bool = False, viewer: Optional[dict] = Depends(get_optional_user)):
     """Public studio view. If preview=true and viewer is the owner, apply their unpublished draft."""

@@ -61,6 +61,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-4 mt-12">
             <Link to="/explore" data-testid="hero-cta-explore" className="btn-lime">{t("home.explore_art")}</Link>
             <Link to="/register?role=artist" data-testid="hero-cta-sell" className="btn-ghost">{t("home.become_artist")}</Link>
+            <Link to="/how-it-works" data-testid="hero-how-it-works" className="label-caps text-zinc-400 hover:text-[#CCFF00] transition-colors">How it works →</Link>
           </div>
           <div className="grid grid-cols-3 gap-8 mt-20 max-w-2xl">
             <Stat label={t("home.stat_artists")} value={stats.artists ?? 0} />

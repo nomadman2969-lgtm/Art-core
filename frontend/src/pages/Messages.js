@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Search, Send, Paperclip, Image as ImageIcon, Palette, Check, CheckCheck, X, Smile } from "lucide-react";
 import { useLive } from "../hooks/useLive";
+import { EmptyState } from "../components/EmptyState";
 
 const REACTION_EMOJIS = [
   { key: "heart", char: "❤️" },
@@ -58,10 +59,8 @@ export function MessagesInbox() {
       </div>
       {loading && threads.length === 0 ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
         threads.length === 0 ? (
-          <div className="border border-dashed border-white/10 py-16 text-center rounded-sm">
-            <div className="label-caps text-zinc-500">{q ? t("messages.no_matches") : t("messages.empty")}</div>
-            {!q && <div className="text-sm text-zinc-400 mt-4">Message an artist from their Studio to start.</div>}
-          </div>
+          q ? <div className="border border-dashed border-white/10 py-16 text-center rounded-sm label-caps text-zinc-500">{t("messages.no_matches")}</div>
+            : <EmptyState icon="message" title="No conversations yet" body="Open any artist's Studio and tap Message to ask about a piece, a size, or a commission. Artists: buyers reach you here — turn on notifications so you never miss one." cta="Find artists" to="/artists" testId="messages-empty" />
         ) : (
           <div className="divide-y divide-white/8 border border-white/8 rounded-sm">
             {threads.map((t) => (

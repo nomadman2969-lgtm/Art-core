@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Heart } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { EmptyState } from "../components/EmptyState";
 
 export default function Explore() {
   const { t } = useTranslation();
@@ -40,7 +41,7 @@ export default function Explore() {
       {loading ? (
         <div className="text-zinc-500 py-24 text-center label-caps">{t("common.loading")}</div>
       ) : feed.length === 0 ? (
-        <div className="border border-dashed border-white/10 py-24 text-center label-caps text-zinc-500 rounded-sm">{t("explore.empty")}</div>
+        <EmptyState icon="sparkles" title="Nothing here yet" body="Art Core is brand new — the first artists are setting up their studios right now. Are you an artist? Founding members lock in a 4% fee for life." cta="Join as an artist" to="/register?role=artist" secondary="How it works" secondaryTo="/how-it-works" testId="explore-empty" />
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {feed.map((a, i) => (

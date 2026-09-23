@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { AnalyticsPanel } from "../components/studio/AnalyticsPanel";
+import { SetupChecklist } from "../components/studio/SetupChecklist";
+import { EmptyState } from "../components/EmptyState";
 import { WaiverBadge } from "../components/FoundingWaiver";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -19,7 +21,7 @@ export function StudioEditor() {
   const { t } = useTranslation();
   const { user, refresh } = useAuth();
   const nav = useNavigate();
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get("tab") || "overview");
   const [dashboard, setDashboard] = useState(null);
   const [artworks, setArtworks] = useState([]);
   const [config, setConfig] = useState(null);
@@ -149,6 +151,8 @@ export function StudioEditor() {
           <Link to="/studio/upload" data-testid="new-artwork-btn" className="btn-lime"><Plus size={14} className="mr-2" /> New Artwork</Link>
         </div>
       </div>
+
+      <SetupChecklist userId={user.id} onTab={setTab} />
 
       <div className="flex flex-wrap gap-1 mb-10 border-b border-white/8 overflow-x-auto">
         {tabs.map(([k, l]) => (
@@ -280,7 +284,7 @@ export function StudioEditor() {
       {tab === "artworks" && (
         <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
           {artworks.length === 0 ? (
-            <div className="text-zinc-500 py-16 label-caps text-center">No artworks yet. <Link to="/studio/upload" className="text-[#CCFF00] ml-2">Upload →</Link></div>
+            <EmptyState icon="palette" title="Your studio is empty" body="Upload your first piece — it shows up here, on Explore, and in the Marketplace within seconds. Most artists start with 3–5 works and a clear photo of each." cta="Upload your first artwork" to="/studio/upload" testId="studio-artworks-empty" />
           ) : artworks.map((a) => (
             <ArtworkRow key={a.id} a={a} onReload={loadAll} onPayFee={payFee} onSubmitAotw={submitAotw} />
           ))}

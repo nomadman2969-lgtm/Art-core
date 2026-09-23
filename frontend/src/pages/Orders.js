@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Package, Star, Download, Truck, CheckCircle2, PackageCheck, PackageX, ShieldCheck } from "lucide-react";
 import { CertificateButton, DisputePanel } from "../components/orders/OrderExtras";
 import { LiveTrackingPanel } from "../components/orders/LiveTrackingPanel";
+import { EmptyState } from "../components/EmptyState";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -31,10 +32,7 @@ export function Orders() {
       <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-10">{t("orders.title")}</h1>
       {loading ? <div className="text-zinc-500 py-16 text-center label-caps">{t("common.loading")}</div> :
         orders.length === 0 ? (
-          <div className="border border-dashed border-white/10 py-20 text-center rounded-sm">
-            <div className="label-caps text-zinc-500">{t("orders.empty")}</div>
-            <Link to="/marketplace" className="btn-lime mt-6 inline-flex">Browse Marketplace</Link>
-          </div>
+          <EmptyState icon="package" title="No orders yet" body="When you buy a piece, it shows up here with tracking. Your payment is held by Art Core until you confirm it arrived — the artist is paid after." cta="Browse the Marketplace" to="/marketplace" secondary="How buying works" secondaryTo="/how-it-works" testId="orders-empty" />
         ) : (
           <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
             {orders.map((o) => {
@@ -75,9 +73,7 @@ export function SellingOrders() {
       <h1 className="font-anton text-5xl md:text-7xl uppercase mt-4 mb-10">{t("orders.selling_title")}</h1>
       {loading ? <div className="text-zinc-500 py-16 text-center label-caps">{t("common.loading")}</div> :
         orders.length === 0 ? (
-          <div className="border border-dashed border-white/10 py-20 text-center rounded-sm">
-            <div className="label-caps text-zinc-500">No sales yet.</div>
-          </div>
+          <EmptyState icon="truck" title="No sales yet" body="When a collector buys your work it lands here. You'll ship it with a tracking number, the buyer confirms delivery, and your payout follows 2 days later. Tip: studios with 5+ published pieces sell first." cta="Upload artwork" to="/studio/upload" secondary="Connect payouts" secondaryTo="/studio?tab=payouts" testId="selling-empty" />
         ) : (
           <div className="border border-white/8 divide-y divide-white/8 rounded-sm">
             {orders.map((o) => {

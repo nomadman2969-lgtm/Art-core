@@ -160,6 +160,7 @@ export default function Layout({ children }) {
             <div className="label-caps mb-4">{t("footer.discover")}</div>
             <ul className="space-y-2 text-sm text-zinc-300">
               <li><Link to="/explore">{t("nav.explore")}</Link></li>
+              <li><Link to="/how-it-works" data-testid="footer-how-it-works">How it works</Link></li>
               <li><Link to="/marketplace">{t("nav.marketplace")}</Link></li>
               <li><Link to="/artists">{t("nav.artists")}</Link></li>
               <li><Link to="/auctions">{t("nav.auctions")}</Link></li>

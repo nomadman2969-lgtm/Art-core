@@ -102,6 +102,7 @@ async def public_settings():
         "waiver_days": s.get("waiver_days", 30),
         "waiver_max_sales": s.get("waiver_max_sales", 5),
         "demo_login_enabled": s.get("demo_login_enabled", True),
+        "stripe_mode": s.get("stripe_mode") or os.environ.get("STRIPE_MODE", "test"),
         **(await founding_stats(s)),
     }
 

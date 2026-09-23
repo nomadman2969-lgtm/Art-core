@@ -5,6 +5,7 @@ import { api, fileUrl } from "../api";
 import { toast } from "sonner";
 import { Ticket, Calendar, MapPin, QrCode, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { CalendarSubscribe } from "../components/CalendarSubscribe";
+import { EmptyState } from "../components/EmptyState";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 const catColor = { gallery_opening: "#D4AF37", pop_up: "#FF4D4D", festival: "#FF6EC7", meetup: "#7C3AED", workshop: "#00E5FF", live_painting: "#F5A623", virtual: "#CCFF00", market: "#00E5FF" };
@@ -44,13 +45,7 @@ export default function Tickets() {
       </div>
 
       {tickets.length === 0 ? (
-        <div className="border border-dashed border-white/10 py-24 text-center rounded-sm">
-          <Ticket size={32} className="mx-auto text-zinc-600" />
-          <div className="label-caps mt-4 text-zinc-500">
-            {tab === "upcoming" ? "No upcoming tickets" : "Nothing here yet"}
-          </div>
-          <Link to="/events" className="btn-lime mt-6 inline-flex">Find Events</Link>
-        </div>
+        <EmptyState icon="ticket" title={tab === "upcoming" ? "No upcoming tickets" : "No past events yet"} body="RSVP to any event and your QR ticket appears here — show it at the door, add it to your calendar, or gift it to a friend." cta="Find events near you" to="/events" testId="tickets-empty" />
       ) : (
         <div className="space-y-3">
           {tickets.map((t) => (

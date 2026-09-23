@@ -11,6 +11,8 @@ const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 export function Cart() {
   const { t } = useTranslation();
   const { items, remove, total } = useCart();
+  const [settings, setSettings] = useState(null);
+  useEffect(() => { api.get("/settings").then((r) => setSettings(r.data)).catch(() => {}); }, []);
   const [busy, setBusy] = useState(false);
   const checkout = async () => {
     if (items.length === 0) return;
@@ -52,7 +54,10 @@ export function Cart() {
               <button data-testid="checkout-btn" onClick={checkout} disabled={busy} className="btn-lime w-full mt-6">
                 {busy ? t("cart.redirecting") : t("cart.checkout")}
               </button>
-              <div className="label-caps mt-4 text-zinc-600 text-center">Stripe · Test card 4242 4242 4242 4242</div>
+              <div className="text-xs text-zinc-400 mt-4 leading-relaxed border-t border-white/8 pt-4" data-testid="escrow-note">
+                <span className="text-[#CCFF00]">Protected purchase.</span> Art Core holds your payment until you confirm the piece arrived. The artist ships with tracking; you get a prompt to confirm or report a problem. <Link to="/how-it-works" className="underline hover:text-white">How it works</Link>
+              </div>
+              {settings?.stripe_mode === "test" && <div className="label-caps mt-3 text-zinc-600 text-center">Stripe test mode · card 4242 4242 4242 4242</div>}
             </div>
           </div>
         </div>

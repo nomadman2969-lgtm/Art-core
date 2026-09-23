@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { api, fileUrl } from "../api";
 import { toast } from "sonner";
 import { Bookmark, Plus, Trash2, X, Lock } from "lucide-react";
+import { EmptyState } from "../components/EmptyState";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -81,12 +82,7 @@ export function SavedIndex() {
 
       {loading ? <div className="text-zinc-500 py-16 text-center label-caps">Loading...</div> :
         cols.length === 1 && cols[0].item_count === 0 ? (
-          <div className="border border-dashed border-white/10 py-24 text-center rounded-sm">
-            <Bookmark size={32} className="mx-auto text-zinc-600" />
-            <div className="label-caps mt-4 text-zinc-500">Nothing saved yet</div>
-            <div className="text-sm text-zinc-400 mt-2">Tap the bookmark on any artwork to save it here.</div>
-            <Link to="/marketplace" className="btn-lime mt-6 inline-flex">Browse Marketplace</Link>
-          </div>
+          <EmptyState icon="bookmark" title="Nothing saved yet" body="Tap the bookmark on any artwork to keep it here. Make collections like “For the studio” or “Gift ideas” and share them." cta="Browse the Marketplace" to="/marketplace" testId="saved-empty" />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {cols.map((c) => (
