@@ -213,7 +213,7 @@ class UpdateProfileReq(BaseModel):
 
 @router.patch("/me")
 async def update_me(req: UpdateProfileReq, user: dict = Depends(get_current_user)):
-    updates = {k: v for k, v in req.model_dump(exclude_none=True).items()}
+    updates = req.model_dump(exclude_unset=True)
     if updates:
         await db.users.update_one({"id": user["id"]}, {"$set": updates})
     fresh = strip_mongo(await db.users.find_one({"id": user["id"]}))

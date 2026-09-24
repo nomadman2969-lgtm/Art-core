@@ -1,0 +1,39 @@
+{
+  "summary": "Iter 31 — Artist avatar editor (Studio → My Story) + 12% commission with Founding 4% locked-for-life + 0% waiver. 6/6 backend pytest pass; all frontend flows green. Found + fixed a backend Pydantic bug on PATCH /api/auth/me that prevented clearing avatar via {avatar:null} (exclude_none dropped null). All other backend contracts intact. Frontend: KeepMoreStrip on Home shows keep-pct '~85%', body says 'flat 12%', Art Core row note contains '12%' and 'Founding Artists: 4% for life'. /how-it-works hiw-net = $84.80 with $12.00 platform + $3.20 processing. /pro no longer contains 'your 4% stays'. Mobile 390 has no horizontal overflow. Spanish language via language-picker (data-testid) renders KeepMoreStrip with '12%' (i18n interpolation works). Avatar flow (throwaway artist tw31b_*): tab-story → avatar-editor visible with avatar-initial, set_input_files on avatar-input uploaded a feature JPEG, avatar-preview img appeared with /api/files/... src, /api/auth/me.avatar set to storage key, /artist/{id} shows studio-avatar img (naturalWidth>0, loaded), Remove → avatar-initial returned and public studio-avatar removed. Backend fee-preview authenticated as founding+waivered artist returns platform_take=0, commission=0, fee_waived=true, founding_locked=true, net=96.8; /api/waiver/me returns locked_commission_percent=4.0, standard=12.0. Final cleanup called POST /api/admin/reset-to-clean-slate {confirm:'DELETE EVERYTHING'} → 200, founding_taken=0.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/auth/me", "issue": "Originally used req.model_dump(exclude_none=True) so payload {avatar: null} was silently dropped and could never clear avatar/bio/cover_image. Fixed to exclude_unset=True during this run so 'Remove photo' works."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter31_avatar_fees.py",
+    "/app/test_reports/pytest/iter31.xml"
+  ],
+  "action_items": [
+    "Review the PATCH /api/auth/me exclude_unset fix in /app/backend/auth.py — same pattern should be verified for any other PATCH endpoints that need to allow clearing optional fields (e.g., admin settings, artwork updates)."
+  ],
+  "critical_code_review_comments": [
+    "auth.py PATCH /me was using exclude_none — a common Pydantic pitfall for PATCH semantics; audit other update endpoints in artworks.py/admin_tools.py/settings.py for the same anti-pattern.",
+    "storage.py returns a raw S3-key style path (e.g. 'house-of-monster/uploads/...'); frontend fileUrl prefixes /api/files/. This works but the /api/upload/image response could return both `path` and `url` for consistency (artworks.py already returns url).",
+    "waiver.py effective_rate correctly uses min(locked, commission) so if global commission drops below 4% founding artists auto-benefit — good.",
+    "PATCH /me returns the fresh user with public_user(include_email=True); confirmed avatar field is included in response and DB is updated (both set and null cases)."
+  ],
+  "updated_files": [
+    "/app/backend/auth.py",
+    "/app/backend/tests/test_iter31_avatar_fees.py",
+    "/app/test_reports/iteration_31.json"
+  ],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (all avatar + KeepMoreStrip + how-it-works + /pro + i18n flows)"},
+  "test_credentials": "Admin admin@artcorestudio.net / atg-6+XxIRZe1zLUDCcwB!_a (ADMIN_PASSWORD in backend/.env, matches /app/memory/test_credentials.md). Throwaway artists tw31_*/tw31b_*/tw31ui_* created via /api/auth/register and cleaned via reset-to-clean-slate.",
+  "seed_data_creation": "None retained. Registered several throwaway artists during backend + frontend flows, then wiped via POST /api/admin/reset-to-clean-slate. Verified GET /api/settings founding_taken=0 post-cleanup.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Language picker uses data-testid=\"language-picker-btn\" + language-option-{code} (NOT lang-picker/select). Register form requires: click role-artist button, then fill register-name/email/password testids, tick the ToS checkbox (plain input[type=checkbox]), then click register-submit — otherwise submit stays disabled. Upload endpoint /api/upload/image returns { path } as raw S3-style key; frontend concatenates via /api/files/ prefix. hom_token is the localStorage key for JWT.",
+  "rca of the issue": "PATCH /api/auth/me bug: `req.model_dump(exclude_none=True)` strips fields whose value is None, so the 'Remove photo' flow — which sends {avatar:null} — was silently a no-op. Reproduced via curl (avatar stayed set after null PATCH). Fix: switch to `req.model_dump(exclude_unset=True)` so null values sent by the client are preserved and Mongo $set writes None. Verified: set /uploads/x.jpg → cleared to None on second PATCH, both API and DB agree, UI Remove now toggles avatar-initial back."
+}
