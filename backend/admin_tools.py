@@ -5,7 +5,8 @@ import json
 import os
 import zipfile
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from db import db, now_iso, strip_mongo
 from auth import require_role
@@ -65,6 +66,35 @@ async def sweep_stale_disputes() -> dict:
 @router.post("/disputes/sweep")
 async def run_sweep(user=Depends(require_role("admin"))):
     return await sweep_stale_disputes()
+
+
+KEEP_COLLECTIONS = {"settings", "push_config", "rate_limits", "webhook_events", "users", "files", "notification_prefs", "admin_audit"}
+
+
+class ResetReq(BaseModel):
+    confirm: str
+
+
+@router.post("/reset-to-clean-slate")
+async def reset_to_clean_slate(req: ResetReq, user=Depends(require_role("admin"))):
+    """Danger zone: delete every account except admins and all content/transactions. Keeps settings + Stripe config."""
+    if req.confirm != "DELETE EVERYTHING":
+        raise HTTPException(400, 'Type "DELETE EVERYTHING" to confirm')
+    admin_ids = [a["id"] async for a in db.users.find({"role": "admin"}, {"id": 1})]
+    removed = {}
+    for name in await db.list_collection_names():
+        if name in KEEP_COLLECTIONS or name.startswith("system."):
+            continue
+        removed[name] = (await db[name].delete_many({})).deleted_count
+    removed["users"] = (await db.users.delete_many({"id": {"$nin": admin_ids}})).deleted_count
+    removed["files"] = (await db.files.update_many({}, {"$set": {"is_deleted": True}})).modified_count
+    await db.notification_prefs.delete_many({"user_id": {"$nin": admin_ids}})
+    await db.users.update_many({"id": {"$in": admin_ids}}, {"$unset": {k: "" for k in (
+        "founding_member", "founding_number", "locked_commission_percent", "waiver_until", "waiver_sales_left", "waiver_sales_used",
+        "sales_count", "checklist_shared", "checklist_dismissed", "followers_count", "following_count", "pro")}})
+    await db.settings.update_one({"id": "global"}, {"$set": {"staff_picks": {}, "featured_artwork_ids": [], "aotw_artwork_id": None}})
+    await db.admin_audit.insert_one({"kind": "reset", "by": user["id"], "at": now_iso(), "removed": removed})
+    return {"ok": True, "removed": removed, "admins_kept": len(admin_ids)}
 
 
 def _scrub_user(u: dict) -> dict:

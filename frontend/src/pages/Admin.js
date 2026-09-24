@@ -44,6 +44,15 @@ export default function AdminDashboard() {
       toast.success("Backup downloaded");
     } catch { toast.error("Export failed"); }
   };
+  const resetAll = async () => {
+    const typed = window.prompt("This deletes EVERY account except admins and ALL artworks, orders, events and messages. Settings and Stripe config are kept.\n\nType DELETE EVERYTHING to confirm:");
+    if (typed === null) return;
+    try {
+      const r = await api.post("/admin/reset-to-clean-slate", { confirm: typed });
+      toast.success(`Clean slate — removed ${r.data.removed.users} accounts`);
+      setTimeout(() => window.location.reload(), 800);
+    } catch (e) { toast.error(e?.response?.data?.detail || "Reset failed"); }
+  };
   const saveSettings = async () => {
     await api.patch("/admin/settings", {
       commission_percent: Number(settings.commission_percent),
@@ -164,6 +173,10 @@ export default function AdminDashboard() {
           <Row label="Data export">
             <a data-testid="admin-export-btn" href={`${process.env.REACT_APP_BACKEND_URL}/api/admin/export.zip`} onClick={exportData} className="btn-ghost !py-2 !text-xs inline-flex items-center gap-2">Download full backup (.zip)</a>
             <div className="text-xs text-zinc-500 mt-2">Every user, order, payout, dispute, event and transaction as JSON + CSV. Passwords and 2FA secrets are excluded.</div>
+          </Row>
+          <Row label="Danger zone">
+            <button data-testid="admin-reset-btn" onClick={resetAll} className="!py-2 px-4 text-xs font-semibold uppercase tracking-widest rounded-sm border border-[#FF4D4D]/60 text-[#FF4D4D] hover:bg-[#FF4D4D]/10 transition-colors">Reset to clean slate</button>
+            <div className="text-xs text-zinc-500 mt-2">Wipes every account except admins plus all content, orders and founding numbers. Use after testing, before launch. Download a backup first.</div>
           </Row>
           <Row label="Demo sign-in buttons">
             <label className="flex items-center gap-2 text-sm"><input data-testid="demo-login-enabled-input" type="checkbox" checked={settings.demo_login_enabled ?? true} onChange={(e) => setSettings({ ...settings, demo_login_enabled: e.target.checked })} className="accent-[#CCFF00]" /> Show "Enter as Artist / Collector" one-tap demo buttons on the login page (turn off before going public)</label>

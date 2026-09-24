@@ -1,0 +1,28 @@
+{
+  "summary": "Iter 29 — dispute safety valve, admin data export, and Claude Listing Assistant. 14/14 backend pytest tests pass + all 3 frontend flows green. Backend: sweep as artist→403; sweep resolves 8-day-old carrier-delivered not_received dispute A to 'reject' (auto_resolved true, order fulfillment→delivered, payout release_at set + hold_reason='dispute_rejected'); B (damaged, no session_id) stays open with auto_resolve_error and one 'dispute_auto_failed' admin notification; C (5-day-old) gets auto_warned + one 'dispute_auto_warning' admin notification; second sweep is idempotent (no re-warn/re-notify). Settings PATCH dispute_auto_days=10 persists and is exposed via public /api/settings; 1→422; restored to 7. /api/admin/export.zip → 200 application/zip with the 6 files, users scrubbed of password_hash/twofa_secret/recovery_codes/trusted_devices, users.csv header valid; artist→403; anon→401. Listing-assist: valid draft returned with all keys, medium ∈ MEDIUMS, 5-8 tags, price_low ≤ suggested ≤ high; another user's image_path→404, bogus path→404, buyer→403, missing image_path→422. Frontend /studio/upload: assist-tip visible before image, listing-assistant card appears after upload, assist-run-btn returns draft in ~10-15s with 'Primary Forms After Dark' + $250, apply fills art-title/art-description/art-price=250, Save & Continue posts artwork and redirects (fee flow). Frontend /admin Settings: dispute-auto-days-input change to 9 persists across reload; admin-export-btn triggers Playwright download 'artcore-export-2026-09-23.zip'. Frontend /notifications: both 'Dispute auto-resolves in 2 days — review it' and 'Dispute auto-resolve failed — needs you' labels render for admin.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter29_valve_export_assist.py",
+    "/app/test_reports/pytest/iter29.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_tools.sweep_stale_disputes iterates disputes with `.to_list(200)` — with growth this cap could silently drop old disputes from a single sweep run. Consider pagination or removing the limit.",
+    "In the failure branch, `if not d.get('auto_resolve_error')` guards double-notify, but the `auto_resolve_error` is overwritten with the latest error each sweep — losing the original error history. Consider `$push` to an errors array or `$setOnInsert`-style guard.",
+    "listing_assist.py: `raise HTTPException(400, ...)` inside an `except Exception` swallows all Pillow errors as 'Could not read that image' — including HTTPException that FastAPI may raise from get_object; add explicit re-raise for HTTPException. Minor.",
+    "admin_tools.export_all pulls up to 200k rows per collection into memory + zips in a single request — fine for MVP scale, but for large datasets this will OOM or time out through k8s ingress. Consider streaming/chunked export.",
+    "SettingsUpdate model has no dispute_auto_days upper bound consistent with UI (UI max=30, Pydantic ge=2,le=30 — good, matches). Ok."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter29_valve_export_assist.py",
+    "/app/test_reports/iteration_29.json"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (3/3 flows)"},
+  "test_credentials": "admin@artcorestudio.net / atg-6+XxIRZe1zLUDCcwB!_a (from ADMIN_PASSWORD env). Throwaway artist + buyer registered per test run via /api/auth/register.",
+  "seed_data_creation": "During backend tests: orders iter29_orderA/B/C + disputes iter29_dispA/B/C created 8/5 days back in Mongo (cleaned up in fixture teardown). During frontend Flow 3: one dispute_auto_failed notification with dispute_id='iter29_fe_seed' seeded in Mongo for the admin (cleaned up post-test).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: /app/backend/tests/test_iter29_valve_export_assist.py (uses pymongo direct seed for stale disputes because created_at needs to be 5/8 days back). Auth: hom_token localStorage key. Notifications API only returns notifications matching current user_id, so to render admin-only kinds in /notifications you must log in as an admin whose id matches notification.user_id. The listing-assist call takes 10-20s and requires EMERGENT_LLM_KEY in backend/.env. Ancient valve seed disp_order_valveC left over from previous curl run still exists in DB — harmless (kept for readback).",
+  "rca of the issue": "N/A — no bugs found."
+}
