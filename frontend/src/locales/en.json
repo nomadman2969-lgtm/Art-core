@@ -76,7 +76,7 @@
     "kicker": "Artist-first economics",
     "title_1": "Artists keep",
     "title_2": "of every sale.",
-    "body": "Art Core takes a flat 4%. The only other cost is Stripe's standard card processing (~2.9% + 30¢), paid out straight to your bank — no listing fees, no monthly plan, no surprise deductions.",
+    "body": "Art Core takes a flat {{pct}}%. The only other cost is Stripe's standard card processing (~2.9% + 30¢), paid out straight to your bank — no listing fees, no monthly plan, no surprise deductions.",
     "cta": "Open your studio",
     "footnote": "Approximate seller take-home on a $100 sale, based on each platform's published fees. Competitor fees change — verify before comparing."
   },

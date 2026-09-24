@@ -76,7 +76,7 @@
     "kicker": "Une économie au service des artistes",
     "title_1": "Les artistes gardent",
     "title_2": "de chaque vente.",
-    "body": "Art Core prend 4 % fixes. Le seul autre coût est le traitement de carte standard de Stripe (~2,9 % + 30¢), versé directement sur votre compte — sans frais de mise en ligne, sans abonnement, sans déduction surprise.",
+    "body": "Art Core prend {{pct}}% fixes. Le seul autre coût est le traitement de carte standard de Stripe (~2,9 % + 30¢), versé directement sur votre compte — sans frais de mise en ligne, sans abonnement, sans déduction surprise.",
     "cta": "Ouvrez votre atelier",
     "footnote": "Revenu net approximatif du vendeur sur une vente de 100 $, d'après les tarifs publiés de chaque plateforme. Les tarifs évoluent — vérifiez avant de comparer."
   },

@@ -500,9 +500,45 @@ export function StoryEditor({ config, save, user, refresh }) {
     setSaving(false);
   };
 
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const uploadAvatar = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setAvatarBusy(true);
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await api.post("/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      await api.patch("/auth/me", { avatar: r.data.path });
+      await refresh();
+      toast.success("Photo updated — it's live on your Studio right away");
+    } catch { toast.error("Upload failed"); }
+    setAvatarBusy(false);
+  };
+  const removeAvatar = async () => {
+    try { await api.patch("/auth/me", { avatar: null }); await refresh(); toast.success("Photo removed"); } catch { toast.error("Failed"); }
+  };
+
   const inputCls = "w-full bg-white/[0.03] border border-white/12 rounded-sm px-3 py-2.5 outline-none focus:border-[#CCFF00]";
   return (
     <div className="space-y-5 max-w-3xl">
+      <div className="glass-card rounded-sm p-5 flex flex-col sm:flex-row items-start sm:items-center gap-5" data-testid="avatar-editor">
+        <div className="avatar-ring w-24 h-24 shrink-0">
+          {user.avatar
+            ? <img src={fileUrl(user.avatar)} alt={user.name} data-testid="avatar-preview" className="w-full h-full object-cover rounded-full" />
+            : <div className="bg-[#0A0A0C] rounded-full w-full h-full flex items-center justify-center font-anton text-3xl uppercase" data-testid="avatar-initial">{user.name?.[0]}</div>}
+        </div>
+        <div className="flex-1">
+          <div className="label-caps">Your photo</div>
+          <div className="text-sm text-zinc-400 mt-1">Show collectors who they're buying from. A clear face shot or you in the studio works best. Square, at least 400×400.</div>
+          <div className="flex flex-wrap gap-3 mt-3">
+            <label className="btn-lime !py-2 !text-xs cursor-pointer">
+              {avatarBusy ? "Uploading..." : user.avatar ? "Change photo" : "Upload photo"}
+              <input data-testid="avatar-input" type="file" accept="image/*" onChange={uploadAvatar} className="hidden" disabled={avatarBusy} />
+            </label>
+            {user.avatar && <button type="button" data-testid="avatar-remove" onClick={removeAvatar} className="btn-ghost !py-2 !text-xs">Remove</button>}
+          </div>
+        </div>
+      </div>
       <label className="block">
         <div className="flex items-center justify-between mb-2">
           <div className="label-caps">Bio (shown at top of your Studio)</div>

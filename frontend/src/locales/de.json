@@ -76,7 +76,7 @@
     "kicker": "Künstler zuerst",
     "title_1": "Künstler behalten",
     "title_2": "jedes Verkaufs.",
-    "body": "Art Core nimmt pauschal 4 %. Die einzigen weiteren Kosten sind Stripes Standard-Kartengebühren (~2,9 % + 30¢), direkt auf dein Konto ausgezahlt — keine Einstellgebühren, kein Abo, keine versteckten Abzüge.",
+    "body": "Art Core nimmt pauschal {{pct}}%. Die einzigen weiteren Kosten sind Stripes Standard-Kartengebühren (~2,9 % + 30¢), direkt auf dein Konto ausgezahlt — keine Einstellgebühren, kein Abo, keine versteckten Abzüge.",
     "cta": "Eröffne dein Studio",
     "footnote": "Ungefährer Verkäufer-Nettoerlös bei einem Verkauf von 100 $, basierend auf den veröffentlichten Gebühren der Plattformen. Gebühren ändern sich — bitte vor dem Vergleich prüfen."
   },

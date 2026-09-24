@@ -75,9 +75,9 @@ export function ArtistStudioPage() {
       <div className="max-w-[1600px] mx-auto px-6 md:px-12 pt-16 pb-12" data-testid="studio-header">
         <div className="flex flex-wrap gap-8 items-start">
           <div className="avatar-ring w-32 h-32 flex-shrink-0">
-            <div className="bg-[#0A0A0C] rounded-full w-full h-full flex items-center justify-center font-anton text-5xl uppercase">
-              {artist.name?.[0]}
-            </div>
+            {artist.avatar
+              ? <img src={fileUrl(artist.avatar)} alt={artist.name} data-testid="studio-avatar" className="w-full h-full object-cover rounded-full" />
+              : <div className="bg-[#0A0A0C] rounded-full w-full h-full flex items-center justify-center font-anton text-5xl uppercase">{artist.name?.[0]}</div>}
           </div>
           <div className="flex-1 min-w-[280px]">
             <div className="label-caps mb-2" style={{ color: "var(--accent)" }}>The Studio of</div>

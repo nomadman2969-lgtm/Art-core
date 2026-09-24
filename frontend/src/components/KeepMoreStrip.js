@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { api } from "../api";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { FoundingBanner } from "./FoundingWaiver";
 
-const ROWS = [
-  { name: "Art Core", keep: 93, accent: "#CCFF00", note: "4% fee + card processing. No listing fees, no subscription." },
+const rows = (pct, keep) => [
+  { name: "Art Core", keep, accent: "#CCFF00", note: `${pct}% fee + card processing. No listing fees, no subscription. Founding Artists: 4% for life.` },
   { name: "Etsy", keep: 88, note: "6.5% + 3% processing + listing fees + offsite ads" },
   { name: "Chairish", keep: 75, note: "20–30% commission on furniture & decor" },
   { name: "Saatchi Art", keep: 65, note: "35–40% commission" },
@@ -13,6 +14,11 @@ const ROWS = [
 
 export function KeepMoreStrip({ compact = false, cta = true }) {
   const { t } = useTranslation();
+  const [s, setS] = useState(null);
+  useEffect(() => { api.get("/settings").then((r) => setS(r.data)).catch(() => {}); }, []);
+  const pct = Number(s?.commission_percent ?? 12);
+  const keep = Math.round(100 - pct - Number(s?.processing_percent ?? 2.9) - 0.3);
+  const ROWS = rows(pct, keep);
   return (
     <section className={`${compact ? "" : "max-w-[1600px] mx-auto px-6 md:px-12 py-24"}`} data-testid="keep-more-strip">
       <div className="mb-6"><FoundingBanner compact={compact} /></div>
@@ -22,10 +28,10 @@ export function KeepMoreStrip({ compact = false, cta = true }) {
           <div>
             <div className="label-caps text-[#CCFF00]">{t("keep.kicker")}</div>
             <h2 className={`font-anton uppercase mt-4 leading-[0.9] ${compact ? "text-3xl md:text-5xl" : "text-4xl sm:text-5xl lg:text-6xl"}`}>
-              {t("keep.title_1")} <span className="text-[#CCFF00]">~93%</span><br />{t("keep.title_2")}
+              {t("keep.title_1")} <span className="text-[#CCFF00]" data-testid="keep-pct">~{keep}%</span><br />{t("keep.title_2")}
             </h2>
             <p className="text-zinc-400 mt-6 max-w-md text-sm md:text-base">
-              {t("keep.body")}
+              {t("keep.body", { pct })}
             </p>
             {cta && (
               <div className="flex flex-wrap gap-4 mt-8">

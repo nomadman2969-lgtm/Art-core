@@ -45,7 +45,7 @@ export default function Pro() {
     <div data-testid="pro-page" className="max-w-5xl mx-auto px-6 md:px-12 pt-16 pb-32">
       <div className="label-caps text-[#C4B5FD] flex items-center gap-2"><Crown size={12} /> Art Core Pro</div>
       <h1 className="font-anton text-4xl sm:text-5xl lg:text-7xl uppercase mt-3 leading-[0.9]">More eyes.<br />Faster money.<br /><span className="text-[#C4B5FD]">Your look.</span></h1>
-      <p className="text-zinc-400 mt-6 max-w-xl text-sm md:text-base">Pro is optional and never touches your commission — your 4% stays exactly where it is. It's for artists who want to move more work, faster.</p>
+      <p className="text-zinc-400 mt-6 max-w-xl text-sm md:text-base">Pro is optional and never touches your commission — your commission rate stays exactly where it is (Founding Artists keep their 4% for life). It's for artists who want to move more work, faster.</p>
 
       <div className="grid lg:grid-cols-[1.2fr_1fr] gap-8 mt-14 items-start">
         <div className="grid sm:grid-cols-2 gap-4">

@@ -1,0 +1,29 @@
+{
+  "summary": "Verified /api/admin/reset-to-clean-slate endpoint + admin dashboard clean state after data wipe. 7/7 backend pytest tests pass. Frontend admin dashboard shows all zeros; /studio has no Founding artist card / 0% fee banner; /selling shows 'NO SALES YET' empty state; /notifications is clean. admin-reset-btn is present on /admin Settings tab, clicking with prompt 'DELETE EVERYTHING' triggers reset, page reloads, and stats return to zero. Wrong phrase => 400, non-admin => 403, admin correct phrase => 200 (removed.users >=1). Throwaway artist can no longer log in after reset. DB left CLEAN: 1 admin user, founding_taken=0, founding_left=500, total_orders=0.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_reset_clean_slate.py",
+    "/app/test_reports/pytest/reset_slate.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Reset endpoint response includes a comprehensive removed-collections map (transparent) and admins_kept count — good.",
+    "waiver_grants collection is correctly wiped on reset (1 grant cleared during test); consistent with keeping settings/admins only.",
+    "Toast confirmation ('Clean slate') is likely fired by the client before window.reload(), so it may not be observable post-reload — consider a small toast delay or persisting toast across reload for admin UX confirmation."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_reset_clean_slate.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin admin@artcorestudio.net / ADMIN_PASSWORD from backend/.env (matches /app/memory/test_credentials.md). Throwaway artists were created via /api/auth/register and cleaned up via reset.",
+  "seed_data_creation": "None. Created and then wiped throwaway artist(s) uitw_*/uiv_*/tw_* via reset endpoint. Final API-level reset confirmed DB is clean (1 admin, founding_taken=0).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Reset-to-clean-slate is stable. If further testing creates throwaway users, always end with POST /api/admin/reset-to-clean-slate {confirm:'DELETE EVERYTHING'} as admin. Verify with GET /api/settings founding_taken==0.",
+  "rca of the issue": "Original bug: admin dashboard showed ~19 founders + ghost sales due to automated-test-created throwaway accounts (each register auto-consumes a founding number). Fix (POST /api/admin/reset-to-clean-slate) deletes all non-admin users + all content/transaction collections while keeping settings, Stripe config and admins; clears admin founding/waiver/sales fields. Verified idempotent and gated by (a) confirm phrase check -> 400 otherwise, (b) admin role check -> 403 otherwise. UI Danger Zone -> window.prompt -> POST -> reload works."
+}

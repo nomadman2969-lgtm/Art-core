@@ -76,7 +76,7 @@
     "kicker": "Economia a misura d'artista",
     "title_1": "Gli artisti tengono",
     "title_2": "di ogni vendita.",
-    "body": "Art Core prende un 4% fisso. L'unico altro costo è l'elaborazione carta standard di Stripe (~2,9% + 30¢), versata direttamente sul tuo conto — nessuna tariffa di inserzione, nessun abbonamento, nessuna detrazione a sorpresa.",
+    "body": "Art Core prende un {{pct}}% fisso. L'unico altro costo è l'elaborazione carta standard di Stripe (~2,9% + 30¢), versata direttamente sul tuo conto — nessuna tariffa di inserzione, nessun abbonamento, nessuna detrazione a sorpresa.",
     "cta": "Apri il tuo studio",
     "footnote": "Guadagno netto approssimativo del venditore su una vendita di 100 $, in base alle tariffe pubblicate da ogni piattaforma. Le tariffe cambiano — verifica prima di confrontare."
   },

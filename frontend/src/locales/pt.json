@@ -76,7 +76,7 @@
     "kicker": "Economia que prioriza o artista",
     "title_1": "Artistas ficam com",
     "title_2": "de cada venda.",
-    "body": "O Art Core cobra 4% fixos. O único outro custo é o processamento de cartão padrão do Stripe (~2,9% + 30¢), pago direto na sua conta — sem taxa de anúncio, sem mensalidade, sem descontos surpresa.",
+    "body": "O Art Core cobra {{pct}}% fixos. O único outro custo é o processamento de cartão padrão do Stripe (~2,9% + 30¢), pago direto na sua conta — sem taxa de anúncio, sem mensalidade, sem descontos surpresa.",
     "cta": "Abra seu estúdio",
     "footnote": "Ganho líquido aproximado do vendedor em uma venda de US$ 100, com base nas taxas publicadas de cada plataforma. Taxas mudam — verifique antes de comparar."
   },
