@@ -679,3 +679,9 @@ Then click Verify in Resend → Domains.
 - **Artist photo**: StoryEditor avatar editor (upload/change/remove → PATCH /auth/me avatar); ArtistStudio header shows avatar. PATCH /auth/me now uses exclude_unset so null clears fields.
 - **Fees**: commission_percent = 12 (settings). Founding Artists locked 4% for life (founding_rate 4, cap 500), 30-day / 5-sale 0% waiver unchanged. KeepMoreStrip + keep.body i18n ({{pct}}) + HowItWorks read live settings (~85% keep; $100 → $84.80).
 - Referral idea agreed in principle (not built): invitee's first sale → referrer's next sale fee-free + badges (no free month).
+
+## 2026-06 — Referral Rewards (iteration_32: 12/12 backend + frontend pass)
+- backend/referrals.py: `users.referral_code` (6-char, lazily minted), `referred_by` (artists only), `on_first_sale` fires once via waiver.after_sale (called from all 4 payment paths) → referrer `fee_free_sales += 1`, `referral_conversions`; invitee `referral_converted_at`. effective_rate: waiver > fee_free credit (0%, `fee_free_referral`) > founding lock > global. Credit consumed by `consume_fee_free_sale`. Badges `recruiter`/`crew` (growth.py). Notifications referral_joined / referral_reward / referral_badge. Endpoints GET /api/referrals/me, GET /api/referrals/check/{code}. Register accepts `referral_code`.
+- Frontend: ReferralCard in Studio → Payouts; /register?ref=CODE banner (+ localStorage hom_ref). Links use PUBLIC_APP_URL (prod domain) — in preview they point to artcorestudio.net (expected).
+- Campus Pages explained to user (not built): school field on users/events + /campus/{slug} page.
+- EasyPost key still not provided → tracking in manual mode.

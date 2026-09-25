@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 32 — Artist Referral Rewards. Backend suite (12 pytest cases) covering /referrals/me shape, /check/{code} case-insensitivity + 404, artist-only counting, buyer-with-code ignored, buyer 403 on /me, first-sale conversion (2× after_sale credits exactly 1), badges recruiter/crew, referral_joined/reward/badge notifications, waiver-expired credit consumption (0% via fee_free_referral → 4% back), and admin reset cleanup — ALL 12 PASS. Frontend Playwright covering studio Payouts ReferralCard (link with ref=CODE, copy toast 'Copied', stats), /register?ref=CODE banner showing/hiding by role, B registering via link → A's invited=1 with 'joined · no sale yet' invitee row, Notifications page label 'An artist joined with your invite link', mobile 390px no overflow — ALL PASS. Post-test admin reset-to-clean-slate executed; settings.founding_taken == 0.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter32_referrals.py",
+    "/app/test_reports/pytest/iter32.xml"
+  ],
+  "action_items": [
+    "Consider setting PUBLIC_APP_URL in preview backend/.env to REACT_APP_BACKEND_URL so shared referral links resolve in preview (currently links point to https://artcorestudio.net which is prod-only). Not a bug for prod but breaks manual QA/click-throughs in preview."
+  ],
+  "critical_code_review_comments": [
+    "referrals.attach_referrer correctly filters buyers and self-referral; case-insensitive lookup via .upper() works. Good.",
+    "waiver.after_sale correctly orders: consume waiver, else consume fee-free credit, then fire on_first_sale (which is idempotent via referral_converted_at). Ordering means invitee's OWN first sale does not consume their fresh fee-free credit if they somehow had one — safe.",
+    "growth.badges returns key field named 'id' (not 'key') — kept documented in tests. If frontend expects a specific field name, cross-check.",
+    "ReferralCard.js is compact and clean; localStorage 'hom_ref' is cleared post-register — good.",
+    "PUBLIC_APP_URL fallback (https://artcorestudio.net) hard-coded — acceptable but env-drift risk."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter32_referrals.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% (all flows)"},
+  "test_credentials": "admin@artcorestudio.net / ADMIN_PASSWORD env; fresh throwaway artists generated per run.",
+  "seed_data_creation": "Fresh users created per test run and wiped via /api/admin/reset-to-clean-slate at end.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "DB was wiped post-run via admin reset. Referral flow verified end-to-end: register → code (6 chars, no O/I/0/1) → invitee join → 'referral_joined' notif → first-sale conversion increments fee_free_sales once → badges recruiter/crew earned → credit consumed on next sale returning to founding 4%. Note PUBLIC_APP_URL points at prod host in referral link; if next test needs to click the copied link in preview, replace host with REACT_APP_BACKEND_URL manually."
+}
