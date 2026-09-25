@@ -4,6 +4,7 @@ import { api, fileUrl, ORIGIN } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { AnalyticsPanel } from "../components/studio/AnalyticsPanel";
 import { SetupChecklist } from "../components/studio/SetupChecklist";
+import { ReferralCard } from "../components/studio/ReferralCard";
 import { EmptyState } from "../components/EmptyState";
 import { WaiverBadge } from "../components/FoundingWaiver";
 import { useTranslation } from "react-i18next";
@@ -293,7 +294,7 @@ export function StudioEditor() {
 
       {tab === "analytics" && analytics && <AnalyticsPanel analytics={analytics} />}
 
-      {tab === "payouts" && <PayoutsPanel dashboard={dashboard} refresh={loadAll} refreshUser={refresh} />}
+      {tab === "payouts" && <div className="space-y-8"><PayoutsPanel dashboard={dashboard} refresh={loadAll} refreshUser={refresh} /><ReferralCard /></div>}
       {tab === "requests" && <CommissionRequestsPanel />}
     </div>
   );

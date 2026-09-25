@@ -63,6 +63,9 @@ def effective_rate(seller: Optional[dict], settings: dict) -> dict:
     if seller and waiver_status(seller, settings)["active"]:
         out["commission_percent"] = 0.0
         out["fee_waived"] = True
+    elif seller and int(seller.get("fee_free_sales") or 0) > 0:
+        out["commission_percent"] = 0.0
+        out["fee_free_referral"] = True
     return out
 
 
@@ -98,6 +101,16 @@ async def grant_founding(user_id: str, settings: dict, source: str = "signup") -
 
 async def consume_waiver_sale(seller_id: str) -> None:
     await db.users.update_one({"id": seller_id, "fee_waiver_sales_left": {"$gt": 0}}, {"$inc": {"fee_waiver_sales_left": -1}})
+
+
+async def after_sale(seller_id: str, seller_settings: dict) -> None:
+    """Consume whichever 0% credit was used and fire referral conversion on a seller's first sale."""
+    if seller_settings.get("fee_waived"):
+        await consume_waiver_sale(seller_id)
+    from referrals import consume_fee_free_sale, on_first_sale
+    if seller_settings.get("fee_free_referral"):
+        await consume_fee_free_sale(seller_id)
+    await on_first_sale(seller_id)
 
 
 @router.get("/me")

@@ -147,6 +147,13 @@ export function Register() {
   const [params] = useSearchParams();
   const [role, setRole] = useState(params.get("role") === "artist" ? "artist" : "buyer");
   const [agreed, setAgreed] = useState(false);
+  const refCode = (params.get("ref") || localStorage.getItem("hom_ref") || "").toUpperCase() || null;
+  const [referrer, setReferrer] = useState(null);
+  useEffect(() => {
+    if (!params.get("ref")) return;
+    localStorage.setItem("hom_ref", params.get("ref").toUpperCase());
+    api.get(`/referrals/check/${params.get("ref")}`).then((r) => setReferrer(r.data.referrer_name)).catch(() => setReferrer(null));
+  }, [params]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -157,7 +164,8 @@ export function Register() {
     e.preventDefault();
     setBusy(true);
     try {
-      const u = await register({ email, password, name, role });
+      const u = await register({ email, password, name, role, referral_code: role === "artist" ? refCode : null });
+      localStorage.removeItem("hom_ref");
       toast.success(t("auth.welcome_to"));
       const next = params.get("next");
       nav(next && next.startsWith("/") ? next : (u.role === "artist" ? "/onboarding" : "/dashboard"));
@@ -174,6 +182,11 @@ export function Register() {
         <button type="button" data-testid="role-artist" onClick={() => setRole("artist")}
           className={`py-3 label-caps text-xs border rounded-sm ${role === "artist" ? "bg-[#CCFF00] text-black border-[#CCFF00]" : "border-white/15 text-zinc-300 hover:border-[#CCFF00]"}`}>{t("auth.artist")}</button>
       </div>
+      {referrer && role === "artist" && (
+        <div className="mb-6 border border-[#CCFF00]/40 bg-[#CCFF00]/5 rounded-sm p-4 text-sm" data-testid="referral-banner">
+          <span className="text-[#CCFF00] font-semibold">{referrer}</span> invited you. You start with 0% fees for 30 days — and when you make your first sale, they get a fee-free sale too.
+        </div>
+      )}
       <form onSubmit={submit} className="space-y-5">
         <input data-testid="register-name" required placeholder={t("auth.full_name")} value={name} onChange={(e) => setName(e.target.value)}
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm px-4 py-3 outline-none focus:border-[#CCFF00]" />

@@ -20,11 +20,14 @@ BADGES = [
     ("rising", "Rising", "10 followers", "#FF6EC7"),
     ("hundred_club", "100 Club", "100 followers", "#D4AF37"),
     ("five_star", "Five Star", "A 5-star collector review", "#CCFF00"),
+    ("recruiter", "Recruiter", "Brought a fellow artist who made a sale", "#CCFF00"),
+    ("crew", "Crew", "Joined through a fellow artist and made a first sale", "#7C3AED"),
 ]
 
 
 @router.get("/users/{user_id}/badges")
 async def badges(user_id: str):
+    u = await db.users.find_one({"id": user_id}) or {}
     sold = await db.orders.count_documents({"artist_payouts.artist_id": user_id, "refunded": {"$ne": True}})
     followers = await db.follows.count_documents({"followed_id": user_id})
     auction_sold = await db.auctions.count_documents({"seller_id": user_id, "status": "ended", "winner_id": {"$ne": None}})
@@ -40,6 +43,7 @@ async def badges(user_id: str):
         "first_sale": sold >= 1, "ten_sales": sold >= 10, "auction_closer": auction_sold >= 1,
         "commissioned": commissions >= 1, "event_host": len(hosted) >= 1, "sold_out_show": sold_out,
         "rising": followers >= 10, "hundred_club": followers >= 100, "five_star": five_star >= 1,
+        "recruiter": int(u.get("referral_conversions") or 0) >= 1, "crew": bool(u.get("referral_converted_at")),
     }
     return [{"id": i, "label": l, "desc": d, "color": c, "earned": earned[i]} for i, l, d, c in BADGES]
 

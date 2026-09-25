@@ -574,9 +574,9 @@ async def _apply_paid(session_id: str):
         from waiver import settings_for_seller, consume_waiver_sale
         _seller_settings = {it["artist_id"]: await settings_for_seller(it["artist_id"], settings) for it in tx["items"]}
         _splits = [split_amount(it["price"] * it["quantity"], _seller_settings[it["artist_id"]]) for it in tx["items"]]
+        from waiver import after_sale
         for _aid, _ss in _seller_settings.items():
-            if _ss.get("fee_waived"):
-                await consume_waiver_sale(_aid)
+            await after_sale(_aid, _ss)
         order = {
             "id": new_id(),
             "session_id": session_id,
@@ -637,8 +637,8 @@ async def _apply_paid(session_id: str):
         settings = await settings_for_seller(tx["seller_id"], await get_settings())
         gross = float(tx["amount"])
         sp = split_amount(gross, settings)
-        if settings.get("fee_waived"):
-            await consume_waiver_sale(tx["seller_id"])
+        from waiver import after_sale
+        await after_sale(tx["seller_id"], settings)
         payout_status = "pending"  # → held by hold_payouts()
         order = {
             "id": new_id(),
@@ -689,8 +689,8 @@ async def _apply_paid(session_id: str):
         settings = await settings_for_seller(tx["seller_id"], await get_settings())
         gross = float(tx["amount"])
         sp = split_amount(gross, settings)
-        if settings.get("fee_waived"):
-            await consume_waiver_sale(tx["seller_id"])
+        from waiver import after_sale
+        await after_sale(tx["seller_id"], settings)
         payout_status = "pending"  # → held by hold_payouts()
         order = {
             "id": new_id(),
@@ -743,8 +743,8 @@ async def _apply_paid(session_id: str):
         settings = await settings_for_seller(tx["artist_id"], await get_settings())
         gross = float(tx["amount"])
         sp = split_amount(gross, settings)
-        if settings.get("fee_waived"):
-            await consume_waiver_sale(tx["artist_id"])
+        from waiver import after_sale
+        await after_sale(tx["artist_id"], settings)
         await db.commissions.update_one({"id": tx["commission_id"]}, {"$set": {
             "paid": True, "paid_at": now_iso(), "status": "paid",
             "platform_take": sp["platform_take"],

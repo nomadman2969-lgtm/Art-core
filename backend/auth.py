@@ -73,6 +73,7 @@ class RegisterReq(BaseModel):
     password: str = Field(min_length=6)
     name: str
     role: str = "buyer"  # buyer | artist
+    referral_code: Optional[str] = Field(default=None, max_length=12)
 
 
 class LoginReq(BaseModel):
@@ -148,6 +149,8 @@ async def register(req: RegisterReq):
         from payments import get_settings as _gs
         _settings = await _gs()
         await grant_waiver(user["id"], user["email"], _settings)
+        from referrals import attach_referrer
+        await attach_referrer(user, req.referral_code)
         await grant_founding(user["id"], _settings)
     token = make_token(user["id"], user["role"])
     return {"token": token, "user": public_user(user, include_email=True)}

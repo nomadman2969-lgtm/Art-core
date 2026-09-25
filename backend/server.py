@@ -33,6 +33,7 @@ from tracking import router as tracking_router
 from poster import router as poster_router
 from admin_tools import router as admin_tools_router
 from listing_assist import router as listing_assist_router
+from referrals import router as referrals_router
 from offers import router as offers_router
 from realtime import router as realtime_router
 from certificates import router as certificates_router
@@ -72,6 +73,7 @@ app.include_router(tracking_router)
 app.include_router(poster_router)
 app.include_router(admin_tools_router)
 app.include_router(listing_assist_router)
+app.include_router(referrals_router)
 app.include_router(orders_router)
 app.include_router(offers_router)
 app.include_router(realtime_router)
