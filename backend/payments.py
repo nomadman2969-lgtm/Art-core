@@ -875,6 +875,8 @@ async def stripe_webhook(request: Request):
     except Exception:
         raise HTTPException(400, "Invalid signature")
     obj, t = event["data"]["object"], event["type"]
+    from stripe_config import current_mode
+    await db.system_status.update_one({"id": "stripe_webhook"}, {"$set": {"last_at": now_iso(), "last_type": t, "mode": current_mode(), "livemode": bool(event.get("livemode"))}}, upsert=True)
     if t == "checkout.session.completed":
         await db.payment_transactions.update_one(
             {"session_id": obj["id"], "payment_status": {"$ne": "paid"}},

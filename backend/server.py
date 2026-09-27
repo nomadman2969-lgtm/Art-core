@@ -45,6 +45,7 @@ from connect import router as connect_router
 from push import router as push_router
 from events import router as events_router
 from campus import router as campus_router, admin_router as campus_admin_router, ensure_seed as ensure_campus_seed
+from launch import router as launch_router
 from storage import init_storage
 
 app = FastAPI(title="Art Core")
@@ -88,6 +89,7 @@ app.include_router(push_router)
 app.include_router(events_router)
 app.include_router(campus_router)
 app.include_router(campus_admin_router)
+app.include_router(launch_router)
 
 
 @app.get("/api/")

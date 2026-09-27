@@ -99,7 +99,7 @@ Never commit `.env` files (they are git-ignored). Copy the examples and fill the
 
 ## Stripe webhooks
 
-Point a Stripe webhook at `POST {backend}/api/payments/webhook` and subscribe to `checkout.session.completed`, `payment_intent.*`, `charge.refunded`, `customer.subscription.*`, `invoice.payment_failed`, `account.updated`. For local dev: `stripe listen --forward-to localhost:8001/api/payments/webhook`.
+Point a Stripe webhook at `POST {backend}/api/stripe/webhook` and subscribe to `checkout.session.completed`, `payment_intent.*`, `charge.refunded`, `customer.subscription.*`, `invoice.payment_failed`, `account.updated`. For local dev: `stripe listen --forward-to localhost:8001/api/stripe/webhook`.
 
 EasyPost (optional): register `POST {backend}/api/tracking/easypost/webhook` in the EasyPost dashboard.
 

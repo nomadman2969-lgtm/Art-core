@@ -699,3 +699,9 @@ Then click Verify in Resend → Domains.
 - README.md rewritten (features, stack, local setup, env table, Stripe/EasyPost webhooks, tests, deploy notes, links to MASTER_PROMPT/PRD). Added LICENSE (proprietary), backend/.env.example, frontend/.env.example (.gitignore un-ignores *.env.example), .github/workflows/ci.yml (backend compile check + frontend yarn build).
 - Secret scrub: admin password literal removed from 6 backend test files (now os.environ["ADMIN_PASSWORD"] via conftest dotenv) and 4 test_reports. test_iter33_campus.py refactored to a session `pending_campus` fixture so it passes under the configured `-n 2 --dist loadscope` (17/17).
 - User pushes via the "Save to GitHub" button (agent cannot git push). .env files stay ignored.
+
+## 2026-06 — Launch readiness panel (self-tested: curl + screenshots desktop/mobile)
+- backend/launch.py: GET /api/admin/launch-readiness → 12 live checks grouped money/domain/safety/content: stripe live mode, webhook received (payments.py stripe_webhook now upserts db.system_status{id:"stripe_webhook", last_at, last_type, mode}), connected artists, PUBLIC_APP_URL, CORS, Resend domain status (live call to api.resend.com/domains — currently 'not_started' for artcorestudio.net), demo login, admin 2FA, test data (TEST_/example.com emails), fees summary, content seeded, EasyPost (info).
+- frontend: components/admin/LaunchPanel.js, Admin tab "Launch" (/admin?tab=launch), data-testids launch-panel/launch-headline/launch-check-{key}[data-status].
+- .env: CORS_ORIGINS locked to artcorestudio.net + www + preview URL; PUBLIC_APP_URL=https://artcorestudio.net added. README webhook path corrected to /api/stripe/webhook.
+- Launch blockers right now: Stripe still test mode; Resend domain DNS not started. Warnings: no artist connected to Stripe, admin 2FA off, 23 test accounts (reset needed), no live artwork.

@@ -7,6 +7,7 @@ import { ReportsPanel } from "../components/admin/ReportsPanel";
 import { StaffPicksPanel } from "../components/admin/StaffPicksPanel";
 import { StripeSetupCard } from "../components/admin/StripeSetupCard";
 import { CampusesPanel } from "../components/admin/CampusesPanel";
+import { LaunchPanel } from "../components/admin/LaunchPanel";
 import { AdminWaiverButton } from "../components/FoundingWaiver";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
@@ -96,6 +97,7 @@ export default function AdminDashboard() {
 
   const tabs = [
     ["overview", "Overview"],
+    ["launch", "Launch"],
     ["settings", "Settings"],
     ["stripe", "Stripe"],
     ["curation", "Curation"],
@@ -304,6 +306,7 @@ export default function AdminDashboard() {
       {tab === "reports" && <ReportsPanel />}
       {tab === "picks" && <StaffPicksPanel />}
       {tab === "campuses" && <CampusesPanel />}
+      {tab === "launch" && <LaunchPanel />}
     </div>
   );
 }
