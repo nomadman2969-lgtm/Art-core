@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, Loader2, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api";
+import { SchoolPicker } from "../SchoolPicker";
 
 const inputCls = "bg-white/[0.03] border border-white/12 px-3 py-3 rounded-sm outline-none focus:border-[#CCFF00] text-sm";
 
@@ -17,6 +18,7 @@ export function CreateEventModal({ onClose, onCreated, categories = [] }) {
     // recurrence
     recurring: false, freq: "weekly", count: 4,
     reminders_enabled: true,
+    campus: null,
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -94,6 +96,7 @@ export function CreateEventModal({ onClose, onCreated, categories = [] }) {
         ticket_price: form.is_free ? null : parseFloat(form.ticket_price) || 0,
         recurrence: form.recurring ? { frequency: form.freq, count: Math.max(2, Math.min(26, Number(form.count) || 2)) } : null,
         reminders_enabled: form.reminders_enabled,
+        campus_id: form.campus?.id || null,
       };
       await api.post("/events", payload);
       toast.success("Event created");
@@ -142,6 +145,10 @@ export function CreateEventModal({ onClose, onCreated, categories = [] }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input data-testid="event-website" placeholder="Website (optional)" value={form.website} onChange={(e) => setF("website", e.target.value)} className={inputCls} />
             <input data-testid="event-tags" placeholder="Tags, comma separated (murals, opening night)" value={form.tags} onChange={(e) => setF("tags", e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <div className="label-caps text-zinc-500 mb-2">Campus (optional) — lists this event on the school's page</div>
+            <SchoolPicker value={form.campus} allowCreate={false} testid="event-school" placeholder="Tag a school…" onChange={(c) => setF("campus", c)} />
           </div>
           <label className="btn-ghost !py-2.5 cursor-pointer text-center flex items-center justify-center gap-2 text-xs">
             {uploading ? <Loader2 size={14} className="animate-spin" /> : `Gallery photos${form.images.length ? ` (${form.images.length})` : ""}`}

@@ -65,6 +65,8 @@ const KIND_META = {
   referral_joined: { label: "An artist joined with your invite link", icon: <UserPlus size={14} />, color: "#CCFF00" },
   referral_reward: { label: "Your invitee made a sale — your next sale is fee-free", icon: <Check size={14} />, color: "#CCFF00" },
   referral_badge: { label: "First sale! You earned the Crew badge", icon: <Check size={14} />, color: "#7C3AED" },
+  campus_pending: { label: "New school suggested — approve it in Campuses", icon: <MapPin size={14} />, color: "#F5A623" },
+  campus_approved: { label: "Your school was approved — your campus page is live", icon: <Check size={14} />, color: "#CCFF00" },
   dispute_auto_warning: { label: "Dispute auto-resolves in 2 days — review it", icon: <Bell size={14} />, color: "#F5A623" },
   dispute_auto_failed: { label: "Dispute auto-resolve failed — needs you", icon: <Bell size={14} />, color: "#FF4D4D" },
   followed_new_artwork: { label: "New work from an artist you follow", icon: <Heart size={14} />, color: "#CCFF00" },
@@ -213,6 +215,8 @@ export default function Notifications() {
               const base = KIND_META[n.kind] || { label: n.kind, icon: <Bell size={14} />, color: "#A1A1AA" };
               const meta = { ...base, label: t(`notif.${n.kind}`, { defaultValue: base.label }) };
               const to = n.commission?.id ? `/commissions/${n.commission.id}` :
+                         n.kind === "campus_pending" ? "/admin?tab=campuses" :
+                         n.kind === "campus_approved" && n.campus_slug ? `/campus/${n.campus_slug}` :
                          n.auction?.id ? `/auctions/${n.auction.id}` :
                          n.offer?.id ? "/offers" :
                          n.order?.id ? `/orders/${n.order.id}` :

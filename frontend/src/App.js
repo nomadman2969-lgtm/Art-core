@@ -42,6 +42,7 @@ import NotFound from "@/pages/NotFound";
 import Legal from "@/pages/Legal";
 import LaunchPage from "@/pages/LaunchPage";
 import HowItWorks from "@/pages/HowItWorks";
+import CampusPage, { CampusDirectory } from "@/pages/Campus";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 function RequireRole({ roles, children }) {
@@ -75,6 +76,8 @@ function App() {
                 <Route path="/artwork/:id" element={<ArtworkDetail />} />
                 <Route path="/artists" element={<ArtistsList />} />
                 <Route path="/artist/:id" element={<ArtistStudioPage />} />
+                <Route path="/campus" element={<CampusDirectory />} />
+                <Route path="/campus/:slug" element={<CampusPage />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />

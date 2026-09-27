@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { api, fileUrl } from "../api";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { DisputesPanel } from "../components/admin/DisputesPanel";
 import { ReportsPanel } from "../components/admin/ReportsPanel";
 import { StaffPicksPanel } from "../components/admin/StaffPicksPanel";
 import { StripeSetupCard } from "../components/admin/StripeSetupCard";
+import { CampusesPanel } from "../components/admin/CampusesPanel";
 import { AdminWaiverButton } from "../components/FoundingWaiver";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState("overview");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get("tab") || "overview");
   const [stats, setStats] = useState(null);
   const [settings, setSettings] = useState(null);
   const [submissions, setSubmissions] = useState([]);
@@ -105,6 +107,7 @@ export default function AdminDashboard() {
     ["disputes", "Disputes"],
     ["reports", "Reports"],
     ["picks", "Staff Picks"],
+    ["campuses", "Campuses"],
   ];
 
   return (
@@ -300,6 +303,7 @@ export default function AdminDashboard() {
       {tab === "disputes" && <DisputesPanel />}
       {tab === "reports" && <ReportsPanel />}
       {tab === "picks" && <StaffPicksPanel />}
+      {tab === "campuses" && <CampusesPanel />}
     </div>
   );
 }

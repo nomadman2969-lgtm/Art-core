@@ -163,6 +163,7 @@ export default function Layout({ children }) {
               <li><Link to="/how-it-works" data-testid="footer-how-it-works">How it works</Link></li>
               <li><Link to="/marketplace">{t("nav.marketplace")}</Link></li>
               <li><Link to="/artists">{t("nav.artists")}</Link></li>
+              <li><Link to="/campus" data-testid="footer-campus">Campus pages</Link></li>
               <li><Link to="/auctions">{t("nav.auctions")}</Link></li>
             </ul>
           </div>

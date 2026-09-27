@@ -358,6 +358,7 @@ async def get_studio(artist_id: str, preview: bool = False, viewer: Optional[dic
             "cover_image": artist.get("cover_image"), "avatar": artist.get("avatar"),
             "founding_member": bool(artist.get("founding_member")), "founding_number": artist.get("founding_number"),
             "pro_active": _pro_active(artist),
+            "campus": {"id": artist["campus_id"], "slug": artist.get("campus_slug"), "name": artist.get("campus_name")} if artist.get("campus_id") else None,
         },
         "config": cfg,
         "artworks": {

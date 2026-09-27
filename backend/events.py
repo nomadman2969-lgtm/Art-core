@@ -71,6 +71,7 @@ class EventCreate(BaseModel):
     ticket_price: Optional[float] = Field(default=None, ge=0)
     recurrence: Optional[Recurrence] = None
     reminders_enabled: bool = True
+    campus_id: Optional[str] = None
 
     @field_validator("website", "ticket_url")
     @classmethod
@@ -145,8 +146,18 @@ async def create_event(req: EventCreate, user: dict = Depends(require_role("arti
             "series_seq": seq if series_id else None,
             "series_total": total if series_id else None,
             "reminders_enabled": req.reminders_enabled,
+            "campus_id": campus["id"] if campus else None,
+            "campus_slug": campus["slug"] if campus else None,
+            "campus_name": campus["name"] if campus else None,
             "created_at": now_iso(),
         }
+
+    campus = None
+    if req.campus_id:
+        from campus import _resolve as _resolve_campus
+        campus = await _resolve_campus(req.campus_id)
+        if not campus:
+            raise HTTPException(404, "School not found")
 
     from engage import notify_followers_soon
     if not req.recurrence:
@@ -189,6 +200,7 @@ async def list_events(
     sort: str = "soonest",  # soonest | trending | distance
     saved_only: bool = False,
     free_only: bool = False,
+    campus: Optional[str] = None,
     limit: int = 60,
     me: Optional[dict] = Depends(get_optional_user),
 ):
@@ -221,6 +233,10 @@ async def list_events(
         q["start_at"] = rng
     if free_only:
         q["is_free"] = True
+    if campus:
+        from campus import _resolve as _resolve_campus
+        c = await _resolve_campus(campus)
+        q["campus_id"] = c["id"] if c else "__none__"
     if q_text := (q_search or "").strip():
         import re as _re
         rx = {"$regex": _re.escape(q_text), "$options": "i"}
@@ -953,6 +969,7 @@ class EventUpdate(BaseModel):
     ticket_info: Optional[str] = Field(default=None, max_length=500)
     ticket_url: Optional[str] = Field(default=None, max_length=500)
     tags: Optional[List[str]] = None
+    campus_id: Optional[str] = None
     apply_to: str = "this"  # "this" | "series"
 
     @field_validator("category")
@@ -995,6 +1012,15 @@ async def edit_event(event_id: str, req: EventUpdate, user: dict = Depends(get_c
             if k in ("website", "ticket_url") and v and not v.startswith(("http://", "https://")):
                 v = "https://" + v
             patch[k] = v
+    if "campus_id" in req.model_fields_set:
+        if req.campus_id:
+            from campus import _resolve as _resolve_campus
+            c = await _resolve_campus(req.campus_id)
+            if not c:
+                raise HTTPException(404, "School not found")
+            patch.update({"campus_id": c["id"], "campus_slug": c["slug"], "campus_name": c["name"]})
+        else:
+            patch.update({"campus_id": None, "campus_slug": None, "campus_name": None})
     # is_free/ticket_price consistency
     if patch.get("is_free") is True:
         patch["ticket_price"] = None

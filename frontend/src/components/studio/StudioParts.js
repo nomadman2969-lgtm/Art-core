@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { api, fileUrl } from "../../api";
 import { toast } from "sonner";
 import { Sparkles, GripVertical, Trash2, ExternalLink, ShieldCheck } from "lucide-react";
+import { MySchoolCard } from "./MySchoolCard";
 
 const resolveImg = (p) => (p?.startsWith("http") ? p : fileUrl(p));
 
@@ -547,6 +548,7 @@ export function StoryEditor({ config, save, user, refresh }) {
         <textarea data-testid="bio-input" value={bio} onChange={(e) => setBio(e.target.value)} rows={4}
           className="w-full bg-white/[0.03] border border-white/12 rounded-sm p-3 outline-none focus:border-[#CCFF00]" />
       </label>
+      <MySchoolCard user={user} refresh={refresh} />
       <div className="grid md:grid-cols-2 gap-4">
         <label className="block"><div className="label-caps mb-2">Location</div><input data-testid="story-location" value={story.location || ""} onChange={(e) => patch("location", e.target.value)} className={inputCls} /></label>
         <label className="block"><div className="label-caps mb-2">Style</div><input data-testid="story-style" value={story.style || ""} onChange={(e) => patch("style", e.target.value)} placeholder="Abstract, street, mixed media..." className={inputCls} /></label>

@@ -14,9 +14,12 @@ export function ArtistsList() {
   useEffect(() => { api.get("/artists").then((r) => setArtists(r.data)); }, []);
   return (
     <div data-testid="artists-list" className="max-w-[1600px] mx-auto px-6 md:px-12 pt-16 pb-32">
-      <div className="mb-12">
-        <div className="label-caps text-[#CCFF00]">The Roster</div>
-        <h1 className="font-anton text-6xl md:text-9xl uppercase mt-4 leading-[0.85]">Artists</h1>
+      <div className="mb-12 flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <div className="label-caps text-[#CCFF00]">The Roster</div>
+          <h1 className="font-anton text-6xl md:text-9xl uppercase mt-4 leading-[0.85]">Artists</h1>
+        </div>
+        <Link to="/campus" data-testid="artists-campus-link" className="btn-ghost">Browse by art school →</Link>
       </div>
       {artists.length === 0 ? (
         <div className="text-zinc-500 py-24 text-center label-caps border border-dashed border-white/10 rounded-sm">No artists yet.</div>

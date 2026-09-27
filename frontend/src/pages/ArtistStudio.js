@@ -11,7 +11,7 @@ import { ReportButton } from "../components/ReportButton";
 import {
   UserPlus, UserCheck, MessageCircle, Palette, Share2, Eye,
   Gavel, Clock, Heart, MessageSquare, Pin, MapPin, Instagram, Twitter, Globe,
-  Megaphone, ArrowRight, ChevronLeft, ChevronRight,
+  Megaphone, ArrowRight, ChevronLeft, ChevronRight, GraduationCap,
 } from "lucide-react";
 import CommissionRequestModal from "../components/CommissionRequestModal";
 
@@ -85,6 +85,11 @@ export function ArtistStudioPage() {
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {config.artist_story?.location && <span className="label-caps flex items-center gap-1"><MapPin size={12} /> {config.artist_story.location}</span>}
               {config.artist_story?.style && <span className="label-caps">· {config.artist_story.style}</span>}
+              {artist.campus?.slug && (
+                <Link to={`/campus/${artist.campus.slug}`} data-testid="studio-campus-chip" className="label-caps flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] transition-colors">
+                  <GraduationCap size={12} /> {artist.campus.name}
+                </Link>
+              )}
               {rank && <RankBadge tier={rank.tier} color={rank.tier_color} />}
               <ArtistBadges artist={artist} size="lg" />
             </div>

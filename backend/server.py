@@ -44,6 +44,7 @@ from engage import router as engage_router
 from connect import router as connect_router
 from push import router as push_router
 from events import router as events_router
+from campus import router as campus_router, admin_router as campus_admin_router, ensure_seed as ensure_campus_seed
 from storage import init_storage
 
 app = FastAPI(title="Art Core")
@@ -85,6 +86,8 @@ app.include_router(engage_router)
 app.include_router(connect_router)
 app.include_router(push_router)
 app.include_router(events_router)
+app.include_router(campus_router)
+app.include_router(campus_admin_router)
 
 
 @app.get("/api/")
@@ -191,6 +194,10 @@ async def startup():
         logger.info("Storage initialized")
     except Exception as e:
         logger.error(f"Storage init failed: {e}")
+    try:
+        await ensure_campus_seed()
+    except Exception as e:
+        logger.error(f"Campus seed failed: {e}")
     # Seed admin from env (password re-synced on every boot → rotate by changing ADMIN_PASSWORD)
     admin_email = os.environ["ADMIN_EMAIL"].lower()
     admin_password = os.environ["ADMIN_PASSWORD"]

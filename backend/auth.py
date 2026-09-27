@@ -109,6 +109,7 @@ def public_user(u: dict, include_email: bool = False) -> dict:
         "founding_member": bool(u.get("founding_member")),
         "founding_number": u.get("founding_number"),
         "pro_active": _pro_active(u),
+        "campus": {"id": u["campus_id"], "slug": u.get("campus_slug"), "name": u.get("campus_name")} if u.get("campus_id") else None,
     }
 
 

@@ -245,7 +245,8 @@ async def _enrich(art: dict) -> dict:
     if artist:
         from auth import _pro_active
         art["artist"] = {"id": artist["id"], "name": artist["name"], "bio": artist.get("bio"),
-                         "founding_member": bool(artist.get("founding_member")), "pro_active": _pro_active(artist)}
+                         "founding_member": bool(artist.get("founding_member")), "pro_active": _pro_active(artist),
+                         "campus_name": artist.get("campus_name"), "campus_slug": artist.get("campus_slug")}
     return art
 
 
