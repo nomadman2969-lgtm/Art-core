@@ -694,3 +694,8 @@ Then click Verify in Resend → Domains.
 - Frontend: pages/Campus.js (/campus directory + /campus/:slug), components/SchoolPicker.js (search combobox + "Add … as my school"), studio/MySchoolCard.js in Studio → Story, admin/CampusesPanel.js (Admin tab "Campuses", /admin?tab= deep link), CreateEventModal campus picker (event-school-*), ArtistStudio header chip (studio-campus-chip), footer "Campus pages", Artists page "Browse by art school". Notifications: campus_pending → /admin?tab=campuses, campus_approved → /campus/slug.
 - Not built (offered): campus ambassador role, .edu verified-student badge, US College Scorecard API source.
 - EasyPost: user tried to sign up but is stuck on EasyPost's account verification; key still not provided → tracking remains in manual/7-day-estimate mode.
+
+## 2026-06 — GitHub readiness
+- README.md rewritten (features, stack, local setup, env table, Stripe/EasyPost webhooks, tests, deploy notes, links to MASTER_PROMPT/PRD). Added LICENSE (proprietary), backend/.env.example, frontend/.env.example (.gitignore un-ignores *.env.example), .github/workflows/ci.yml (backend compile check + frontend yarn build).
+- Secret scrub: admin password literal removed from 6 backend test files (now os.environ["ADMIN_PASSWORD"] via conftest dotenv) and 4 test_reports. test_iter33_campus.py refactored to a session `pending_campus` fixture so it passes under the configured `-n 2 --dist loadscope` (17/17).
+- User pushes via the "Save to GitHub" button (agent cannot git push). .env files stay ignored.

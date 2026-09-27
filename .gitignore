@@ -96,3 +96,7 @@ frontend/node_modules/.cache/default-development/9.pack
 credentials.json
 *.key
 .credentials
+
+# Keep env templates
+!.env.example
+!**/.env.example

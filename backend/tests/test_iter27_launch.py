@@ -18,7 +18,7 @@ def _read_frontend_env():
 BASE = (os.environ.get("REACT_APP_BACKEND_URL") or _read_frontend_env() or "").rstrip("/")
 assert BASE, "REACT_APP_BACKEND_URL not set"
 ADMIN_EMAIL = "admin@artcorestudio.net"
-ADMIN_PW = os.environ.get("ADMIN_PASSWORD") or "atg-6+XxIRZe1zLUDCcwB!_a"
+ADMIN_PW = os.environ.get("ADMIN_PASSWORD") or os.environ["ADMIN_PASSWORD"]
 ARTIST_EMAIL = "demo.artist@artcorestudio.net"
 ARTIST_PW = "DemoArtist2026!"
 COLLECTOR_EMAIL = "demo.collector@artcorestudio.net"

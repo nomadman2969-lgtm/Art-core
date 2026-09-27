@@ -30,7 +30,7 @@
     "/app/test_reports/iteration_31.json"
   ],
   "success_rate": {"backend": "100% (6/6)", "frontend": "100% (all avatar + KeepMoreStrip + how-it-works + /pro + i18n flows)"},
-  "test_credentials": "Admin admin@artcorestudio.net / atg-6+XxIRZe1zLUDCcwB!_a (ADMIN_PASSWORD in backend/.env, matches /app/memory/test_credentials.md). Throwaway artists tw31_*/tw31b_*/tw31ui_* created via /api/auth/register and cleaned via reset-to-clean-slate.",
+  "test_credentials": "Admin admin@artcorestudio.net / <ADMIN_PASSWORD from backend/.env> (ADMIN_PASSWORD in backend/.env, matches /app/memory/test_credentials.md). Throwaway artists tw31_*/tw31b_*/tw31ui_* created via /api/auth/register and cleaned via reset-to-clean-slate.",
   "seed_data_creation": "None retained. Registered several throwaway artists during backend + frontend flows, then wiped via POST /api/admin/reset-to-clean-slate. Verified GET /api/settings founding_taken=0 post-cleanup.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

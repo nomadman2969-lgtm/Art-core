@@ -8,7 +8,7 @@ import pytest
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or "https://monster-curated.preview.emergentagent.com"
 API = f"{BASE}/api"
 ADMIN_EMAIL = "admin@artcorestudio.net"
-ADMIN_PW = "atg-6+XxIRZe1zLUDCcwB!_a"
+ADMIN_PW = os.environ["ADMIN_PASSWORD"]
 
 TAG = uuid.uuid4().hex[:6]
 

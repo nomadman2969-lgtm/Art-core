@@ -19,7 +19,7 @@
     "/app/test_reports/iteration_29.json"
   ],
   "success_rate": {"backend": "100% (14/14)", "frontend": "100% (3/3 flows)"},
-  "test_credentials": "admin@artcorestudio.net / atg-6+XxIRZe1zLUDCcwB!_a (from ADMIN_PASSWORD env). Throwaway artist + buyer registered per test run via /api/auth/register.",
+  "test_credentials": "admin@artcorestudio.net / <ADMIN_PASSWORD from backend/.env> (from ADMIN_PASSWORD env). Throwaway artist + buyer registered per test run via /api/auth/register.",
   "seed_data_creation": "During backend tests: orders iter29_orderA/B/C + disputes iter29_dispA/B/C created 8/5 days back in Mongo (cleaned up in fixture teardown). During frontend Flow 3: one dispute_auto_failed notification with dispute_id='iter29_fe_seed' seeded in Mongo for the admin (cleaned up post-test).",
   "retest_needed": false,
   "main_agent_can_self_test": true,

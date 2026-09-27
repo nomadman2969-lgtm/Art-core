@@ -9,7 +9,7 @@ BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://monster-curated.preview.
 API = f"{BASE}/api"
 
 ADMIN_EMAIL = "admin@artcorestudio.net"
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "atg-6+XxIRZe1zLUDCcwB!_a")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", os.environ["ADMIN_PASSWORD"])
 CAMPUS_ARTIST = ("campus.artist@example.com", "Campus123!")
 
 
@@ -110,6 +110,17 @@ class TestMe:
         assert not me2.get("campus")
 
 
+@pytest.fixture(scope="session")
+def pending_campus(throwaway_artist):
+    """A pending campus created by throwaway_artist — shared by admin tests (xdist-safe)."""
+    tok = throwaway_artist["token"]
+    name = f"TEST Admin School {uuid.uuid4().hex[:6].upper()}"
+    r = requests.post(f"{API}/campus/me", json={"name": name, "city": "Testville"}, headers=_headers(tok), timeout=15)
+    assert r.status_code == 200, r.text
+    c = r.json()
+    return {"id": c["id"], "slug": c["slug"], "creator_id": throwaway_artist["id"], "creator_tok": tok}
+
+
 # ---- Pending creation via name (dedupe + notification) ----
 class TestPendingCreation:
     def test_create_pending_dedupe(self, throwaway_artist, admin_tok):
@@ -133,11 +144,6 @@ class TestPendingCreation:
         rows = notifs.get("items") if isinstance(notifs, dict) else notifs
         assert any(n.get("kind") == "campus_pending" and n.get("campus_id") == c1["id"] for n in rows), \
             f"campus_pending notif not found for {c1['id']}"
-        # stash for merge test
-        pytest.pending_campus_id = c1["id"]
-        pytest.pending_campus_slug = c1["slug"]
-        pytest.pending_creator_id = throwaway_artist["id"]
-        pytest.pending_creator_tok = tok
 
 
 # ---- Campus public page ----
@@ -162,24 +168,23 @@ class TestAdmin:
         r = requests.get(f"{API}/admin/campuses", headers=_headers(artist_tok), timeout=15)
         assert r.status_code == 403
 
-    def test_admin_list_pending(self, admin_tok):
+    def test_admin_list_pending(self, admin_tok, pending_campus):
         r = requests.get(f"{API}/admin/campuses", params={"status": "pending"}, headers=_headers(admin_tok), timeout=15)
         assert r.status_code == 200
         rows = r.json()
-        cid = getattr(pytest, "pending_campus_id", None)
-        assert cid
+        cid = pending_campus["id"]
         row = next((x for x in rows if x["id"] == cid), None)
         assert row is not None, "pending campus not returned by admin list"
         assert row.get("created_by") and row["created_by"].get("email")
         assert "artist_count" in row
 
-    def test_admin_approve_and_feature_and_rename(self, admin_tok):
-        cid = pytest.pending_campus_id
+    def test_admin_approve_and_feature_and_rename(self, admin_tok, pending_campus):
+        cid = pending_campus["id"]
         # approve + feature
         r = requests.patch(f"{API}/admin/campuses/{cid}", json={"status": "approved", "featured": True}, headers=_headers(admin_tok), timeout=15)
         assert r.status_code == 200
         # notification to creator
-        n = requests.get(f"{API}/notifications", headers=_headers(pytest.pending_creator_tok), timeout=15).json()
+        n = requests.get(f"{API}/notifications", headers=_headers(pending_campus['creator_tok']), timeout=15).json()
         rows = n.get("items") if isinstance(n, dict) else n
         assert any(x.get("kind") == "campus_approved" and x.get("campus_id") == cid for x in rows)
         # rename
@@ -187,14 +192,14 @@ class TestAdmin:
         r = requests.patch(f"{API}/admin/campuses/{cid}", json={"name": new_name}, headers=_headers(admin_tok), timeout=15)
         assert r.status_code == 200
         # denorm sync
-        me = requests.get(f"{API}/auth/me", headers=_headers(pytest.pending_creator_tok), timeout=15).json()
+        me = requests.get(f"{API}/auth/me", headers=_headers(pending_campus['creator_tok']), timeout=15).json()
         assert me["campus"]["name"] == new_name, f"campus_name denorm didn't sync: {me['campus']}"
 
-    def test_admin_merge_into_scad(self, admin_tok):
+    def test_admin_merge_into_scad(self, admin_tok, pending_campus):
         # Need SCAD id
         rows = requests.get(f"{API}/admin/campuses", params={"q": "savannah"}, headers=_headers(admin_tok), timeout=15).json()
         scad = next(x for x in rows if "Savannah College" in x["name"])
-        src = pytest.pending_campus_id
+        src = pending_campus["id"]
         # merge into self -> 400
         r = requests.post(f"{API}/admin/campuses/{src}/merge", json={"into_id": src}, headers=_headers(admin_tok), timeout=15)
         assert r.status_code == 400
@@ -202,14 +207,14 @@ class TestAdmin:
         r = requests.post(f"{API}/admin/campuses/{src}/merge", json={"into_id": scad["id"]}, headers=_headers(admin_tok), timeout=15)
         assert r.status_code == 200, r.text
         # old slug resolves to SCAD now
-        r = requests.get(f"{API}/campus/{pytest.pending_campus_slug}", timeout=15)
+        r = requests.get(f"{API}/campus/{pending_campus['slug']}", timeout=15)
         assert r.status_code == 200
         assert r.json()["campus"]["slug"] == scad["slug"]
         # creator now tagged to SCAD
-        me = requests.get(f"{API}/auth/me", headers=_headers(pytest.pending_creator_tok), timeout=15).json()
+        me = requests.get(f"{API}/auth/me", headers=_headers(pending_campus['creator_tok']), timeout=15).json()
         assert me["campus"]["slug"] == scad["slug"]
 
-    def test_admin_reject_untags(self, admin_tok, throwaway_artist):
+    def test_admin_reject_untags(self, admin_tok, pending_campus, throwaway_artist):
         # create another pending campus with a different throwaway artist token, then reject
         email = f"TEST_artist_{uuid.uuid4().hex[:8]}@example.com"
         rr = requests.post(f"{API}/auth/register", json={"email": email, "password": "Artist123!", "name": "R", "role": "artist"}, timeout=20)

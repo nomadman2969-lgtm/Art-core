@@ -16,7 +16,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iter26_security_tracking.py"],
   "success_rate": {"backend": "100%", "frontend": "100%"},
-  "test_credentials": "monster@houseofmonster.com / value of ADMIN_PASSWORD in /app/backend/.env (currently 'atg-6+XxIRZe1zLUDCcwB!_a'). demo.artist@artcorestudio.net / DemoArtist2026!. demo.collector@artcorestudio.net / DemoCollector2026!. Old admin pw 'MonsterAdmin2026!' correctly rejected.",
+  "test_credentials": "monster@houseofmonster.com / value of ADMIN_PASSWORD in /app/backend/.env (currently '<ADMIN_PASSWORD from backend/.env>'). demo.artist@artcorestudio.net / DemoArtist2026!. demo.collector@artcorestudio.net / DemoCollector2026!. Old admin pw 'MonsterAdmin2026!' correctly rejected.",
   "seed_data_creation": "Tests register ~10 throwaway iter26-*@artcore-test.io accounts and create + delete one TEST_iter26_* order + one throwaway RSVP on a demo-artist event. All cleaned up in fixtures. Rate_limits collection cleared at fixture setup and teardown. Seeded order order_testA1 (carrier_delivered, buyer=demo collector) was READ (via /orders/{id}/tracking + Playwright /orders/order_testA1) but NOT confirmed — preserved for future runs.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

@@ -6,7 +6,7 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://monster-curated.preview.emergentagent.com").rstrip("/")
 ADMIN_EMAIL = "admin@artcorestudio.net"
-ADMIN_PASSWORD = "atg-6+XxIRZe1zLUDCcwB!_a"
+ADMIN_PASSWORD = os.environ["ADMIN_PASSWORD"]
 
 
 def _login(session, email, password):

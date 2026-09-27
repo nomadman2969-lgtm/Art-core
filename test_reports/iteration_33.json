@@ -27,7 +27,7 @@
     "/app/backend/tests/test_iter33_campus.py"
   ],
   "success_rate": {"backend": "100% (17/17)", "frontend": "~95% (all core testids present; one mobile overflow bug on /campus/{slug} artist cards)"},
-  "test_credentials": "admin@artcorestudio.net / atg-6+XxIRZe1zLUDCcwB!_a ; campus.artist@example.com / Campus123! (restored to SCAD at end).",
+  "test_credentials": "admin@artcorestudio.net / <ADMIN_PASSWORD from backend/.env> ; campus.artist@example.com / Campus123! (restored to SCAD at end).",
   "seed_data_creation": "Registered a few throwaway TEST_ artists via /api/auth/register during pytest. Created + merged pending campus 'Testing Academy of Doodles' via frontend flow (still exists as merged into SCAD; /campus/testing-academy-of-doodles resolves to SCAD). Also created one TEST rejected campus via admin flow.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

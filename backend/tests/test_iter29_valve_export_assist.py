@@ -17,7 +17,7 @@ API = f"{BASE_URL}/api"
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "house_of_monster")
 ADMIN_EMAIL = "admin@artcorestudio.net"
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "atg-6+XxIRZe1zLUDCcwB!_a")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", os.environ["ADMIN_PASSWORD"])
 
 _mongo = MongoClient(MONGO_URL)[DB_NAME]
 
