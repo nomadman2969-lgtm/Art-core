@@ -1,0 +1,36 @@
+{
+  "summary": "Full backend + frontend testing of the new Campus Pages feature. Backend: 17/17 pytest cases pass covering search (alias/short-q), directory, /campus/me lifecycle (buyer 403, artist set/get/clear), pending creation with dedupe + admin notification, /campus/{slug} page structure, unknown/rejected 404, admin list (pending w/ created_by + artist_count), admin approve+feature+rename with denorm sync + creator notification, merge (self=400, real merge redirects old slug), reject untags artists, event campus tagging + filter + campus-page appearance, studio.campus + artworks artist.campus_name enrichment. Frontend: /campus directory renders SCAD card and RISD search navigation; /campus/{slug} page renders campus-name/stats/artists/events/share/join; logged-in StoryEditor MySchoolCard shows SCAD chip, clear→input→create flow for 'Testing Academy of Doodles' creates pending campus and chip updates; admin /admin?tab=campuses opens Campuses panel with pending filter, search 'doodles' narrows, and all approve/reject/feature/rename/merge-toggle buttons rendered per row; public studio /artist/{id} shows studio-campus-chip linking to /campus/{slug}; /artists has 'Browse by art school' link and footer-campus link present. campus.artist@example.com was restored to SCAD at the end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CampusPage artist card", "issue": "On mobile 390px viewport, the artist cards inside campus-page overflow horizontally (documentElement scrollWidth 417 vs clientWidth 390 -> ~27px overflow). Each campus-artist-<id> card renders at 393px inside a 390px viewport. Founding-badge/city text uses inline-flex without min-w-0 wrapping so the card can't shrink below its intrinsic content width.", "selector": "[data-testid^='campus-artist-']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter33_campus.py",
+    "/app/test_reports/pytest/iter33.xml"
+  ],
+  "action_items": [
+    "Fix mobile horizontal overflow on /campus/{slug} — add min-w-0/truncate on the artist card inner containers (city text and founding-badge row) or set the artist card to overflow-hidden/flex-wrap so it fits <=390px width."
+  ],
+  "critical_code_review_comments": [
+    "campus.py:135 — campus_pending notification is enqueued in a loop for every admin without bulk insert; fine at current admin count but consider insert_many.",
+    "campus.py:139 _set_user_campus after possibly creating a pending campus; if two artists race with same brand-new name, both may hit the insert path before the unique norm lookup. Consider a unique index on (norm) or upsert-on-conflict to guarantee no duplicate.",
+    "campus.py:226 — 'approved_notified' status is checked but never actually set anywhere in code, so re-approving an already-approved campus will still enqueue another campus_approved notification. Consider setting status='approved_notified' or track a boolean flag.",
+    "campus.py page endpoint always resolves merged slugs to the target — good, but leaderboard.sales uses sold_by aggregate limited to current artist set only; historical sales attributed while artist was tagged elsewhere are not surfaced (acceptable).",
+    "events.py list_events campus filter behavior not audited in detail here, but backend test confirmed campus=<slug> works.",
+    "Mobile overflow in CampusPage.js artist card — see above."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter33_campus.py"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "~95% (all core testids present; one mobile overflow bug on /campus/{slug} artist cards)"},
+  "test_credentials": "admin@artcorestudio.net / atg-6+XxIRZe1zLUDCcwB!_a ; campus.artist@example.com / Campus123! (restored to SCAD at end).",
+  "seed_data_creation": "Registered a few throwaway TEST_ artists via /api/auth/register during pytest. Created + merged pending campus 'Testing Academy of Doodles' via frontend flow (still exists as merged into SCAD; /campus/testing-academy-of-doodles resolves to SCAD). Also created one TEST rejected campus via admin flow.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend suite at /app/backend/tests/test_iter33_campus.py runs with `-o addopts=''` (default pytest.ini uses xdist which breaks cross-class state via pytest.<attr>); can also be refactored to use fixtures. campus.artist is currently tagged to SCAD and hosts 'SCAD Spring Show'. The pending campus 'Testing Academy of Doodles' has been merged into SCAD via both pytest and frontend flow and now redirects to SCAD. Do NOT call /api/admin/reset-to-clean-slate.",
+  "rca of the issue": "Mobile overflow on /campus/<slug>: campus-artist card layout is `flex gap-4 items-center` with an inner `min-w-0 flex-1` div, but the card itself has natural min-content width from the wrapping name+founding-badge inline-flex, so on 390px viewports the card renders at 393px causing 27px horizontal scroll. Fix: add `min-w-0` to the outer flex and wrap the badge row inside a `flex-wrap` or truncate the name span; verify with `document.documentElement.scrollWidth === clientWidth` at 390px."
+}

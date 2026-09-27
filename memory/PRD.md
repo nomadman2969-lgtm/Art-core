@@ -685,3 +685,12 @@ Then click Verify in Resend → Domains.
 - Frontend: ReferralCard in Studio → Payouts; /register?ref=CODE banner (+ localStorage hom_ref). Links use PUBLIC_APP_URL (prod domain) — in preview they point to artcorestudio.net (expected).
 - Campus Pages explained to user (not built): school field on users/events + /campus/{slug} page.
 - EasyPost key still not provided → tracking in manual mode.
+
+## 2026-06 — Campus Pages (iteration_33: 17/17 backend + frontend pass)
+- backend/campus.py + campus_seed.py (~300 art schools worldwide + ALIASES like RISD/SCAD/CSM; seeded idempotently at startup, `db.campuses` {id, slug, name, norm, city, country, status approved|pending|rejected|merged, featured, seeded, created_by, merged_into}). Users get denormalised `campus_id/campus_slug/campus_name`; `public_user()` + studio artist + artworks artist enrich expose `campus`.
+- Public: GET /api/campus/search?q= (name/city/alias), GET /api/campus (directory: campuses with artists or featured), GET/POST/DELETE /api/campus/me (artist picks by id/slug or types a new name → pending campus + admin `campus_pending` notif), GET /api/campus/{slug} (artists w/ works/followers/sales, live artworks, upcoming events tagged or hosted by campus artists, leaderboard, stats; follows merge chain).
+- Admin: GET /api/admin/campuses?status&q, PATCH /api/admin/campuses/{id} {status, featured, name, city, country} (approve → `campus_approved` notif to creator; reject → untags artists; rename syncs denorm), POST /api/admin/campuses/{id}/merge {into_id}.
+- Events: `campus_id` on create/update; GET /api/events?campus=slug filter; stored campus_slug/campus_name.
+- Frontend: pages/Campus.js (/campus directory + /campus/:slug), components/SchoolPicker.js (search combobox + "Add … as my school"), studio/MySchoolCard.js in Studio → Story, admin/CampusesPanel.js (Admin tab "Campuses", /admin?tab= deep link), CreateEventModal campus picker (event-school-*), ArtistStudio header chip (studio-campus-chip), footer "Campus pages", Artists page "Browse by art school". Notifications: campus_pending → /admin?tab=campuses, campus_approved → /campus/slug.
+- Not built (offered): campus ambassador role, .edu verified-student badge, US College Scorecard API source.
+- EasyPost: user tried to sign up but is stuck on EasyPost's account verification; key still not provided → tracking remains in manual/7-day-estimate mode.

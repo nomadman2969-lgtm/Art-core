@@ -117,13 +117,13 @@ export default function CampusPage() {
           <Section title="Artists" icon={<Users size={14} />} count={artists.length}>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {artists.map((a) => (
-                <Link key={a.id} to={`/artist/${a.id}`} data-testid={`campus-artist-${a.id}`} className="glass-card p-5 rounded-sm hover-lift-card group flex gap-4 items-center">
+                <Link key={a.id} to={`/artist/${a.id}`} data-testid={`campus-artist-${a.id}`} className="glass-card p-5 rounded-sm hover-lift-card group flex gap-4 items-center min-w-0">
                   <div className="avatar-ring w-14 h-14 shrink-0">
                     {a.avatar ? <img src={resolveImg(a.avatar)} alt="" className="w-full h-full object-cover rounded-full" /> :
                       <div className="bg-[#0A0A0C] rounded-full w-full h-full flex items-center justify-center font-anton text-xl uppercase">{a.name?.[0]}</div>}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-unbounded font-semibold group-hover:text-[#CCFF00] transition-colors flex items-center gap-1.5 min-w-0"><span className="truncate">{a.name}</span><span className="shrink-0"><ArtistBadges artist={a} /></span></div>
+                    <div className="font-unbounded font-semibold group-hover:text-[#CCFF00] transition-colors flex items-center gap-x-1.5 gap-y-1 flex-wrap min-w-0"><span className="min-w-0 break-words">{a.name}</span><span className="shrink-0"><ArtistBadges artist={a} /></span></div>
                     <div className="text-[11px] text-zinc-500 mt-1">{a.works} works · {a.followers} followers{a.sales ? ` · ${a.sales} sold` : ""}</div>
                   </div>
                 </Link>
