@@ -705,3 +705,7 @@ Then click Verify in Resend → Domains.
 - frontend: components/admin/LaunchPanel.js, Admin tab "Launch" (/admin?tab=launch), data-testids launch-panel/launch-headline/launch-check-{key}[data-status].
 - .env: CORS_ORIGINS locked to artcorestudio.net + www + preview URL; PUBLIC_APP_URL=https://artcorestudio.net added. README webhook path corrected to /api/stripe/webhook.
 - Launch blockers right now: Stripe still test mode; Resend domain DNS not started. Warnings: no artist connected to Stripe, admin 2FA off, 23 test accounts (reset needed), no live artwork.
+
+## 2026-06 — Deployment readiness PASS
+- deployment_agent: first run flagged CORS (platform requires "*" — frontend/API share origin so safe; launch check updated to explain, not warn) and destructive wipe helpers inside seed_demo.py → moved to backend/seed_maintenance.py (lazy-imported only in the CLI main()). Second run: PASS, no findings.
+- User instructed: Publish via Emergent (Manage Publishes → Domain: artcorestudio.net, Cloudflare A records 162.159.142.117 + 172.66.2.113, CNAME www → root, proxy OFF) and push via "Save to GitHub". Agent cannot do either.

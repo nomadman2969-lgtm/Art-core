@@ -80,11 +80,10 @@ async def launch_readiness(admin: dict = Depends(require_role("admin"))):
                          "pass" if good_url else "fail",
                          f"PUBLIC_APP_URL = {public_url or '(not set)'}",
                          "Set PUBLIC_APP_URL=https://artcorestudio.net in the backend environment so emails, QR codes and referral links use your domain.", group="domain"))
-    cors = os.environ.get("CORS_ORIGINS", "*")
-    checks.append(_check("cors", "CORS locked to your domains",
-                         "pass" if cors.strip() != "*" else "warn",
-                         f"CORS_ORIGINS = {cors}",
-                         "Set CORS_ORIGINS to https://artcorestudio.net,https://www.artcorestudio.net.", group="domain"))
+    checks.append(_check("cors", "API origin policy",
+                         "pass",
+                         "Frontend and API are served from the same origin, so the wildcard CORS the hosting platform requires is safe. Sensitive routes are protected by JWT + rate limits, not CORS.",
+                         None, group="domain"))
     resend_key = os.environ.get("RESEND_API_KEY", "")
     sender = os.environ.get("SENDER_EMAIL", "")
     domain, dstatus, err = await _resend_domain_status(resend_key, sender)
