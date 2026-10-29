@@ -84,11 +84,12 @@ Never commit `.env` files (they are git-ignored). Copy the examples and fill the
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | ✅ | seeded founder account |
 | `CORS_ORIGINS` | ✅ | comma-separated allowed origins |
 | `PUBLIC_APP_URL` | ✅ | public site URL used in emails/QRs/referral links |
-| `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_MODE` | ✅ for commerce | can also be set from **/admin → Stripe** |
+| `STRIPE_SECRET_KEY` | ✅ | must be present at boot (a `sk_test_…` key is fine); live keys can be set from **/admin → Stripe** |
+| `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_MODE` | for commerce | can also be set from **/admin → Stripe** |
 | `RESEND_API_KEY`, `SENDER_EMAIL` | for email | verify your domain's DNS in Resend |
 | `EMERGENT_LLM_KEY` | for AI features | listing assistant, studio designer, polish |
 | `EASYPOST_API_KEY`, `EASYPOST_WEBHOOK_SECRET` | optional | enables live carrier tracking; otherwise 7-day estimate |
-| `DEMO_ARTIST_PASSWORD`, `DEMO_COLLECTOR_PASSWORD` | optional | demo accounts, only seeded when `demo_login_enabled` is on |
+| `DEMO_ARTIST_PASSWORD`, `DEMO_COLLECTOR_PASSWORD` | optional | demo accounts, only seeded when `demo_login_enabled` is on and the password is set |
 
 ### `frontend/.env`
 | Key | Notes |

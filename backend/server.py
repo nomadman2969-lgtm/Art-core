@@ -243,14 +243,14 @@ async def startup():
     demo_accounts = [
         {
             "email": "demo.artist@artcorestudio.net",
-            "password": os.environ["DEMO_ARTIST_PASSWORD"],
+            "password": os.environ.get("DEMO_ARTIST_PASSWORD"),
             "name": "Demo Artist",
             "role": "artist",
             "bio": "This is a demo artist account. Explore posting artworks, running auctions, and hosting events.",
         },
         {
             "email": "demo.collector@artcorestudio.net",
-            "password": os.environ["DEMO_COLLECTOR_PASSWORD"],
+            "password": os.environ.get("DEMO_COLLECTOR_PASSWORD"),
             "name": "Demo Collector",
             "role": "buyer",
             "bio": "This is a demo buyer account. Explore browsing, offers, purchases, and RSVPing to events.",
@@ -258,6 +258,10 @@ async def startup():
     ]
     _settings = await db.settings.find_one({"id": "global"}) or {}
     for d in (demo_accounts if _settings.get("demo_login_enabled", True) else []):
+        if not d["password"]:
+            # Optional: a missing demo password must not stop the API from booting
+            logger.warning(f"Demo account {d['email']} skipped: password env var not set")
+            continue
         existing_demo = await db.users.find_one({"email": d["email"]})
         if existing_demo:
             if not verify_password(d["password"], existing_demo["password_hash"]):
