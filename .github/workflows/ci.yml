@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [_abcmain, main, master]
   pull_request:
 
 jobs:
@@ -13,10 +13,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install
-        run: |
-          pip install -r backend/requirements.txt
-          pip install emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
+      # Syntax check only — needs no dependencies, so it can't break on the
+      # Emergent-hosted wheels (litellm, emergentintegrations) in requirements.txt.
       - name: Compile check
         run: python -m compileall -q backend
 
@@ -27,11 +25,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-          cache-dependency-path: frontend/yarn.lock
+      # No yarn.lock is committed (Emergent exports without it), so no
+      # lockfile cache or --frozen-lockfile.
       - name: Install
         working-directory: frontend
-        run: yarn install --frozen-lockfile
+        run: yarn install --network-timeout 300000
       - name: Build
         working-directory: frontend
         env:
